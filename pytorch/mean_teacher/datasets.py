@@ -52,3 +52,13 @@ def cifar10():
         'datadir': 'data-local/images/cifar/cifar10/by-image',
         'num_classes': 10
     }
+
+@export
+def riedel10():
+
+    return {
+        'train_transformation': None,
+        'eval_transformation': None,
+        'datadir': 'data-local/riedel10',
+        'num_classes': 56
+    }

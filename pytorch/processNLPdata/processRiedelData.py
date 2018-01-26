@@ -72,14 +72,19 @@ def create_data_for_pytorch(raw_train_data, relation_dict, lookupGiga, gigaW2vEm
     return (embedding_dataset, relation_labels)
 
 if __name__ == '__main__':
-    train_data_path = "/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/train.txt"
-    test_data_path = "/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/test.txt"
-    w2vfile = "/Users/ajaynagesh/Research/code/research/clint/data/vectors.goldbergdeps.txt"
 
-    train_data_np_file = "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/train_np_riedel.npy"
-    train_data_np_lbls_file = "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/train_np_riedel_labels.npy"
-    test_data_np_file = "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/test_np_riedel.npy"
-    test_data_np_lbls_file = "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/test_np_riedel_label.npy"
+    riedel_data_path = "./data-local/riedel10/raw"
+    destination_dir_path = "./data-local/riedel10"
+    w2vfile = "/work/ajaynagesh/clara_expts/research-ontonotes/clint/data/vectors.goldbergdeps.txt" #"/Users/ajaynagesh/Research/code/research/clint/data/vectors.goldbergdeps.txt"
+
+    train_data_path = riedel_data_path + "/train.txt" #"/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/train.txt"
+    test_data_path = riedel_data_path + "/test.txt"   #/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/test.txt"
+
+
+    train_data_np_file = destination_dir_path + "/train/train_np_riedel.npy" # "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/train_np_riedel.npy"
+    train_data_np_lbls_file = destination_dir_path + "/train/train_np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/train_np_riedel_labels.npy"
+    test_data_np_file = destination_dir_path + "/test/test_np_riedel.npy"  #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/test_np_riedel.npy"
+    test_data_np_lbls_file = destination_dir_path + "/test/test_np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/test_np_riedel_labels.npy"
 
     print("Parsing the raw dataset ... from ... " + train_data_path)
     raw_train_data = parse_data(train_data_path)

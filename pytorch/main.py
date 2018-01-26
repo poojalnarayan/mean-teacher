@@ -137,44 +137,81 @@ def parse_dict_args(**kwargs):
     cmdline_args = list(sum(kwargs_pairs, ()))
     args = parser.parse_args(cmdline_args)
 
-
 def create_data_loaders(train_transformation,
                         eval_transformation,
                         datadir,
                         args):
+
     traindir = os.path.join(datadir, args.train_subdir)
     evaldir = os.path.join(datadir, args.eval_subdir)
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
+    # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
+    ## Used for loading the riedel10 arrays into pytorch
+    if args.dataset == 'riedel10':
+        train_numpy_file = traindir + '/train_np_riedel.npy'
+        train_lbl_numpy_file = traindir + '/train_np_riedel_labels.npy'
+        test_numpy_file = evaldir + '/test_np_riedel.npy'
+        test_lbl_numpy_file = evaldir + '/test_np_riedel_labels.npy'
 
-    if args.labels:
-        with open(args.labels) as f:
-            labels = dict(line.split(' ') for line in f.read().splitlines())
-        labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
+        train_data = np.load(train_numpy_file)
+        train_lbl = np.load(train_lbl_numpy_file)
+        test_data = np.load(test_numpy_file)
+        test_lbl = np.load(test_lbl_numpy_file)
 
-    if args.exclude_unlabeled:
-        sampler = SubsetRandomSampler(labeled_idxs)
-        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-    elif args.labeled_batch_size:
-        batch_sampler = data.TwoStreamBatchSampler(
-            unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
-    else:
-        assert False, "labeled batch size {}".format(args.labeled_batch_size)
+        tensor_train = torch.stack([torch.Tensor(datum) for datum in train_data])
+        tensor_train_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in train_lbl])
+        tensor_test = torch.stack([torch.Tensor(datum) for datum in test_data])
+        tensor_test_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in test_lbl])
 
-    train_loader = torch.utils.data.DataLoader(dataset,
-                                               batch_sampler=batch_sampler,
-                                               num_workers=args.workers,
-                                               pin_memory=True)
+        dataset = torch.utils.data.TensorDataset(tensor_train, tensor_train_lbl)
+        dataset_test = torch.utils.data.TensorDataset(tensor_test, tensor_test_lbl)
 
-    eval_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.ImageFolder(evaldir, eval_transformation),
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=2 * args.workers,  # Needs images twice as fast
-        pin_memory=True,
-        drop_last=False)
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                   shuffle=True,
+                                                   num_workers=args.workers,
+                                                   pin_memory=True,
+                                                   drop_last=False,
+                                                   batch_size=args.batch_size)
+
+        eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=2 * args.workers,
+                                                  pin_memory=True,
+                                                  drop_last=False)
+
+    else :
+
+        dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
+
+        if args.labels:
+            with open(args.labels) as f:
+                labels = dict(line.split(' ') for line in f.read().splitlines())
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
+
+        if args.exclude_unlabeled:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
+
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers,
+                                                   pin_memory=True)
+
+        eval_loader = torch.utils.data.DataLoader(
+            torchvision.datasets.ImageFolder(evaldir, eval_transformation),
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=2 * args.workers,  # Needs images twice as fast
+            pin_memory=True,
+            drop_last=False)
 
     return train_loader, eval_loader
 

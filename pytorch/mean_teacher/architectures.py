@@ -11,6 +11,34 @@ from .utils import export, parameter_count
 
 
 @export
+def simple_MLP(pretrained=True, num_classes=10):
+
+    ## Hard-coding the parameters
+    input_sz = 900
+    hidden_sz = 400
+    output_sz = num_classes
+    model = FeedForwardMLP(input_sz, hidden_sz, output_sz)
+
+    return model
+
+class FeedForwardMLP(nn.Module):
+    def __init__(self, input_sz, hidden_sz, output_sz):
+        ## Write code to initialize the MLP module
+        super().__init__()
+        self.layer1 = nn.Linear(input_sz, hidden_sz, bias=True)
+        self.activation = nn.ReLU()
+        self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
+        self.softmax = nn.Softmax()
+
+    def forward(self, x):
+        ## code to to the forward pass of the MLP module
+        x = self.layer1(x)
+        x = self.activation(x)
+        x = self.layer2(x)
+        x = self.softmax(x)
+        return x
+
+@export
 def cifar_shakeshake26(pretrained=False, **kwargs):
     assert not pretrained
     model = ResNet32x32(ShakeShakeBlock,
