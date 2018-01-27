@@ -55,7 +55,7 @@ def main(context):
 
         if ema:
             for param in model.parameters():
-                param.detach_()
+                param.detach_() ##NOTE: Detaches the variable from hte gradient computation, making it a leaf .. needed from EMA model
 
         return model
 

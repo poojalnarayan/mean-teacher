@@ -141,3 +141,11 @@ def grouper(iterable, n):
     # grouper('ABCDEFG', 3) --> ABC DEF"
     args = [iter(iterable)] * n
     return zip(*args)
+
+class AddGaussianNoise:
+    def __init__(self, stdev=1):
+        self.stdev = stdev
+
+    def __call__(self, x):
+        noise = np.random.normal(scale=self.stdev, size=x.shape)
+        return x + noise

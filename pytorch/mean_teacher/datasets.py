@@ -57,7 +57,7 @@ def cifar10():
 def riedel10():
 
     return {
-        'train_transformation': None,
+        'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
         'eval_transformation': None,
         'datadir': 'data-local/riedel10',
         'num_classes': 56
