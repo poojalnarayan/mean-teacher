@@ -7,6 +7,7 @@ import os.path
 from PIL import Image
 import numpy as np
 from torch.utils.data.sampler import Sampler
+import torch
 
 
 LOG = logging.getLogger('main')
@@ -148,4 +149,4 @@ class AddGaussianNoise:
 
     def __call__(self, x):
         noise = np.random.normal(scale=self.stdev, size=x.shape)
-        return x + noise
+        return x + torch.Tensor(noise)
