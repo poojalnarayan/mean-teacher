@@ -85,7 +85,7 @@ class RiedelDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.transform is not None:
-            tensor_datum = torch.Tensor(self.transform(self.data[idx]))
+            tensor_datum = self.transform(torch.Tensor(self.data[idx]))
         else:
             tensor_datum = torch.Tensor(self.data[idx])
 
