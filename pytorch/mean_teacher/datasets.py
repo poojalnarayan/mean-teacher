@@ -1,4 +1,6 @@
 import torchvision.transforms as transforms
+from torch.utils.data import Dataset
+import torch
 
 from . import data
 from .utils import export
@@ -62,3 +64,30 @@ def riedel10():
         'datadir': 'data-local/riedel10',
         'num_classes': 56
     }
+
+class RiedelDataset(Dataset):
+    def __init__(self, dir, transform=None):
+        numpy_file = dir + '/np_riedel.npy'
+        lbl_numpy_file = dir + '/np_riedel_labels.npy'
+
+        self.data = np.load(numpy_file)
+        self.lbl = np.load(lbl_numpy_file)
+
+        # self.tensor = torch.stack([torch.Tensor(datum) for datum in data])
+        # self.tensor_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in lbl])
+        #
+        # self.dataset = torch.utils.data.TensorDataset(self.tensor, self.tensor_lbl)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        if self.transform is not None:
+            tensor_datum = torch.Tensor(self.transform(self.data[idx]))
+        else:
+            tensor_datum = torch.Tensor(self.data[idx])
+
+        label = self.lbl[idx]
+
+        return tensor_datum, label

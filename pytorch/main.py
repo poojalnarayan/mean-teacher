@@ -150,23 +150,28 @@ def create_data_loaders(train_transformation,
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
     if args.dataset == 'riedel10':
-        train_numpy_file = traindir + '/train_np_riedel.npy'
-        train_lbl_numpy_file = traindir + '/train_np_riedel_labels.npy'
-        test_numpy_file = evaldir + '/test_np_riedel.npy'
-        test_lbl_numpy_file = evaldir + '/test_np_riedel_labels.npy'
 
-        train_data = np.load(train_numpy_file)
-        train_lbl = np.load(train_lbl_numpy_file)
-        test_data = np.load(test_numpy_file)
-        test_lbl = np.load(test_lbl_numpy_file)
+        dataset = datasets.RiedelDataset(traindir, train_transformation)
+        dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
 
-        tensor_train = torch.stack([torch.Tensor(datum) for datum in train_data])
-        tensor_train_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in train_lbl])
-        tensor_test = torch.stack([torch.Tensor(datum) for datum in test_data])
-        tensor_test_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in test_lbl])
-
-        dataset = torch.utils.data.TensorDataset(tensor_train, tensor_train_lbl)
-        dataset_test = torch.utils.data.TensorDataset(tensor_test, tensor_test_lbl)
+        # train_numpy_file = traindir + '/np_riedel.npy'
+        # train_lbl_numpy_file = traindir + '/np_riedel_labels.npy'
+        # test_numpy_file = evaldir + '/np_riedel.npy'
+        # test_lbl_numpy_file = evaldir + '/np_riedel_labels.npy'
+        #
+        # train_data = np.load(train_numpy_file)
+        # train_lbl = np.load(train_lbl_numpy_file)
+        # test_data = np.load(test_numpy_file)
+        # test_lbl = np.load(test_lbl_numpy_file)
+        #
+        # tensor_train = torch.stack([torch.Tensor( train_transformation(datum) )
+        #                             for datum in train_data])
+        # tensor_train_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in train_lbl])
+        # tensor_test = torch.stack([torch.Tensor(datum) for datum in test_data])
+        # tensor_test_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in test_lbl])
+        #
+        # dataset = torch.utils.data.TensorDataset(tensor_train, tensor_train_lbl)
+        # dataset_test = torch.utils.data.TensorDataset(tensor_test, tensor_test_lbl)
 
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    shuffle=True,
