@@ -154,7 +154,7 @@ def relabel_dataset_relext(dataset, args):
     labels_hist = {}
     for lbl in all_labels:
         if lbl in labels_hist:
-            labels_hist[lbl] += i
+            labels_hist[lbl] += 1
         else:
             labels_hist[lbl] = 1
 
