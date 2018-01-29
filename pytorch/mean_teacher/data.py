@@ -9,7 +9,6 @@ import numpy as np
 from torch.utils.data.sampler import Sampler
 import torch
 
-
 LOG = logging.getLogger('main')
 NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
 
@@ -138,6 +137,40 @@ class TransformTwice:
         out1 = self.transform(inp)
         out2 = self.transform(inp)
         return out1, out2
+
+
+def relabel_dataset_relext(dataset, args):
+    unlabeled_idxs = []
+    labeled_ids = []
+
+    ### args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
+    percent_labels = float(args.labels)
+    num_labels = int(percent_labels * len(dataset))
+    num_classes = dataset.get_num_classes
+    num_labels_per_cat = int(num_labels / num_classes)
+
+    all_labels = dataset.get_labels
+
+    labels_hist = {}
+    for lbl in all_labels:
+        if lbl in labels_hist:
+            labels_hist[lbl] += i
+        else:
+            labels_hist[lbl] = 1
+
+    num_labels_per_cat_dict = {}
+    for lbl, cnt in labels_hist.items():
+        num_labels_per_cat[lbl] = min(labels_hist[lbl], num_labels_per_cat)
+
+
+    for idx, l in enumerate(all_labels):
+        if num_labels_per_cat_dict[l] > 0:
+            labeled_ids.append(idx)
+            num_labels_per_cat_dict -= 1
+        else:
+            unlabeled_idxs.append(idx)
+
+    return labeled_ids, unlabeled_idxs
 
 
 def relabel_dataset(dataset, labels):

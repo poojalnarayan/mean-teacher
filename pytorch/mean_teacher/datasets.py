@@ -102,3 +102,9 @@ class RiedelDataset(Dataset):
         label = self.lbl[idx]
 
         return tensor_datum, label
+
+    def get_num_classes(self):
+        return len(list({l for l in self.lbl}))
+
+    def get_labels(self):
+        return self.lbl

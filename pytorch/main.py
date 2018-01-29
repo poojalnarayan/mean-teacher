@@ -152,33 +152,27 @@ def create_data_loaders(train_transformation,
     if args.dataset in ['riedel10', 'gids']:
 
         dataset = datasets.RiedelDataset(traindir, train_transformation)
-        dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
 
-        # train_numpy_file = traindir + '/np_riedel.npy'
-        # train_lbl_numpy_file = traindir + '/np_riedel_labels.npy'
-        # test_numpy_file = evaldir + '/np_riedel.npy'
-        # test_lbl_numpy_file = evaldir + '/np_riedel_labels.npy'
-        #
-        # train_data = np.load(train_numpy_file)
-        # train_lbl = np.load(train_lbl_numpy_file)
-        # test_data = np.load(test_numpy_file)
-        # test_lbl = np.load(test_lbl_numpy_file)
-        #
-        # tensor_train = torch.stack([torch.Tensor( train_transformation(datum) )
-        #                             for datum in train_data])
-        # tensor_train_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in train_lbl])
-        # tensor_test = torch.stack([torch.Tensor(datum) for datum in test_data])
-        # tensor_test_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in test_lbl])
-        #
-        # dataset = torch.utils.data.TensorDataset(tensor_train, tensor_train_lbl)
-        # dataset_test = torch.utils.data.TensorDataset(tensor_test, tensor_test_lbl)
+        if args.labels:
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
+        if args.exclude_unlabeled:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
-                                                   shuffle=True,
+                                                   #shuffle=True,
                                                    num_workers=args.workers,
                                                    pin_memory=True,
                                                    drop_last=False,
-                                                   batch_size=args.batch_size)
+                                                   batch_sampler=batch_sampler)
+                                                   #batch_size=args.batch_size)
+
+        dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
@@ -187,7 +181,7 @@ def create_data_loaders(train_transformation,
                                                   pin_memory=True,
                                                   drop_last=False)
 
-    else :
+    else:
 
         dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
 
