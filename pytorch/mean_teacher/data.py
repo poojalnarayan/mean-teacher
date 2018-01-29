@@ -166,7 +166,7 @@ def relabel_dataset_relext(dataset, args):
     for idx, l in enumerate(all_labels):
         if num_labels_per_cat_dict[l] > 0:
             labeled_ids.append(idx)
-            num_labels_per_cat_dict -= 1
+            num_labels_per_cat_dict[l] -= 1
         else:
             unlabeled_idxs.append(idx)
 
