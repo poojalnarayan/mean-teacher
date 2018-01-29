@@ -149,7 +149,7 @@ def create_data_loaders(train_transformation,
 
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
-    if args.dataset == 'riedel10':
+    if args.dataset in ['riedel10', 'gids']:
 
         dataset = datasets.RiedelDataset(traindir, train_transformation)
         dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
