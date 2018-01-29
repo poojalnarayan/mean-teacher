@@ -160,7 +160,7 @@ def relabel_dataset_relext(dataset, args):
 
     num_labels_per_cat_dict = {}
     for lbl, cnt in labels_hist.items():
-        num_labels_per_cat[lbl] = min(labels_hist[lbl], num_labels_per_cat)
+        num_labels_per_cat_dict[lbl] = min(labels_hist[lbl], num_labels_per_cat)
 
 
     for idx, l in enumerate(all_labels):
