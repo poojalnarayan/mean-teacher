@@ -243,7 +243,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     meters = AverageMeterSet()
 
     # switch to train mode
-    model.train()
+    model.train() ### From the documentation (nn.module,py) : i) Sets the module in training mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
     ema_model.train()
 
     end = time.time()
@@ -255,7 +255,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
         input_var = torch.autograd.Variable(input)
-        ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
+        ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
         target_var = torch.autograd.Variable(target.cuda(async=True))
 
         minibatch_size = len(target_var)
@@ -266,6 +266,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         ema_model_out = ema_model(ema_input_var)
         model_out = model(input_var)
 
+        ## DONE: AJAY - WHAT IS THIS CODE BLK ACHIEVING ? Ans: THIS IS RELATED TO --logit-distance-cost .. (fc1 and fc2 in model) ...
         if isinstance(model_out, Variable):
             assert args.logit_distance_cost < 0
             logit1 = model_out
@@ -276,7 +277,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             logit1, logit2 = model_out
             ema_logit, _ = ema_model_out
 
-        ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
+        ema_logit = Variable(ema_logit.detach().data, requires_grad=False) ## DO NOT UPDATE THE GRADIENTS THORUGH THE TEACHER (EMA) MODEL
 
         if args.logit_distance_cost >= 0:
             class_logit, cons_logit = logit1, logit2
@@ -289,10 +290,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
         ema_softmax = F.softmax(ema_logit, dim=1)
 
-        class_loss = class_criterion(class_logit, target_var) / minibatch_size
+        class_loss = class_criterion(class_logit, target_var) / minibatch_size  ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()`
         meters.update('class_loss', class_loss.data[0])
 
-        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
+        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()`
         meters.update('ema_class_loss', ema_class_loss.data[0])
 
         if args.consistency:
@@ -304,7 +305,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             consistency_loss = 0
             meters.update('cons_loss', 0)
 
-        loss = class_loss + consistency_loss + res_loss
+        loss = class_loss + consistency_loss + res_loss # NOTE: AJAY - loss is a combination of classification loss and consistency loss (+ residual loss from the 2 outputs of student model fc1 and fc2, see args.logit_distance_cost)
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
@@ -354,14 +355,14 @@ def validate(eval_loader, model, log, global_step, epoch):
     meters = AverageMeterSet()
 
     # switch to evaluate mode
-    model.eval()
+    model.eval() ### From the documentation (nn.module,py) : i) Sets the module in evaluation mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
 
     end = time.time()
     for i, (input, target) in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        input_var = torch.autograd.Variable(input, volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
+        input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
