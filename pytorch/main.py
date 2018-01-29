@@ -366,7 +366,13 @@ def validate(eval_loader, model, log, global_step, epoch):
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
-        assert labeled_minibatch_size > 0
+        ############## NOTE: AJAY -- changing this piece of code to make sure evaluation does not
+        ############## thrown exception when the minibatch consists of only NAs. Skip the batch
+        ############## TODO: AJAY -- To remove this later
+        # assert labeled_minibatch_size > 0
+        if labeled_minibatch_size == 0:
+            continue
+        ###################################################
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         # compute output
