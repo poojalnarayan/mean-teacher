@@ -145,7 +145,7 @@ def relabel_dataset_relext(dataset, args):
 
     ### args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
     percent_labels = float(args.labels)
-    num_labels = int(percent_labels * len(dataset))
+    num_labels = int(percent_labels * len(dataset.get_labels))
     num_classes = dataset.get_num_classes
     num_labels_per_cat = int(num_labels / num_classes)
 
