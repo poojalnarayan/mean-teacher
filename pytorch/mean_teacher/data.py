@@ -11,7 +11,7 @@ import torch
 
 
 LOG = logging.getLogger('main')
-NO_LABEL = 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  # -1
+NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
 
 ##################################################
 #### RIEDEL DATASET LABELS
@@ -72,6 +72,15 @@ NO_LABEL = 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA
 #  '/sports/sports_team_location/teams': 53,
 #  '/time/event/locations': 54,
 #  'NA': 55}
+##################################################
+
+## GIDS dataset labels
+##################################################
+# {'NA': 4,
+# '/people/person/place_of_birth': 3,
+# '/people/person/education./education/education/institution': 2,
+# '/people/deceased_person/place_of_death': 0,
+# '/people/person/education./education/education/degree': 1}
 ##################################################
 
 class RandomTranslateWithReflect:

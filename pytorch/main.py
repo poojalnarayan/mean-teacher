@@ -371,6 +371,7 @@ def validate(eval_loader, model, log, global_step, epoch):
         ############## TODO: AJAY -- To remove this later
         # assert labeled_minibatch_size > 0
         if labeled_minibatch_size == 0:
+            print ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%AJAY: Labeled_minibatch_size == 0 ....%%%%%%%%%%%%%%%%%%%%%%%")
             continue
         ###################################################
         meters.update('labeled_minibatch_size', labeled_minibatch_size)

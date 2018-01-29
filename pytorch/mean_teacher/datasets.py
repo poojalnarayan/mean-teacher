@@ -66,10 +66,20 @@ def riedel10():
         'num_classes': 56
     }
 
+@export
+def gids():
+
+    return {
+        'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
+        'eval_transformation': None,
+        'datadir': 'data-local/gids',
+        'num_classes': 5
+    }
+
 class RiedelDataset(Dataset):
     def __init__(self, dir, transform=None):
-        numpy_file = dir + '/np_riedel.npy'
-        lbl_numpy_file = dir + '/np_riedel_labels.npy'
+        numpy_file = dir + '/np_relext.npy'
+        lbl_numpy_file = dir + '/np_relext_labels.npy'
 
         self.data = np.load(numpy_file)
         self.lbl = np.load(lbl_numpy_file)
