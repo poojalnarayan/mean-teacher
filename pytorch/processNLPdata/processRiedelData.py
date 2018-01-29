@@ -83,8 +83,8 @@ if __name__ == '__main__':
 
     train_data_np_file = destination_dir_path + "/train/np_riedel.npy" # "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel.npy"
     train_data_np_lbls_file = destination_dir_path + "/train/np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel_labels.npy"
-    test_data_np_file = destination_dir_path + "/test/np_riedel.npy"  #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel.npy"
-    test_data_np_lbls_file = destination_dir_path + "/test/np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel_labels.npy"
+    test_data_np_file = destination_dir_path + "/val/np_riedel.npy"  #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel.npy"
+    test_data_np_lbls_file = destination_dir_path + "/val/np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel_labels.npy"
 
     print("Parsing the raw dataset ... from ... " + train_data_path)
     raw_train_data = parse_data(train_data_path)

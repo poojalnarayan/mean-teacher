@@ -11,10 +11,68 @@ import torch
 
 
 LOG = logging.getLogger('main')
-NO_LABEL = -1
+NO_LABEL = 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  # -1
 
-
-
+##################################################
+#### RIEDEL DATASET LABELS
+##################################################
+# {'/broadcast/content/location': 0,
+#  '/broadcast/producer/location': 1,
+#  '/business/business_location/parent_company': 2,
+#  '/business/company/advisors': 3,
+#  '/business/company/founders': 4,
+#  '/business/company/industry': 5,
+#  '/business/company/locations': 6,
+#  '/business/company/major_shareholders': 7,
+#  '/business/company/place_founded': 8,
+#  '/business/company_advisor/companies_advised': 9,
+#  '/business/company_shareholder/major_shareholder_of': 10,
+#  '/business/person/company': 11,
+#  '/business/shopping_center/owner': 12,
+#  '/business/shopping_center_owner/shopping_centers_owned': 13,
+#  '/film/film/featured_film_locations': 14,
+#  '/film/film_festival/location': 15,
+#  '/film/film_location/featured_in_films': 16,
+#  '/location/administrative_division/country': 17,
+#  '/location/br_state/capital': 18,
+#  '/location/cn_province/capital': 19,
+#  '/location/country/administrative_divisions': 20,
+#  '/location/country/capital': 21,
+#  '/location/de_state/capital': 22,
+#  '/location/fr_region/capital': 23,
+#  '/location/in_state/administrative_capital': 24,
+#  '/location/in_state/judicial_capital': 25,
+#  '/location/in_state/legislative_capital': 26,
+#  '/location/it_region/capital': 27,
+#  '/location/jp_prefecture/capital': 28,
+#  '/location/location/contains': 29,
+#  '/location/mx_state/capital': 30,
+#  '/location/neighborhood/neighborhood_of': 31,
+#  '/location/province/capital': 32,
+#  '/location/us_county/county_seat': 33,
+#  '/location/us_state/capital': 34,
+#  '/people/deceased_person/place_of_burial': 35,
+#  '/people/deceased_person/place_of_death': 36,
+#  '/people/ethnicity/geographic_distribution': 37,
+#  '/people/ethnicity/included_in_group': 38,
+#  '/people/ethnicity/includes_groups': 39,
+#  '/people/ethnicity/people': 40,
+#  '/people/family/country': 41,
+#  '/people/family/members': 42,
+#  '/people/person/children': 43,
+#  '/people/person/ethnicity': 44,
+#  '/people/person/nationality': 45,
+#  '/people/person/place_lived': 46,
+#  '/people/person/place_of_birth': 47,
+#  '/people/person/profession': 48,
+#  '/people/person/religion': 49,
+#  '/people/place_of_interment/interred_here': 50,
+#  '/people/profession/people_with_this_profession': 51,
+#  '/sports/sports_team/location': 52,
+#  '/sports/sports_team_location/teams': 53,
+#  '/time/event/locations': 54,
+#  'NA': 55}
+##################################################
 
 class RandomTranslateWithReflect:
     """Translate image randomly

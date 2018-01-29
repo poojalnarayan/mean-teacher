@@ -28,14 +28,14 @@ class FeedForwardMLP(nn.Module):
         self.layer1 = nn.Linear(input_sz, hidden_sz, bias=True)
         self.activation = nn.ReLU()
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax() ## TODO: Add the right dimension ...
 
     def forward(self, x):
         ## code to to the forward pass of the MLP module
         x = self.layer1(x)
         x = self.activation(x)
         x = self.layer2(x)
-        x = self.softmax(x)
+        x = self.softmax(x) ## TODO: Add the right dimension ...
         return x
 
 @export
