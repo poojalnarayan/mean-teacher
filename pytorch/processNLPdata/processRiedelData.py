@@ -73,18 +73,25 @@ def create_data_for_pytorch(raw_train_data, relation_dict, lookupGiga, gigaW2vEm
 
 if __name__ == '__main__':
 
-    riedel_data_path = "./data-local/riedel10/raw"
-    destination_dir_path = "./data-local/riedel10"
+    #### RIEDEL DATASET
+    # relext_data_path = "./data-local/riedel10/raw"
+    # destination_dir_path = "./data-local/riedel10"
+
+    #### GIDS DATASET
+    relext_data_path = "./data-local/gids/raw"
+    destination_dir_path = "./data-local/gids"
+
+
     w2vfile = "/work/ajaynagesh/clara_expts/research-ontonotes/clint/data/vectors.goldbergdeps.txt" #"/Users/ajaynagesh/Research/code/research/clint/data/vectors.goldbergdeps.txt"
 
-    train_data_path = riedel_data_path + "/train.txt" #"/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/train.txt"
-    test_data_path = riedel_data_path + "/test.txt"   #/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/test.txt"
+    train_data_path = relext_data_path + "/train.txt" #"/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/train.txt"
+    test_data_path = relext_data_path + "/test.txt"   #/Users/ajaynagesh/Research/LadderNetworks/relext_data/Riedel2010dataset/RE/test.txt"
 
 
-    train_data_np_file = destination_dir_path + "/train/np_riedel.npy" # "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel.npy"
-    train_data_np_lbls_file = destination_dir_path + "/train/np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel_labels.npy"
-    test_data_np_file = destination_dir_path + "/val/np_riedel.npy"  #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel.npy"
-    test_data_np_lbls_file = destination_dir_path + "/val/np_riedel_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_riedel_labels.npy"
+    train_data_np_file = destination_dir_path + "/train/np_relext.npy" # "/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_relext.npy"
+    train_data_np_lbls_file = destination_dir_path + "/train/np_relext_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_relext_labels.npy"
+    test_data_np_file = destination_dir_path + "/val/np_relext.npy"  #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_relext.npy"
+    test_data_np_lbls_file = destination_dir_path + "/val/np_relext_labels.npy" #"/Users/ajaynagesh/Research/LadderNetworks/mean-teacher/pytorch/processNLPdata/np_relext_labels.npy"
 
     print("Parsing the raw dataset ... from ... " + train_data_path)
     raw_train_data = parse_data(train_data_path)
@@ -93,6 +100,11 @@ if __name__ == '__main__':
 
     ## Relation labels
     relation_dict =  dict((lbl, id) for (id, lbl) in enumerate(sorted(list({datum[4] for datum in raw_train_data}))))
+    print("---------------------------")
+    print ("Relation Mappings : ")
+    print("---------------------------")
+    print (relation_dict)
+    print ("---------------------------")
 
     print("Loading the gigaword embeddings ...")
     gigaW2vEmbed, lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
