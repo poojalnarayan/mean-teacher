@@ -169,6 +169,7 @@ def relabel_dataset_relext(dataset, args):
             num_labels_per_cat_dict[l] -= 1
         else:
             unlabeled_idxs.append(idx)
+            dataset.lbl[idx] = NO_LABEL
 
     return labeled_ids, unlabeled_idxs
 
