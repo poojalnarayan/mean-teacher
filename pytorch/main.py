@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
+from torchtext.data import Iterator, BucketIterator
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -147,9 +148,45 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
+    if args.dataset == 'conll':
+
+        print ("traindir : " + traindir)
+        print ("evaldir : " + evaldir)
+        dataset = datasets.CoNLLDataset(traindir, train_transformation)
+
+        # if args.labels:
+        #     labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
+        # if args.exclude_unlabeled:
+        #     sampler = SubsetRandomSampler(labeled_idxs)
+        #     batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        # elif args.labeled_batch_size:
+        #     batch_sampler = data.TwoStreamBatchSampler(
+        #         unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        # else:
+        #     assert False, "labeled batch size {}".format(args.labeled_batch_size)
+
+        train_loader, _ = BucketIterator.splits(
+           (dataset, dataset), # we pass in the datasets we want the iterator to draw data from
+            batch_sizes=(64, 64),
+            device=-1, # if you want to use the GPU, specify the GPU number here
+            sort_key=lambda x: len(x.patterns), # the BucketIterator needs to be told what function it should use to group the data.
+            sort_within_batch=False,
+            repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
+            )
+
+
+        dataset_test = datasets.CoNLLDataset(evaldir, train_transformation) ## NOTE: test data is the same as train data
+
+        eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=2 * args.workers,
+                                                  pin_memory=True,
+                                                  drop_last=False)
+
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
-    if args.dataset in ['riedel10', 'gids']:
+    elif args.dataset in ['riedel10', 'gids']:
 
         dataset = datasets.RiedelDataset(traindir, train_transformation)
 

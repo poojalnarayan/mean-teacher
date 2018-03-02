@@ -2,10 +2,12 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 import torch
 import numpy as np
+from torchtext.data import TabularDataset, Field
 
 from . import data
 from .utils import export
 
+from .processNLPdata.processNECdata import *
 
 @export
 def imagenet():
@@ -55,6 +57,43 @@ def cifar10():
         'datadir': 'data-local/images/cifar/cifar10/by-image',
         'num_classes': 10
     }
+
+@export
+def conll():
+
+    return {
+        'train_transformation': None,
+        'eval_transformation': None,
+        'datadir': 'data-local/nec/conll',
+        'num_classes': 4
+    }
+
+def simple_tokenizer(datapoint):
+    fields = datapoint.split("__")
+    return fields
+
+def CoNLLDataset(dir, transform):
+
+    print ("Dir in CoNLLDataset : " + dir)
+    data_file = "training_data_with_labels_emboot.filtered.txt.processed"
+
+    LABEL = Field(sequential=False, use_vocab=True)
+    ENTITY = Field(sequential=False, use_vocab=True, lower=True)
+    PATTERN = Field(sequential=True, use_vocab=True, lower=True, tokenize=simple_tokenizer)
+
+    datafields = [("label", LABEL), ("entity", ENTITY), ("patterns", PATTERN)]
+    dataset, _ = TabularDataset.splits(path=dir, train=data_file, validation=data_file, format='tsv',
+                                     fields=datafields)
+
+    LABEL.build_vocab(dataset)
+    ENTITY.build_vocab(dataset)
+    PATTERN.build_vocab(dataset)
+
+    # todo: APPLY THE TRANSFORMATION HERE
+    # transform = transform
+
+    return dataset
+
 
 @export
 def riedel10():

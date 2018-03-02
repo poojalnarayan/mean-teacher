@@ -251,3 +251,12 @@ class AddGaussianNoise:
     def __call__(self, x):
         noise = np.random.normal(scale=self.stdev, size=x.shape)
         return x + torch.Tensor(noise)
+
+class RandomWordDropout:
+    def __init__(self, percentDrop):
+        self.percentDrop = percentDrop
+
+    def __call__(self, x):
+
+        noise = np.random.normal(scale=self.stdev, size=x.shape)
+        return x + torch.Tensor(noise)

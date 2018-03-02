@@ -9,6 +9,44 @@ from torch.autograd import Variable, Function
 
 from .utils import export, parameter_count
 
+@export
+def simple_MLP_embed(pretrained=True, **kwargs):
+
+    ### Hard code the parameters for CoNLL
+    embedding_size = 300
+    ent_vocab_size = 5523
+    pat_vocab_size = 8478
+    hidden_size = 50
+    output_size = 4
+    model = FeedForwardMLPEmbed(ent_vocab_size, pat_vocab_size, embedding_size, hidden_size, output_size)
+    return model
+
+
+class FeedForwardMLPEmbed(nn.Module):
+    def __init__(self, ent_vocab_size, pat_vocab_size, embedding_size, hidden_sz, output_sz):
+        super().__init__()
+        self.embedding_size = embedding_size
+        self.entity_embeddings = nn.Embedding(ent_vocab_size, embedding_size)
+        self.pat_embeddings = nn.Embedding(pat_vocab_size, embedding_size)
+        ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
+        ## create : layer1 + ReLU
+        self.layer1 = nn.Linear(embedding_size*2, hidden_sz, bias=True) ## concatenate entity and pattern embeddings
+        self.activation = nn.ReLU()
+        ## create : layer2 + Softmax: Todo: To create softmax here ??
+        self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
+        self.softmax = nn.Softmax()
+
+    def forward(self, x):
+        entity_id = x[0]
+        pat_ids = x[1]
+        entity_embed = self.entity_embeddings(entity_id)
+        pat_embed = torch.unsqueeze(torch.mean(torch.t(self.pat_embeddings(pat_ids)), 1), 0)
+        concatenated = torch.cat([entity_embed, pat_embed], 1)
+        res = self.layer1(concatenated)
+        res = self.activation(res)
+        res = self.layer2(res)
+        res = self.softmax(res)
+        return res
 
 @export
 def simple_MLP(pretrained=True, num_classes=10):
