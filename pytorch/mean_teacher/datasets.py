@@ -195,7 +195,7 @@ class CoNLLDataset(Dataset):
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
         else:
-            return (entity_datum, context_datums), None, label
+            return (entity_datum, context_datums), label
 
         ##### USING Torchtext ... now reverting to using custom code
         # print ("Dir in CoNLLDataset : " + dir)

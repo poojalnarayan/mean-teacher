@@ -419,10 +419,21 @@ def validate(eval_loader, model, log, global_step, epoch):
     model.eval() ### From the documentation (nn.module,py) : i) Sets the module in evaluation mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
 
     end = time.time()
-    for i, (input, target) in enumerate(eval_loader):
+    for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        if args.dataset in ['conll', 'ontonotes']:
+            entity = datapoint[0]
+            patterns = datapoint[1]
+            target = datapoint[2]
+
+            entity_var = torch.autograd.Variable(entity, volatile=True)
+            patterns_var = torch.autograd.Variable(patterns, volatile=True)
+
+        else:
+            (input, target) = datapoint
+            input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+
         target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         minibatch_size = len(target_var)
@@ -438,7 +449,10 @@ def validate(eval_loader, model, log, global_step, epoch):
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         # compute output
-        output1 = model(input_var) ##, output2 = model(input_var)
+        if args.dataset in ['conll', 'ontonotes']:
+            output1 = model(entity_var, patterns_var)
+        else:
+            output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
