@@ -53,7 +53,7 @@ def main(context):
 
         if ema:
             for param in model.parameters():
-                param.detach_() ##NOTE: Detaches the variable from hte gradient computation, making it a leaf .. needed from EMA model
+                param.detach_() ##NOTE: Detaches the variable from the gradient computation, making it a leaf .. needed from EMA model
 
         return model
 
@@ -321,8 +321,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         if args.dataset == 'conll':
-            ema_model_out = ema_model(entity_var, patterns_var)
-            model_out = model(ema_entity_var, ema_patterns_var)
+            ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
+            model_out = model(entity_var, patterns_var)
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
