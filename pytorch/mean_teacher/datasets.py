@@ -165,7 +165,7 @@ class CoNLLDataset(Dataset):
     def __getitem__(self, idx):
         entity_words = [self.word_vocab.get_id(w) for w in self.entity_vocab.get_word(self.mentions[idx]).split(" ")]
         entity_words_padded = self.pad_item(entity_words, isPattern=False)
-        entity_datum = torch.LongTensor([entity_words_padded])  ## Note the square brackets .. converting singleton into array [of size 1]
+        entity_datum = torch.LongTensor(entity_words_padded)  ## todo: verify --> Note: this is not necessary [prev .. Note the square brackets .. converting singleton into array [of size 1] ]
 
         context_words = [[self.word_vocab.get_id(w) for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
         # max_ctx_len = len(max(context_words, key=lambda x: len(x)))

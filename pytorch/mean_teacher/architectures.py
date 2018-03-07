@@ -18,8 +18,8 @@ def simple_MLP_embed(pretrained=True, **kwargs):
 
     ### Hard code the parameters for CoNLL
     embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
-    ent_vocab_size = 5523
-    pat_vocab_size = 8478
+    ent_vocab_size = 7970 #5523 #todo: verify ... this shld be the total number of words in the word_vocab
+    pat_vocab_size = 7970 #8478
     hidden_size = 50
     output_size = 4
     model = FeedForwardMLPEmbed(ent_vocab_size, pat_vocab_size, embedding_size, hidden_size, output_size)
@@ -41,18 +41,22 @@ class FeedForwardMLPEmbed(nn.Module):
         self.activation = nn.ReLU()
         ## create : layer2 + Softmax: Create softmax here
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        self.softmax = nn.Softmax(dim=2)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, entity, pattern):
-        entity_id = entity
-        pat_ids = pattern
-        entity_embed = self.entity_embeddings(entity_id)
-        pat_embed = torch.unsqueeze(torch.mean((self.pat_embeddings(pat_ids)), 1), 0)
-        concatenated = torch.cat([entity_embed, pat_embed], 2)
+        entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
+        pattern_flattened = pattern.view(pattern.size()[0], -1)                  # Note: Flatten the list of list of words into a list of words
+        pattern_embed = torch.mean((self.pat_embeddings(pattern_flattened)), 1)  # Note: Average the words in every pattern in the list of patterns
+        # print (entity_embed.size())
+        # print (pattern_embed.size())
+        concatenated = torch.cat([entity_embed, pattern_embed], 1)
         res = self.layer1(concatenated)
         res = self.activation(res)
         res = self.layer2(res)
+        # print (res)
+        # print (res.shape)
         res = self.softmax(res)
+        # print ("After softmax : " + str(res))
         return res
 
 @export
