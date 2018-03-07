@@ -457,7 +457,7 @@ def validate(eval_loader, model, log, global_step, epoch):
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 5))
+        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
         meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
