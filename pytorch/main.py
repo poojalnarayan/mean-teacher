@@ -423,9 +423,9 @@ def validate(eval_loader, model, log, global_step, epoch):
         meters.update('data_time', time.time() - end)
 
         if args.dataset in ['conll', 'ontonotes']:
-            entity = datapoint[0]
-            patterns = datapoint[1]
-            target = datapoint[2]
+            entity = datapoint[0][0]
+            patterns = datapoint[0][1]
+            target = datapoint[1]
 
             entity_var = torch.autograd.Variable(entity, volatile=True)
             patterns_var = torch.autograd.Variable(patterns, volatile=True)
