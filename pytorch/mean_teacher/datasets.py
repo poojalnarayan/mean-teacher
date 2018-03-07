@@ -190,7 +190,7 @@ class CoNLLDataset(Dataset):
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
-        label = torch.LongTensor([self.lbl[idx]])
+        label = self.lbl[idx] #torch.LongTensor([self.lbl[idx]]) #Note: .. no need to create a tensor variable (borrowed from the other nlp dataset code)
 
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
