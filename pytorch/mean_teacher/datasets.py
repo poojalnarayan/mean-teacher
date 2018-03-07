@@ -1,8 +1,6 @@
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 import torch
-import numpy as np
-from torchtext.data import TabularDataset, Field
 
 from . import data
 from .utils import export
@@ -61,38 +59,114 @@ def cifar10():
 @export
 def conll():
 
+    num_words_to_dropout = 1
+    dropout = data.RandomPatternDropout(num_words_to_dropout, CoNLLDataset.OOV_ID)
+
     return {
-        'train_transformation': None,
+        'train_transformation': data.TransformTwiceNEC(dropout), ## todo: add dropout functionality here
         'eval_transformation': None,
         'datadir': 'data-local/nec/conll',
         'num_classes': 4
     }
 
-def simple_tokenizer(datapoint):
-    fields = datapoint.split("__")
-    return fields
+##### USING Torchtext ... now reverting to using custom code
+# def simple_tokenizer(datapoint):
+#     fields = datapoint.split("__")
+#     return fields
+######################################################################
 
-def CoNLLDataset(dir, transform):
 
-    print ("Dir in CoNLLDataset : " + dir)
-    data_file = "training_data_with_labels_emboot.filtered.txt.processed"
+class CoNLLDataset(Dataset):
 
-    LABEL = Field(sequential=False, use_vocab=True)
-    ENTITY = Field(sequential=False, use_vocab=True, lower=True)
-    PATTERN = Field(sequential=True, use_vocab=True, lower=True, tokenize=simple_tokenizer)
+    PAD = "@PADDING"
+    OOV = "</s>"
+    ENTITY = "@ENTITY"
+    OOV_ID = 0
+    ENTITY_ID = -1
 
-    datafields = [("label", LABEL), ("entity", ENTITY), ("patterns", PATTERN)]
-    dataset, _ = TabularDataset.splits(path=dir, train=data_file, validation=data_file, format='tsv',
-                                     fields=datafields)
+    def __init__(self, dir, transform=None):
+        entity_vocab_file = dir + "/entity_vocabulary.emboot.filtered.txt"
+        context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
+        dataset_file = dir + "/training_data_with_labels_emboot.filtered.txt"
 
-    LABEL.build_vocab(dataset)
-    ENTITY.build_vocab(dataset)
-    PATTERN.build_vocab(dataset)
+        categories = sorted(list(['PER', 'ORG', 'LOC', 'MISC']))
+        self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
+        self.context_vocab = Vocabulary.from_file(context_vocab_file)
+        self.mentions, self.contexts, self.labels = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
+        self.word_vocab = self.build_word_vocabulary()
+        CoNLLDataset.OOV_ID = self.word_vocab.get_id(CoNLLDataset.OOV)
+        CoNLLDataset.ENTITY_ID = self.word_vocab.get_id(CoNLLDataset.ENTITY)
+        self.label_ids_all = [categories.index(l) for l in self.labels]
 
-    # todo: APPLY THE TRANSFORMATION HERE
-    # transform = transform
+        self.transform = transform
 
-    return dataset
+    def build_word_vocabulary(self):
+        word_vocab = Vocabulary()
+
+        for mentionId in self.mentions:
+            words = [w for w in self.entity_vocab.get_word(mentionId).split(" ")]
+            for w in words:
+                word_vocab.add(w)
+
+        for context in self.contexts:
+            for patternId in context:
+                words = [w for w in self.context_vocab.get_word(patternId).split(" ")]
+                for w in words:
+                    word_vocab.add(w)
+
+        word_vocab.add(CoNLLDataset.PAD, 0) ## todo: is this right ?
+        return word_vocab
+
+    def __len__(self):
+        return len(self.mentions)
+
+    def __getitem__(self, idx):
+        entity_words = [self.word_vocab.get_id(w) for w in self.entity_vocab.get_word(self.mentions[idx]).split(" ")]
+        entity_datum = torch.LongTensor([entity_words])  ## Note the square brackets .. converting singleton into array [of size 1]
+
+        context_words = [[self.word_vocab.get_id(w) for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
+        max_ctx_len = len(max(context_words, key=lambda x: len(x)))
+
+        if self.transform is not None:
+            ## Dropout done .. transform twice (1. student 2. teacher): DONE
+            context_words_dropout = self.transform(context_words, self.word_vocab.get_id(CoNLLDataset.ENTITY))
+            if len(context_words_dropout) == 2:
+                context_words_padded_1 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[0]]
+                context_words_padded_2 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[1]]
+                context_datums = (torch.LongTensor(context_words_padded_1), torch.LongTensor(context_words_padded_2))
+            else:
+                context_datums = torch.LongTensor(context_words_padded)
+        else:
+            context_words_padded = [ ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)]*(max_ctx_len - len(ctx)) for ctx in context_words]
+            context_datums = torch.LongTensor(context_words_padded)
+
+        # print ("label : " + self.labels[idx])
+        # print ("label id : " + str(self.label_ids_all[idx]))
+        label = torch.LongTensor([self.label_ids_all[idx]])
+
+        return (entity_datum, context_datums, label)
+
+        ##### USING Torchtext ... now reverting to using custom code
+        # print ("Dir in CoNLLDataset : " + dir)
+        # data_file = "training_data_with_labels_emboot.filtered.txt.processed"
+        #
+        # LABEL = Field(sequential=False, use_vocab=True)
+        # ENTITY = Field(sequential=False, use_vocab=True, lower=True)
+        # PATTERN = Field(sequential=True, use_vocab=True, lower=True, tokenize=simple_tokenizer)
+        #
+        # datafields = [("label", LABEL), ("entity", ENTITY), ("patterns", PATTERN)]
+        # dataset, _ = TabularDataset.splits(path=dir, train=data_file, validation=data_file, format='tsv',
+        #                                  fields=datafields)
+        #
+        # LABEL.build_vocab(dataset)
+        # ENTITY.build_vocab(dataset)
+        # PATTERN.build_vocab(dataset)
+
+        # APPLY THE TRANSFORMATION HERE
+        # transform = transform
+
+        # return dataset
+        ######################################################################
 
 
 @export

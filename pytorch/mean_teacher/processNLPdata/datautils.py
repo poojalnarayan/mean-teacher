@@ -37,7 +37,8 @@ class Datautils:
                     num_count_words+=1
             print('num count words:',num_count_words)
 
-        return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
+        # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
+        return entities, contexts, labels
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...

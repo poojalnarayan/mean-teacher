@@ -8,6 +8,7 @@ from PIL import Image
 import numpy as np
 from torch.utils.data.sampler import Sampler
 import torch
+import random
 
 LOG = logging.getLogger('main')
 NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
@@ -252,11 +253,37 @@ class AddGaussianNoise:
         noise = np.random.normal(scale=self.stdev, size=x.shape)
         return x + torch.Tensor(noise)
 
-class RandomWordDropout:
-    def __init__(self, percentDrop):
-        self.percentDrop = percentDrop
 
-    def __call__(self, x):
+class TransformTwiceNEC:
+    def __init__(self, transform):
+        self.transform = transform
 
-        noise = np.random.normal(scale=self.stdev, size=x.shape)
-        return x + torch.Tensor(noise)
+    def __call__(self, inp, entity_token):
+        out1 = self.transform(inp, entity_token)
+        out2 = self.transform(inp, entity_token)
+        return out1, out2
+
+
+class RandomPatternDropout:
+
+    def __init__(self, number_words, replace):
+        self.number_words = number_words
+        self.replace = replace
+
+    def __call__(self, datums, entity_token):
+
+        dropout_datums = list()
+        for datum in datums:
+            dropout_datum = list()
+            to_replace = list(datum)
+            to_replace.remove(entity_token)
+            num_words_to_dropout = min(self.number_words, len(datum) - 1)
+            to_replace = random.sample(to_replace, num_words_to_dropout)
+            for w in datum:
+                if w in to_replace:
+                    dropout_datum.append(self.replace)
+                else:
+                    dropout_datum.append(w)
+            dropout_datums.append(dropout_datum)
+
+        return dropout_datums

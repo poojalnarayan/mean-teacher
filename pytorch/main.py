@@ -1,11 +1,9 @@
 import re
-import argparse
 import os
 import shutil
 import time
-import math
 import logging
-
+import parser
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,12 +13,11 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
-from torchtext.data import Iterator, BucketIterator
 
-from mean_teacher import architectures, datasets, data, losses, ramps, cli
-from mean_teacher.run_context import RunContext
-from mean_teacher.data import NO_LABEL
-from mean_teacher.utils import *
+from .mean_teacher import architectures, datasets, data, losses, ramps, cli
+from .mean_teacher.run_context import RunContext
+from .mean_teacher.data import NO_LABEL
+from .mean_teacher.utils import *
 
 
 LOG = logging.getLogger('main')
@@ -154,29 +151,38 @@ def create_data_loaders(train_transformation,
         print ("evaldir : " + evaldir)
         dataset = datasets.CoNLLDataset(traindir, train_transformation)
 
-        # if args.labels:
-        #     labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
-        # if args.exclude_unlabeled:
-        #     sampler = SubsetRandomSampler(labeled_idxs)
-        #     batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-        # elif args.labeled_batch_size:
-        #     batch_sampler = data.TwoStreamBatchSampler(
-        #         unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
-        # else:
-        #     assert False, "labeled batch size {}".format(args.labeled_batch_size)
+        if args.labels:
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
+        if args.exclude_unlabeled:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
-        train_loader, _ = BucketIterator.splits(
-           (dataset, dataset), # we pass in the datasets we want the iterator to draw data from
-            batch_sizes=(64, 64),
-            device=-1, # if you want to use the GPU, specify the GPU number here
-            sort_key=lambda x: len(x.patterns), # the BucketIterator needs to be told what function it should use to group the data.
-            sort_within_batch=False,
-            repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
-            )
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=args.workers,
+                                                  pin_memory=True,
+                                                  drop_last=False)
 
+        ################## Using torchtext .. not using this currently ####################################
+        # train_loader, _ = BucketIterator.splits(
+        #    (dataset, dataset), # we pass in the datasets we want the iterator to draw data from
+        #     batch_sizes=(64, 64),
+        #     device=-1, # if you want to use the GPU, specify the GPU number here
+        #     sort_key=lambda x: len(x.patterns), # the BucketIterator needs to be told what function it should use to group the data.
+        #     sort_within_batch=False,
+        #     repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
+        #     )
+        ############################################################################################################
 
         dataset_test = datasets.CoNLLDataset(evaldir, train_transformation) ## NOTE: test data is the same as train data
 
+        # todo: Currently not padding .. so batch size must be 1. To fix this later
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
@@ -285,8 +291,23 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        input_var = torch.autograd.Variable(input)
-        ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        if args.dataset == 'conll':
+            ## Input consists of tuple (entity_id, pattern_ids)
+            input_entity = input[0]
+            input_patterns = input[1]
+            entity_var = torch.autograd.Variable(input_entity)
+            patterns_var = torch.autograd.Variable(input_patterns)
+
+            ema_input_entity = ema_input[0]
+            ema_input_patterns = ema_input[1]
+            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True)
+            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True)
+
+        else:
+
+            input_var = torch.autograd.Variable(input)
+            ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+
         target_var = torch.autograd.Variable(target.cuda(async=True))
 
         minibatch_size = len(target_var)
@@ -294,8 +315,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        ema_model_out = ema_model(ema_input_var)
-        model_out = model(input_var)
+        if args.dataset == 'conll':
+            ema_model_out = ema_model(entity_var, patterns_var)
+            model_out = model(ema_entity_var, ema_patterns_var)
+        else:
+            ema_model_out = ema_model(ema_input_var)
+            model_out = model(input_var)
 
         ## DONE: AJAY - WHAT IS THIS CODE BLK ACHIEVING ? Ans: THIS IS RELATED TO --logit-distance-cost .. (fc1 and fc2 in model) ...
         if isinstance(model_out, Variable):

@@ -9,16 +9,23 @@ from torch.autograd import Variable, Function
 
 from .utils import export, parameter_count
 
+###############
+#### TODO: Add the emboot objective functions as another parameter
+###############
+
 @export
 def simple_MLP_embed(pretrained=True, **kwargs):
 
     ### Hard code the parameters for CoNLL
-    embedding_size = 300
+    embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
     ent_vocab_size = 5523
     pat_vocab_size = 8478
     hidden_size = 50
     output_size = 4
     model = FeedForwardMLPEmbed(ent_vocab_size, pat_vocab_size, embedding_size, hidden_size, output_size)
+
+    ### Hard code the parameters for Ontonotes
+
     return model
 
 
@@ -26,22 +33,22 @@ class FeedForwardMLPEmbed(nn.Module):
     def __init__(self, ent_vocab_size, pat_vocab_size, embedding_size, hidden_sz, output_sz):
         super().__init__()
         self.embedding_size = embedding_size
-        self.entity_embeddings = nn.Embedding(ent_vocab_size, embedding_size)
+        self.entity_embeddings = nn.Embedding(ent_vocab_size, embedding_size) # todo: how to pre-init the embeddings ?
         self.pat_embeddings = nn.Embedding(pat_vocab_size, embedding_size)
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
         self.layer1 = nn.Linear(embedding_size*2, hidden_sz, bias=True) ## concatenate entity and pattern embeddings
         self.activation = nn.ReLU()
-        ## create : layer2 + Softmax: Todo: To create softmax here ??
+        ## create : layer2 + Softmax: Create softmax here
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=2)
 
-    def forward(self, x):
-        entity_id = x[0]
-        pat_ids = x[1]
+    def forward(self, entity, pattern):
+        entity_id = entity
+        pat_ids = pattern
         entity_embed = self.entity_embeddings(entity_id)
-        pat_embed = torch.unsqueeze(torch.mean(torch.t(self.pat_embeddings(pat_ids)), 1), 0)
-        concatenated = torch.cat([entity_embed, pat_embed], 1)
+        pat_embed = torch.unsqueeze(torch.mean((self.pat_embeddings(pat_ids)), 1), 0)
+        concatenated = torch.cat([entity_embed, pat_embed], 2)
         res = self.layer1(concatenated)
         res = self.activation(res)
         res = self.layer2(res)
