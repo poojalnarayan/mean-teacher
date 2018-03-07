@@ -61,9 +61,10 @@ def conll():
 
     num_words_to_dropout = 1
     dropout = data.RandomPatternDropout(num_words_to_dropout, CoNLLDataset.OOV_ID)
+    # todo: Add the replace (from wordnet) noise functionality
 
     return {
-        'train_transformation': data.TransformTwiceNEC(dropout), ## todo: add dropout functionality here
+        'train_transformation': data.TransformTwiceNEC(dropout),
         'eval_transformation': None,
         'datadir': 'data-local/nec/conll',
         'num_classes': 4
@@ -93,7 +94,7 @@ class CoNLLDataset(Dataset):
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
-        self.word_vocab = self.build_word_vocabulary()
+        self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
         CoNLLDataset.OOV_ID = self.word_vocab.get_id(CoNLLDataset.OOV)
         CoNLLDataset.ENTITY_ID = self.word_vocab.get_id(CoNLLDataset.ENTITY)
         self.label_ids_all = [categories.index(l) for l in self.labels]
@@ -103,10 +104,21 @@ class CoNLLDataset(Dataset):
     def build_word_vocabulary(self):
         word_vocab = Vocabulary()
 
+        max_entity_len = 0
+        max_pattern_len = 0
+        max_num_patterns = 0
+
+        max_entity = ""
+        max_pattern = ""
+
         for mentionId in self.mentions:
             words = [w for w in self.entity_vocab.get_word(mentionId).split(" ")]
             for w in words:
                 word_vocab.add(w)
+
+            if len(words) > max_entity_len:
+                max_entity_len = len(words)
+                max_entity = words
 
         for context in self.contexts:
             for patternId in context:
@@ -114,37 +126,76 @@ class CoNLLDataset(Dataset):
                 for w in words:
                     word_vocab.add(w)
 
+                if len(words) > max_pattern_len:
+                    max_pattern_len = len(words)
+                    max_pattern = words
+
+            if len(context) > max_num_patterns:
+                max_num_patterns = len(context)
+
         word_vocab.add(CoNLLDataset.PAD, 0) ## todo: is this right ?
-        return word_vocab
+        # print (max_entity)
+        # print (max_entity_len)
+        # print (max_pattern)
+        # print (max_pattern_len)
+        return word_vocab, max_entity_len, max_pattern_len, max_num_patterns
 
     def __len__(self):
         return len(self.mentions)
 
+    def pad_item(self, dataitem, isPattern=True):
+        if isPattern: ## Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
+            dataitem_padded = list()
+            for datum in dataitem:
+                datum_padded = datum + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (self.max_pattern_len - len(datum))
+                dataitem_padded.append(datum_padded)
+            for _ in range(0, self.max_num_patterns - len(dataitem)):
+                dataitem_padded.append([self.word_vocab.get_id(CoNLLDataset.PAD)] * self.max_pattern_len)
+        else: ## Note: padding an entity (consisting of a seq of tokens)
+            dataitem_padded = dataitem + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (self.max_entity_len - len(dataitem))
+
+        return dataitem_padded
+
+    def get_num_classes(self):
+        return len(list({l for l in self.label_ids_all}))
+
+    def get_labels(self):
+        return self.label_ids_all
+
     def __getitem__(self, idx):
         entity_words = [self.word_vocab.get_id(w) for w in self.entity_vocab.get_word(self.mentions[idx]).split(" ")]
-        entity_datum = torch.LongTensor([entity_words])  ## Note the square brackets .. converting singleton into array [of size 1]
+        entity_words_padded = self.pad_item(entity_words, isPattern=False)
+        entity_datum = torch.LongTensor([entity_words_padded])  ## Note the square brackets .. converting singleton into array [of size 1]
 
         context_words = [[self.word_vocab.get_id(w) for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
-        max_ctx_len = len(max(context_words, key=lambda x: len(x)))
+        # max_ctx_len = len(max(context_words, key=lambda x: len(x)))
 
         if self.transform is not None:
             ## Dropout done .. transform twice (1. student 2. teacher): DONE
             context_words_dropout = self.transform(context_words, self.word_vocab.get_id(CoNLLDataset.ENTITY))
             if len(context_words_dropout) == 2:
-                context_words_padded_1 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[0]]
-                context_words_padded_2 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[1]]
-                context_datums = (torch.LongTensor(context_words_padded_1), torch.LongTensor(context_words_padded_2))
+                # context_words_padded_1 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[0]]
+                # context_words_padded_2 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[1]]
+                # context_datums = (torch.LongTensor(context_words_padded_1), torch.LongTensor(context_words_padded_2))
+                context_words_padded_0 = self.pad_item(context_words_dropout[0])
+                context_words_padded_1 = self.pad_item(context_words_dropout[1])
+                context_datums = (torch.LongTensor(context_words_padded_0), torch.LongTensor(context_words_padded_1))
             else:
+                context_words_padded = self.pad_item(context_words_dropout)
                 context_datums = torch.LongTensor(context_words_padded)
         else:
-            context_words_padded = [ ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)]*(max_ctx_len - len(ctx)) for ctx in context_words]
+            # context_words_padded = [ ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)]*(max_ctx_len - len(ctx)) for ctx in context_words]
+            context_words_padded = self.pad_item(context_words)
             context_datums = torch.LongTensor(context_words_padded)
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
         label = torch.LongTensor([self.label_ids_all[idx]])
 
-        return (entity_datum, context_datums, label)
+        if self.transform is not None:
+            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
+        else:
+            return (entity_datum, context_datums), None, label
 
         ##### USING Torchtext ... now reverting to using custom code
         # print ("Dir in CoNLLDataset : " + dir)

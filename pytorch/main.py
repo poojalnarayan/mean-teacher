@@ -145,14 +145,14 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    if args.dataset == 'conll':
+    if args.dataset in ['conll', 'ontonotes']:
 
         print ("traindir : " + traindir)
         print ("evaldir : " + evaldir)
         dataset = datasets.CoNLLDataset(traindir, train_transformation)
 
         if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
         if args.exclude_unlabeled:
             sampler = SubsetRandomSampler(labeled_idxs)
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
@@ -163,11 +163,12 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
-                                                  batch_size=args.batch_size,
-                                                  shuffle=False,
+                                                  batch_sampler=batch_sampler,
                                                   num_workers=args.workers,
-                                                  pin_memory=True,
-                                                  drop_last=False)
+                                                  pin_memory=True)
+                                                  # drop_last=False)
+                                                  # batch_size=args.batch_size,
+                                                  # shuffle=False)
 
         ################## Using torchtext .. not using this currently ####################################
         # train_loader, _ = BucketIterator.splits(
@@ -180,9 +181,8 @@ def create_data_loaders(train_transformation,
         #     )
         ############################################################################################################
 
-        dataset_test = datasets.CoNLLDataset(evaldir, train_transformation) ## NOTE: test data is the same as train data
+        dataset_test = datasets.CoNLLDataset(evaldir, eval_transformation) ## NOTE: test data is the same as train data
 
-        # todo: Currently not padding .. so batch size must be 1. To fix this later
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
@@ -197,7 +197,7 @@ def create_data_loaders(train_transformation,
         dataset = datasets.RiedelDataset(traindir, train_transformation)
 
         if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_relext(dataset, args)
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
         if args.exclude_unlabeled:
             sampler = SubsetRandomSampler(labeled_idxs)
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
@@ -208,12 +208,12 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
-                                                   #shuffle=True,
+                                                   batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=True,
-                                                   drop_last=False,
-                                                   batch_sampler=batch_sampler)
-                                                   #batch_size=args.batch_size)
+                                                   pin_memory=True)
+                                                   # drop_last=False)
+                                                   # batch_size=args.batch_size)
+                                                   # shuffle=True)
 
         dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
 

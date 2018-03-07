@@ -140,20 +140,20 @@ class TransformTwice:
         return out1, out2
 
 
-def relabel_dataset_relext(dataset, args):
+def relabel_dataset_nlp(dataset, args):
     unlabeled_idxs = []
     labeled_ids = []
 
-    ### args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
+    # args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
     percent_labels = float(args.labels)
-    all_labels = dataset.get_labels()
+    all_labels = random.shuffle(list(enumerate(dataset.get_labels()))) # randomizing the relabeling ...
     num_classes = dataset.get_num_classes()
 
     num_labels = int(percent_labels * len(all_labels))
     num_labels_per_cat = int(num_labels / num_classes)
 
     labels_hist = {}
-    for lbl in all_labels:
+    for _, lbl in all_labels:
         if lbl in labels_hist:
             labels_hist[lbl] += 1
         else:
@@ -163,8 +163,7 @@ def relabel_dataset_relext(dataset, args):
     for lbl, cnt in labels_hist.items():
         num_labels_per_cat_dict[lbl] = min(labels_hist[lbl], num_labels_per_cat)
 
-
-    for idx, l in enumerate(all_labels):
+    for idx, l in all_labels:
         if num_labels_per_cat_dict[l] > 0:
             labeled_ids.append(idx)
             num_labels_per_cat_dict[l] -= 1
