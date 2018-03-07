@@ -284,14 +284,19 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     ema_model.train()
 
     end = time.time()
-    for i, ((input, ema_input), target) in enumerate(train_loader):
+    for i, datapoint in enumerate(train_loader):
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        if args.dataset == 'conll':
+        if args.dataset in ['conll', 'ontonotes']:
+
+            input = datapoint[0]
+            ema_input = datapoint[1]
+            target = datapoint[2]
+
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
             input_patterns = input[1]
@@ -304,7 +309,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True)
 
         else:
-
+            ((input, ema_input), target) = datapoint
             input_var = torch.autograd.Variable(input)
             ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 

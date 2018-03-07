@@ -93,11 +93,11 @@ class CoNLLDataset(Dataset):
         categories = sorted(list(['PER', 'ORG', 'LOC', 'MISC']))
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
-        self.mentions, self.contexts, self.labels = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
+        self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
         CoNLLDataset.OOV_ID = self.word_vocab.get_id(CoNLLDataset.OOV)
         CoNLLDataset.ENTITY_ID = self.word_vocab.get_id(CoNLLDataset.ENTITY)
-        self.label_ids_all = [categories.index(l) for l in self.labels]
+        self.lbl = [categories.index(l) for l in self.labels_str]
 
         self.transform = transform
 
@@ -157,10 +157,10 @@ class CoNLLDataset(Dataset):
         return dataitem_padded
 
     def get_num_classes(self):
-        return len(list({l for l in self.label_ids_all}))
+        return len(list({l for l in self.lbl}))
 
     def get_labels(self):
-        return self.label_ids_all
+        return self.lbl
 
     def __getitem__(self, idx):
         entity_words = [self.word_vocab.get_id(w) for w in self.entity_vocab.get_word(self.mentions[idx]).split(" ")]
@@ -190,7 +190,7 @@ class CoNLLDataset(Dataset):
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
-        label = torch.LongTensor([self.label_ids_all[idx]])
+        label = torch.LongTensor([self.lbl[idx]])
 
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
