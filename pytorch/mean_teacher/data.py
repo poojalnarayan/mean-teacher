@@ -146,9 +146,13 @@ def relabel_dataset_nlp(dataset, args):
 
     # args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
     percent_labels = float(args.labels)
-    all_labels = random.shuffle(list(enumerate(dataset.get_labels()))) # randomizing the relabeling ...
+    all_labels = list(enumerate(dataset.get_labels()))
+    random.shuffle(all_labels) # randomizing the relabeling ...
     num_classes = dataset.get_num_classes()
 
+    print (percent_labels)
+    print (len(all_labels))
+    print ("!!!!!!!!!!!!!!!!!")
     num_labels = int(percent_labels * len(all_labels))
     num_labels_per_cat = int(num_labels / num_classes)
 
@@ -169,7 +173,7 @@ def relabel_dataset_nlp(dataset, args):
             num_labels_per_cat_dict[l] -= 1
         else:
             unlabeled_idxs.append(idx)
-            dataset.lbl[idx] = NO_LABEL
+            dataset.label_ids_all[idx] = NO_LABEL #todo: To make this more generic ...
 
     return labeled_ids, unlabeled_idxs
 

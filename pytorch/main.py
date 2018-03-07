@@ -14,10 +14,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
 
-from .mean_teacher import architectures, datasets, data, losses, ramps, cli
-from .mean_teacher.run_context import RunContext
-from .mean_teacher.data import NO_LABEL
-from .mean_teacher.utils import *
+from mean_teacher import architectures, datasets, data, losses, ramps, cli
+from mean_teacher.run_context import RunContext
+from mean_teacher.data import NO_LABEL
+from mean_teacher.utils import *
 
 
 LOG = logging.getLogger('main')
