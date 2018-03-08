@@ -114,7 +114,7 @@ def main(context):
         else:
             is_best = False
 
-        if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0:
+        if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0 and is_best:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'global_step': global_step,
@@ -506,6 +506,9 @@ def save_checkpoint(state, is_best, dirpath, epoch):
     if is_best:
         shutil.copyfile(checkpoint_path, best_path)
         LOG.info("--- checkpoint copied to %s ---" % best_path)
+        if args.epochs != epoch: # Note: Save the last checkpoint
+            os.remove(checkpoint_path)
+            LOG.info("--- removing original checkpoint %s ---" % checkpoint_path) # Note: I can as well not save the original file and only save the best config. But not changing the functionality too much, if need to revert later
 
 
 def adjust_learning_rate(optimizer, epoch, step_in_epoch, total_steps_in_epoch):

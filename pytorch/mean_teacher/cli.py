@@ -11,21 +11,21 @@ __all__ = ['parse_cmd_args', 'parse_dict_args']
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+    parser = argparse.ArgumentParser(description='PyTorch Mean-Teacher Training')
     parser.add_argument('--dataset', metavar='DATASET', default='conll',
                         choices=datasets.__all__,
                         help='dataset: ' +
                             ' | '.join(datasets.__all__) +
-                            ' (default: imagenet)')
+                            ' (default: conll)')
     parser.add_argument('--train-subdir', type=str, default='train',
                         help='the subdirectory inside the data directory that contains the training data')
     parser.add_argument('--eval-subdir', type=str, default='val',
                         help='the subdirectory inside the data directory that contains the evaluation data')
     parser.add_argument('--labels', default=None, type=str, #metavar='FILE',
-                        help='list of image labels (default: based on directory structure)')
+                        help='list of image labels (default: based on directory structure) OR \% of labeled data to be used for the NLP task (randomly selected)')
     parser.add_argument('--exclude-unlabeled', default=False, type=str2bool, metavar='BOOL',
                         help='exclude unlabeled examples from the training set')
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='simple_MLP',
+    parser.add_argument('--arch', '-a', metavar='ARCH', default='simple_MLP_embed',
                         choices=architectures.__all__,
                         help='model architecture: ' +
                             ' | '.join(architectures.__all__))
@@ -68,7 +68,7 @@ def create_parser():
                         metavar='EPOCHS', help='checkpoint frequency in epochs, 0 to turn checkpointing off (default: 1)')
     parser.add_argument('--evaluation-epochs', default=1, type=int,
                         metavar='EPOCHS', help='evaluation frequency in epochs, 0 to turn evaluation off (default: 1)')
-    parser.add_argument('--print-freq', '-p', default=10, type=int,
+    parser.add_argument('--print-freq', '-p', default=50, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
