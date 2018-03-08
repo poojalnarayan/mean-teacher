@@ -149,7 +149,7 @@ def create_data_loaders(train_transformation,
 
         print ("traindir : " + traindir)
         print ("evaldir : " + evaldir)
-        dataset = datasets.CoNLLDataset(traindir, train_transformation)
+        dataset = datasets.NECDataset(traindir, train_transformation)
 
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
@@ -181,7 +181,7 @@ def create_data_loaders(train_transformation,
         #     )
         ############################################################################################################
 
-        dataset_test = datasets.CoNLLDataset(evaldir, eval_transformation) ## NOTE: test data is the same as train data
+        dataset_test = datasets.NECDataset(evaldir, eval_transformation) ## NOTE: test data is the same as train data
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
@@ -320,7 +320,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        if args.dataset == 'conll':
+        if args.dataset in ['conll', 'ontonotes']:
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
         else:

@@ -16,25 +16,27 @@ from .utils import export, parameter_count
 @export
 def simple_MLP_embed(pretrained=True, **kwargs):
 
-    ### Hard code the parameters for CoNLL
     embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
-    ent_vocab_size = 7970 #5523 #todo: verify ... this shld be the total number of words in the word_vocab
-    pat_vocab_size = 7970 #8478
     hidden_size = 50
-    output_size = 4
-    model = FeedForwardMLPEmbed(ent_vocab_size, pat_vocab_size, embedding_size, hidden_size, output_size)
+
+    ### Hard code the parameters for CoNLL
+    # word_vocab_size = 7970 #5523 #Note:  this shld be the total number of words in the word_vocab
+    # output_size = 4
 
     ### Hard code the parameters for Ontonotes
+    word_vocab_size = 18727
+    output_size = 11
 
+    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, output_size)
     return model
 
 
 class FeedForwardMLPEmbed(nn.Module):
-    def __init__(self, ent_vocab_size, pat_vocab_size, embedding_size, hidden_sz, output_sz):
+    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz):
         super().__init__()
         self.embedding_size = embedding_size
-        self.entity_embeddings = nn.Embedding(ent_vocab_size, embedding_size) # todo: how to pre-init the embeddings ?
-        self.pat_embeddings = nn.Embedding(pat_vocab_size, embedding_size)
+        self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size) # todo: how to pre-init the embeddings ?
+        self.pat_embeddings = nn.Embedding(word_vocab_size, embedding_size)
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
         self.layer1 = nn.Linear(embedding_size*2, hidden_sz, bias=True) ## concatenate entity and pattern embeddings

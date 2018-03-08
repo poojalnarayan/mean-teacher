@@ -57,10 +57,25 @@ def cifar10():
     }
 
 @export
+def ontonotes():
+
+    num_words_to_dropout = 1
+    dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
+    # todo: Add the replace (from wordnet) noise functionality
+
+    return {
+        'train_transformation': data.TransformTwiceNEC(dropout),
+        'eval_transformation': None,
+        'datadir': 'data-local/nec/ontonotes',
+        'num_classes': 11
+    }
+
+
+@export
 def conll():
 
     num_words_to_dropout = 1
-    dropout = data.RandomPatternDropout(num_words_to_dropout, CoNLLDataset.OOV_ID)
+    dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
     # todo: Add the replace (from wordnet) noise functionality
 
     return {
@@ -77,7 +92,7 @@ def conll():
 ######################################################################
 
 
-class CoNLLDataset(Dataset):
+class NECDataset(Dataset):
 
     PAD = "@PADDING"
     OOV = "</s>"
@@ -90,13 +105,31 @@ class CoNLLDataset(Dataset):
         context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
         dataset_file = dir + "/training_data_with_labels_emboot.filtered.txt"
 
-        categories = sorted(list(['PER', 'ORG', 'LOC', 'MISC']))
+        ###### CoNLL ##########################
+        # categories = sorted(list(['PER', 'ORG', 'LOC', 'MISC']))
+        #######################################
+
+        ###### Onto ##########################
+        categories = sorted(list([ "EVENT",
+                                   "FAC",
+                                   "GPE",
+                                   "LANGUAGE",
+                                   "LAW",
+                                   "LOC",
+                                   "NORP",
+                                   "ORG",
+                                   "PERSON",
+                                   "PRODUCT",
+                                   "WORK_OF_ART"]))
+
+        #######################################
+
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
-        CoNLLDataset.OOV_ID = self.word_vocab.get_id(CoNLLDataset.OOV)
-        CoNLLDataset.ENTITY_ID = self.word_vocab.get_id(CoNLLDataset.ENTITY)
+        NECDataset.OOV_ID = self.word_vocab.get_id(NECDataset.OOV)
+        NECDataset.ENTITY_ID = self.word_vocab.get_id(NECDataset.ENTITY)
         self.lbl = [categories.index(l) for l in self.labels_str]
 
         self.transform = transform
@@ -133,7 +166,7 @@ class CoNLLDataset(Dataset):
             if len(context) > max_num_patterns:
                 max_num_patterns = len(context)
 
-        word_vocab.add(CoNLLDataset.PAD, 0) ## todo: is this right ?
+        word_vocab.add(NECDataset.PAD, 0) ## todo: is this right ?
         # print (max_entity)
         # print (max_entity_len)
         # print (max_pattern)
@@ -147,12 +180,12 @@ class CoNLLDataset(Dataset):
         if isPattern: ## Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
             dataitem_padded = list()
             for datum in dataitem:
-                datum_padded = datum + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (self.max_pattern_len - len(datum))
+                datum_padded = datum + [self.word_vocab.get_id(NECDataset.PAD)] * (self.max_pattern_len - len(datum))
                 dataitem_padded.append(datum_padded)
             for _ in range(0, self.max_num_patterns - len(dataitem)):
-                dataitem_padded.append([self.word_vocab.get_id(CoNLLDataset.PAD)] * self.max_pattern_len)
+                dataitem_padded.append([self.word_vocab.get_id(NECDataset.PAD)] * self.max_pattern_len)
         else: ## Note: padding an entity (consisting of a seq of tokens)
-            dataitem_padded = dataitem + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (self.max_entity_len - len(dataitem))
+            dataitem_padded = dataitem + [self.word_vocab.get_id(NECDataset.PAD)] * (self.max_entity_len - len(dataitem))
 
         return dataitem_padded
 
@@ -172,10 +205,10 @@ class CoNLLDataset(Dataset):
 
         if self.transform is not None:
             ## Dropout done .. transform twice (1. student 2. teacher): DONE
-            context_words_dropout = self.transform(context_words, self.word_vocab.get_id(CoNLLDataset.ENTITY))
+            context_words_dropout = self.transform(context_words, self.word_vocab.get_id(NECDataset.ENTITY))
             if len(context_words_dropout) == 2:
-                # context_words_padded_1 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[0]]
-                # context_words_padded_2 = [ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[1]]
+                # context_words_padded_1 = [ctx + [self.word_vocab.get_id(NECDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[0]]
+                # context_words_padded_2 = [ctx + [self.word_vocab.get_id(NECDataset.PAD)] * (max_ctx_len - len(ctx)) for ctx in context_words_dropout[1]]
                 # context_datums = (torch.LongTensor(context_words_padded_1), torch.LongTensor(context_words_padded_2))
                 context_words_padded_0 = self.pad_item(context_words_dropout[0])
                 context_words_padded_1 = self.pad_item(context_words_dropout[1])
@@ -184,7 +217,7 @@ class CoNLLDataset(Dataset):
                 context_words_padded = self.pad_item(context_words_dropout)
                 context_datums = torch.LongTensor(context_words_padded)
         else:
-            # context_words_padded = [ ctx + [self.word_vocab.get_id(CoNLLDataset.PAD)]*(max_ctx_len - len(ctx)) for ctx in context_words]
+            # context_words_padded = [ ctx + [self.word_vocab.get_id(NECDataset.PAD)]*(max_ctx_len - len(ctx)) for ctx in context_words]
             context_words_padded = self.pad_item(context_words)
             context_datums = torch.LongTensor(context_words_padded)
 
@@ -198,7 +231,7 @@ class CoNLLDataset(Dataset):
             return (entity_datum, context_datums), label
 
         ##### USING Torchtext ... now reverting to using custom code
-        # print ("Dir in CoNLLDataset : " + dir)
+        # print ("Dir in NECDataset : " + dir)
         # data_file = "training_data_with_labels_emboot.filtered.txt.processed"
         #
         # LABEL = Field(sequential=False, use_vocab=True)
