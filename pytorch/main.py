@@ -26,6 +26,13 @@ args = None
 best_prec1 = 0
 global_step = 0
 
+###########
+# NOTE: To change to a new NEC dataset .. currently some params are hardcoded
+# 1. Change args.dataset in the command line
+# 2. In datasets.py --  uncomment the appropriate `categories`
+# 3. In architectures.py -- uncomment the appropriate params in simple_MLP_embed
+###########
+
 
 def main(context):
     global global_step
