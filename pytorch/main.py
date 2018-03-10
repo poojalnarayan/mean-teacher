@@ -22,6 +22,18 @@ from mean_teacher.utils import *
 
 LOG = logging.getLogger('main')
 
+################
+# NOTE: To enable logging on IPythonConsole output or IPyNoteBook
+# LOG = logging.getLogger()
+# LOG.setLevel(logging.DEBUG)
+# LOG.debug("test")
+
+# NOTE: To init args to Mean Teacher :
+# parser = cli.create_parser()
+# parser.set_defaults(dataset='cifar10') # OR any other param
+# args = parser.parse_known_args()[0]
+################
+
 args = None
 best_prec1 = 0
 global_step = 0
@@ -29,8 +41,7 @@ global_step = 0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
-# 2. In datasets.py --  uncomment the appropriate `categories`
-# 3. In architectures.py -- uncomment the appropriate params in simple_MLP_embed
+# 2. In architectures.py -- uncomment the appropriate params in simple_MLP_embed
 ###########
 
 
@@ -114,7 +125,7 @@ def main(context):
         else:
             is_best = False
 
-        if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0 and is_best:
+        if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'global_step': global_step,
@@ -154,8 +165,8 @@ def create_data_loaders(train_transformation,
 
     if args.dataset in ['conll', 'ontonotes']:
 
-        print ("traindir : " + traindir)
-        print ("evaldir : " + evaldir)
+        LOG.info("traindir : " + traindir)
+        LOG.info("evaldir : " + evaldir)
         dataset = datasets.NECDataset(traindir, train_transformation)
 
         if args.labels:
@@ -292,6 +303,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     end = time.time()
     for i, datapoint in enumerate(train_loader):
+
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
@@ -327,6 +339,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
+        # todo: some debug stmt ... to be removed later
+        num_unlabeled = sum([1 for lbl in datapoint[2].numpy().flatten() if lbl == -1])
+        num_labeled = minibatch_size - num_unlabeled
+        LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
+
         if args.dataset in ['conll', 'ontonotes']:
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
@@ -354,9 +371,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         else:
             class_logit, cons_logit = logit1, logit1
             res_loss = 0
-
-        class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
-        ema_softmax = F.softmax(ema_logit, dim=1)
 
         class_loss = class_criterion(class_logit, target_var) / minibatch_size  ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()`
         meters.update('class_loss', class_loss.data[0])

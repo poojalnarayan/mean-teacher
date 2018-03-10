@@ -144,16 +144,21 @@ def relabel_dataset_nlp(dataset, args):
     unlabeled_idxs = []
     labeled_ids = []
 
-    # args.labels will contain a number between (0, 1). Select `args.labels`% of data randomly and uniformly across all labels as labeled examples
-    percent_labels = float(args.labels)
     all_labels = list(enumerate(dataset.get_labels()))
     random.shuffle(all_labels) # randomizing the relabeling ...
     num_classes = dataset.get_num_classes()
 
-    # print (percent_labels)
-    # print (len(all_labels))
-    # print ("!!!!!!!!!!!!!!!!!")
-    num_labels = int(percent_labels * len(all_labels))
+    if args.labels.isdigit():
+        # NOTE: if it contains whole numbers --> number of labeled datapoints
+        LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
+        num_labels = int(args.labels)
+    else:
+        # NOTE: if it contains a float (remember even xx.00) then it is a percentage ..
+        #       give a float number between 0 and 100 .. indicating percentage
+        LOG.info("[relabel dataset] Choosing " + args.labels + "% OF EXAMPLES randomly as supervision")
+        percent_labels = float(args.labels)
+        num_labels = int(percent_labels * len(all_labels) / 100.0)
+
     num_labels_per_cat = int(num_labels / num_classes)
 
     labels_hist = {}
@@ -175,6 +180,9 @@ def relabel_dataset_nlp(dataset, args):
             unlabeled_idxs.append(idx)
             dataset.lbl[idx] = NO_LABEL
 
+    LOG.info("[relabel dataset] Number of LABELED examples : " + str(len(labeled_ids)))
+    LOG.info("[relabel dataset] Number of UNLABELED examples : " + str(len(unlabeled_idxs)))
+    LOG.info("[relabel dataset] TOTAL : " + str(len(labeled_ids)+len(unlabeled_idxs)))
     return labeled_ids, unlabeled_idxs
 
 

@@ -12,6 +12,15 @@ from .utils import export, parameter_count
 ###############
 #### TODO: Add the emboot objective functions as another parameter
 ###############
+# @export
+# def pushpull_embed(pretrained=True, **kwargs):
+#
+#
+# Look at pytorch implementations like https://github.com/fanglanting/skip-gram-pytorch/blob/master/model.py
+# class PushPullSkipGram(nn.Module):
+#
+#     def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz):
+#         super().__init__()
 
 @export
 def simple_MLP_embed(pretrained=True, **kwargs):
