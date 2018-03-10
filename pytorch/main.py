@@ -49,6 +49,8 @@ def main(context):
     global global_step
     global best_prec1
 
+    time_start = time.time()
+
     checkpoint_path = context.transient_dir
     training_log = context.create_train_log("training")
     validation_log = context.create_train_log("validation")
@@ -135,6 +137,8 @@ def main(context):
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint_path, epoch + 1)
+
+    LOG.info("--------Total end to end time %s seconds ----------- " % (time.time() - time_start))
 
 
 def parse_dict_args(**kwargs):
@@ -415,15 +419,20 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         end = time.time()
 
         if i % args.print_freq == 0:
+            # LOG.info(
+            #     'Epoch: [{0}][{1}/{2}]\t'
+            #     'Time {meters[batch_time]:.3f}\t'
+            #     'Data {meters[data_time]:.3f}\t'
+            #     'Class {meters[class_loss]:.4f}\t'
+            #     'Cons {meters[cons_loss]:.4f}\t'
+            #     'Prec@1 {meters[top1]:.3f}\t'
+            #     'Prec@5 {meters[top5]:.3f}'.format(
+            #         epoch, i, len(train_loader), meters=meters))
             LOG.info(
-                'Epoch: [{0}][{1}/{2}]\t'
-                'Time {meters[batch_time]:.3f}\t'
-                'Data {meters[data_time]:.3f}\t'
-                'Class {meters[class_loss]:.4f}\t'
-                'Cons {meters[cons_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
-                    epoch, i, len(train_loader), meters=meters))
+                'Test: [{0}/{1}]\t'
+                'ClassLoss {meters[class_loss]:.4f}\t'
+                'Prec@1 {meters[top1]:.3f}}'.format(
+                    i, len(eval_loader), meters=meters))
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
                 **meters.values(),
@@ -490,17 +499,23 @@ def validate(eval_loader, model, log, global_step, epoch):
         end = time.time()
 
         if i % args.print_freq == 0:
+            # LOG.info(
+            #     'Test: [{0}/{1}]\t'
+            #     'Time {meters[batch_time]:.3f}\t'
+            #     'Data {meters[data_time]:.3f}\t'
+            #     'Class {meters[class_loss]:.4f}\t'
+            #     'Prec@1 {meters[top1]:.3f}\t'
+            #     'Prec@5 {meters[top5]:.3f}'.format(
+            #         i, len(eval_loader), meters=meters))
+
             LOG.info(
                 'Test: [{0}/{1}]\t'
-                'Time {meters[batch_time]:.3f}\t'
-                'Data {meters[data_time]:.3f}\t'
-                'Class {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
+                'ClassLoss {meters[class_loss]:.4f}\t'
+                'Prec@1 {meters[top1]:.3f}}'.format(
                     i, len(eval_loader), meters=meters))
 
-    LOG.info(' * Prec@1 {top1.avg:.3f}\tPrec@5 {top5.avg:.3f}'
-          .format(top1=meters['top1'], top5=meters['top5']))
+    LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
+          .format(top1=meters['top1'], class_loss=meters['class_loss']))
     log.record(epoch, {
         'step': global_step,
         **meters.values(),
