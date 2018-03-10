@@ -339,10 +339,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        # todo: some debug stmt ... to be removed later
-        num_unlabeled = sum([1 for lbl in datapoint[2].numpy().flatten() if lbl == -1])
-        num_labeled = minibatch_size - num_unlabeled
-        LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
+        # some debug stmt ... to be removed later
+        # num_unlabeled = sum([1 for lbl in datapoint[2].numpy().flatten() if lbl == -1])
+        # num_labeled = minibatch_size - num_unlabeled
+        # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
         if args.dataset in ['conll', 'ontonotes']:
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
