@@ -52,7 +52,7 @@ class FeedForwardMLPEmbed(nn.Module):
         self.activation = nn.ReLU()
         ## create : layer2 + Softmax: Create softmax here
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
 
     def forward(self, entity, pattern):
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
@@ -66,7 +66,7 @@ class FeedForwardMLPEmbed(nn.Module):
         res = self.layer2(res)
         # print (res)
         # print (res.shape)
-        res = self.softmax(res)
+        # res = self.softmax(res) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
         # print ("After softmax : " + str(res))
         return res
 
@@ -88,14 +88,14 @@ class FeedForwardMLP(nn.Module):
         self.layer1 = nn.Linear(input_sz, hidden_sz, bias=True)
         self.activation = nn.ReLU()
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        self.softmax = nn.Softmax() ## TODO: Add the right dimension ...
+        # self.softmax = nn.Softmax()
 
     def forward(self, x):
         ## code to to the forward pass of the MLP module
         x = self.layer1(x)
         x = self.activation(x)
         x = self.layer2(x)
-        x = self.softmax(x) ## TODO: Add the right dimension ...
+        # x = self.softmax(x) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
         return x
 
 @export
