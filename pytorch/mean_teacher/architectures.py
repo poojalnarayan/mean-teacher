@@ -10,6 +10,9 @@ from torch.autograd import Variable, Function
 from .utils import export, parameter_count
 
 ###############
+# https://stackoverflow.com/questions/34240703/whats-the-difference-between-softmax-and-softmax-cross-entropy-with-logits
+
+###############
 #### TODO: Add the emboot objective functions as another parameter
 ###############
 # @export
