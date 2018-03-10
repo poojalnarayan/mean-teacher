@@ -429,10 +429,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             #     'Prec@5 {meters[top5]:.3f}'.format(
             #         epoch, i, len(train_loader), meters=meters))
             LOG.info(
-                'Test: [{0}/{1}]\t'
+                'Epoch: [{0}][{1}/{2}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}}'.format(
-                    i, len(train_loader), meters=meters))
+                'Prec@1 {meters[top1]:.3f}'.format(
+                    epoch, i, len(train_loader), meters=meters))
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
                 **meters.values(),
@@ -511,7 +511,7 @@ def validate(eval_loader, model, log, global_step, epoch):
             LOG.info(
                 'Test: [{0}/{1}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}}'.format(
+                'Prec@1 {meters[top1]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
 
     LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
