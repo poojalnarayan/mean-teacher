@@ -49,8 +49,8 @@ class FeedForwardMLPEmbed(nn.Module):
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             # NOTE: do not update the emebddings # todo: make this a parameter
-            self.entity_embeddings.detach_()
-            self.pat_embeddings.detach_()
+            self.entity_embeddings.weight.detach_()
+            self.pat_embeddings.weight.detach_()
 
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
