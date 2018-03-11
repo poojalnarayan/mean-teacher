@@ -74,7 +74,7 @@ def main(context):
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
 
         if args.dataset in ['conll', 'ontonotes']:
-            model_params['word_embed'] = word_vocab_embed
+            model_params['word_vocab_embed'] = word_vocab_embed
 
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
