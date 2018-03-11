@@ -49,6 +49,7 @@ class FeedForwardMLPEmbed(nn.Module):
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             # NOTE: do not update the emebddings # todo: make this a parameter
+            # https://discuss.pytorch.org/t/how-to-exclude-embedding-layer-from-model-parameters/1283
             self.entity_embeddings.weight.detach_()
             self.pat_embeddings.weight.detach_()
 

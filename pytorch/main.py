@@ -90,7 +90,17 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
+    if args.dataset in ['conll', 'ontonotes']:
+        ## Note: removing the parameters of embeddings as they are not updated
+        ## todo: make this a parameter --> update embeddings / or not
+        # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
+        filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+        optimizer = torch.optim.SGD(filtered_parameters, args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay,
+                                    nesterov=args.nesterov)
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay,
                                 nesterov=args.nesterov)
