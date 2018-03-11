@@ -135,7 +135,7 @@ class NECDataset(Dataset):
 
         # NOTE: adding the embed for @PADDING at the end
         word_vocab_embed.append(Gigaword.norm(gigaW2vEmbed[lookupGiga["<pad>"]]))
-        return np.array(word_vocab_embed)
+        return np.array(word_vocab_embed).astype('float32')
 
     def build_word_vocabulary(self):
         word_vocab = Vocabulary()
