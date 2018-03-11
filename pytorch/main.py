@@ -41,7 +41,6 @@ global_step = 0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
-# 2. In architectures.py -- uncomment the appropriate params in simple_MLP_embed
 ###########
 
 
