@@ -25,21 +25,13 @@ from .utils import export, parameter_count
 #         super().__init__()
 
 @export
-def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None):
+def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970):
 
+    # todo: parameterize these arguments as well
     embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
     hidden_size = 50
-    output_size = num_classes
 
-    word_vocab_embed = word_vocab_embed # hard code the path
-
-    ### Hard code the parameters for CoNLL
-    word_vocab_size = 7970 #5523 #Note:  this shld be the total number of words in the word_vocab
-
-    ### Hard code the parameters for Ontonotes
-    # word_vocab_size = 18727
-
-    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, output_size, word_vocab_embed)
+    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, num_classes, word_vocab_embed)
     return model
 
 
@@ -55,6 +47,10 @@ class FeedForwardMLPEmbed(nn.Module):
             print("Using a pre-initialized word-embedding vector .. loaded from disk")
             self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
+            # NOTE: do not update the emebddings # todo: make this a parameter
+            self.entity_embeddings.detach_()
+            self.pat_embeddings.detach_()
 
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU

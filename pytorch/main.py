@@ -75,6 +75,7 @@ def main(context):
 
         if args.dataset in ['conll', 'ontonotes']:
             model_params['word_vocab_embed'] = word_vocab_embed
+            model_params['word_vocab_size'] = dataset_config.pop('word_vocab_size')
 
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
