@@ -59,7 +59,7 @@ def main(context):
     num_classes = dataset_config.pop('num_classes')
 
     if args.dataset in ['conll', 'ontonotes']:
-        train_loader, eval_loader, word_vocab_embed = create_data_loaders(**dataset_config, args=args)
+        train_loader, eval_loader, word_vocab_embed, word_vocab_size = create_data_loaders(**dataset_config, args=args)
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
@@ -74,7 +74,7 @@ def main(context):
 
         if args.dataset in ['conll', 'ontonotes']:
             model_params['word_vocab_embed'] = word_vocab_embed
-            model_params['word_vocab_size'] = dataset_config.pop('word_vocab_size')
+            model_params['word_vocab_size'] = word_vocab_size
 
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
@@ -287,7 +287,7 @@ def create_data_loaders(train_transformation,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes']:
-        return train_loader, eval_loader, dataset.word_vocab_embed
+        return train_loader, eval_loader, dataset.word_vocab_embed, dataset.word_vocab.size()
     else:
         return train_loader, eval_loader
 

@@ -67,8 +67,7 @@ def ontonotes():
         'train_transformation': data.TransformTwiceNEC(dropout),
         'eval_transformation': None,
         'datadir': 'data-local/nec/ontonotes',
-        'num_classes': 11,
-        'word_vocab_size': 18727 # todo: can be obtained from reading the dataset .. no need to hard code .. Note: The total number of words in the word_vocab
+        'num_classes': 11
     }
 
 
@@ -83,8 +82,7 @@ def conll():
         'train_transformation': data.TransformTwiceNEC(dropout),
         'eval_transformation': None,
         'datadir': 'data-local/nec/conll',
-        'num_classes': 4,
-        'word_vocab_size': 7970 # todo: can be obtained from reading the dataset .. no need to hard code .. Note: The total number of words in the word_vocab
+        'num_classes': 4
     }
 
 ##### USING Torchtext ... now reverting to using custom code
