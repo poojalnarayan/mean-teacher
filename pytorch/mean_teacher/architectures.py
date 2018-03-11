@@ -8,7 +8,6 @@ from torch.nn import functional as F
 from torch.autograd import Variable, Function
 
 from .utils import export, parameter_count
-
 ###############
 # https://stackoverflow.com/questions/34240703/whats-the-difference-between-softmax-and-softmax-cross-entropy-with-logits
 
@@ -26,36 +25,44 @@ from .utils import export, parameter_count
 #         super().__init__()
 
 @export
-def simple_MLP_embed(pretrained=True, **kwargs):
+def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None):
 
     embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
     hidden_size = 50
+    output_size = num_classes
+
+    word_vocab_embed = word_vocab_embed # hard code the path
 
     ### Hard code the parameters for CoNLL
-    # word_vocab_size = 7970 #5523 #Note:  this shld be the total number of words in the word_vocab
-    # output_size = 4
+    word_vocab_size = 7970 #5523 #Note:  this shld be the total number of words in the word_vocab
 
     ### Hard code the parameters for Ontonotes
-    word_vocab_size = 18727
-    output_size = 11
+    # word_vocab_size = 18727
 
-    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, output_size)
+    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, output_size, word_vocab_embed)
     return model
 
 
 class FeedForwardMLPEmbed(nn.Module):
-    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz):
+    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed):
         super().__init__()
         self.embedding_size = embedding_size
-        self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size) # todo: how to pre-init the embeddings ?
+        self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size)
         self.pat_embeddings = nn.Embedding(word_vocab_size, embedding_size)
+
+        # https://discuss.pytorch.org/t/can-we-use-pre-trained-word-embeddings-for-weight-initialization-in-nn-embedding/1222
+        if word_vocab_embed is not None: # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
+            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
         self.layer1 = nn.Linear(embedding_size*2, hidden_sz, bias=True) ## concatenate entity and pattern embeddings
         self.activation = nn.ReLU()
         ## create : layer2 + Softmax: Create softmax here
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        # self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
     def forward(self, entity, pattern):
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
@@ -91,7 +98,7 @@ class FeedForwardMLP(nn.Module):
         self.layer1 = nn.Linear(input_sz, hidden_sz, bias=True)
         self.activation = nn.ReLU()
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
-        # self.softmax = nn.Softmax()
+        # self.softmax = nn.Softmax() ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
     def forward(self, x):
         ## code to to the forward pass of the MLP module

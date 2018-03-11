@@ -59,7 +59,7 @@ def cifar10():
 @export
 def ontonotes():
 
-    num_words_to_dropout = 1
+    num_words_to_dropout = 1  # todo: parameterize this ?
     dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
     # todo: Add the replace (from wordnet) noise functionality
 
@@ -74,7 +74,7 @@ def ontonotes():
 @export
 def conll():
 
-    num_words_to_dropout = 1
+    num_words_to_dropout = 1 # todo: parameterize this ?
     dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
     # todo: Add the replace (from wordnet) noise functionality
 
@@ -104,17 +104,38 @@ class NECDataset(Dataset):
         entity_vocab_file = dir + "/entity_vocabulary.emboot.filtered.txt"
         context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
         dataset_file = dir + "/training_data_with_labels_emboot.filtered.txt"
+        w2vfile = dir + "../../vectors.goldbergdeps.txt"
 
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
+        self.word_vocab_embed = self.load_pretrained_word_embeddings(w2vfile)
         NECDataset.OOV_ID = self.word_vocab.get_id(NECDataset.OOV)
         NECDataset.ENTITY_ID = self.word_vocab.get_id(NECDataset.ENTITY)
         categories = sorted(list({l for l in self.labels_str}))
         self.lbl = [categories.index(l) for l in self.labels_str]
 
         self.transform = transform
+
+    def load_pretrained_word_embeddings(self, w2vfile):
+        gigaW2vEmbed, lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
+        word_vocab_embed = list()
+
+        # leave last word = "@PADDING"
+        for word_id in range(0, self.word_vocab.size()-1):
+
+            word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
+            if word in lookupGiga:
+                word_embed = Gigaword.norm(gigaW2vEmbed[lookupGiga[word]])
+            else:
+                word_embed = Gigaword.norm(gigaW2vEmbed[lookupGiga["<unk>"]])
+
+            word_vocab_embed.append(word_embed)
+
+        # NOTE: adding the embed for @PADDING at the end
+        word_vocab_embed.append(Gigaword.norm(gigaW2vEmbed[lookupGiga["<pad>"]]))
+        return np.array(word_vocab_embed)
 
     def build_word_vocabulary(self):
         word_vocab = Vocabulary()

@@ -58,7 +58,11 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
+
+    if args.dataset in ['conll', 'ontonotes']:
+        train_loader, eval_loader, word_vocab_embed = create_data_loaders(**dataset_config, args=args)
+    else:
+        train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -68,6 +72,10 @@ def main(context):
 
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
+
+        if args.dataset in ['conll', 'ontonotes']:
+            model_params['word_embed'] = word_vocab_embed
+
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
 
@@ -175,6 +183,7 @@ def create_data_loaders(train_transformation,
 
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
+
         if args.exclude_unlabeled:
             sampler = SubsetRandomSampler(labeled_idxs)
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
@@ -277,8 +286,10 @@ def create_data_loaders(train_transformation,
             pin_memory=True,
             drop_last=False)
 
-    return train_loader, eval_loader
-
+    if args.dataset in ['conll', 'ontonotes']:
+        return train_loader, eval_loader, dataset.word_vocab_embed
+    else:
+        return train_loader, eval_loader
 
 def update_ema_variables(model, ema_model, alpha, global_step):
     # Use the true average until the exponential average is more correct

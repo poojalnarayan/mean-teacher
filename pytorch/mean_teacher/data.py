@@ -236,7 +236,7 @@ class TwoStreamBatchSampler(Sampler):
         )
 
     def __len__(self):
-        return len(self.primary_indices) // self.primary_batch_size
+        return len(self.primary_indices) // self.primary_batch_size ## Note: floor division
 
 
 def iterate_once(iterable):
