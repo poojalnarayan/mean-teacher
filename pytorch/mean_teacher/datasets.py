@@ -233,9 +233,8 @@ class NECDataset(Dataset):
             context_words_dropout_str = self.transform(context_words_str, NECDataset.ENTITY)
 
             if NECDataset.WORD_NOISE_TYPE == 'replace':
-                # todo: correct the assert below
-                # assert len(context_words_str) != 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
-                new_replaced_words = [w for ctx in context_words_str[0] + context_words_str[1]
+                assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
+                new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
                                         for w in ctx
                                         if not self.word_vocab.contains(w)]
 
