@@ -74,8 +74,7 @@ def ontonotes():
 @export
 def conll():
 
-    num_words_to_dropout = 1 # todo: parameterize this ?
-    dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
+    dropout = data.RandomPatternDropout(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV_ID)
     # todo: Add the replace (from wordnet) noise functionality
 
     return {
@@ -99,8 +98,9 @@ class NECDataset(Dataset):
     ENTITY = "@ENTITY"
     OOV_ID = 0
     ENTITY_ID = -1
+    NUM_WORDS_TO_REPLACE = 1
 
-    def __init__(self, dir, transform=None):
+    def __init__(self, dir, args, transform=None):
         entity_vocab_file = dir + "/entity_vocabulary.emboot.filtered.txt"
         context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
         dataset_file = dir + "/training_data_with_labels_emboot.filtered.txt"
@@ -110,9 +110,18 @@ class NECDataset(Dataset):
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
-        self.word_vocab_embed = self.load_pretrained_word_embeddings(w2vfile)
+        if args.pretrained_wordemb:
+            self.word_vocab_embed = self.load_pretrained_word_embeddings(w2vfile)
+        else:
+            # todo: assert here that [--update-pretrained-wordemb=True]
+            self.word_vocab_embed = None
         NECDataset.OOV_ID = self.word_vocab.get_id(NECDataset.OOV)
         NECDataset.ENTITY_ID = self.word_vocab.get_id(NECDataset.ENTITY)
+
+        type_of_noise, size_of_noise = args.word_noise.split(":")
+        # todo: assert either 'drop' or 'replace'
+        NECDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
+
         categories = sorted(list({l for l in self.labels_str}))
         self.lbl = [categories.index(l) for l in self.labels_str]
 
@@ -201,7 +210,7 @@ class NECDataset(Dataset):
     def __getitem__(self, idx):
         entity_words = [self.word_vocab.get_id(w) for w in self.entity_vocab.get_word(self.mentions[idx]).split(" ")]
         entity_words_padded = self.pad_item(entity_words, isPattern=False)
-        entity_datum = torch.LongTensor(entity_words_padded)  ## todo: verify --> Note: this is not necessary [prev .. Note the square brackets .. converting singleton into array [of size 1] ]
+        entity_datum = torch.LongTensor(entity_words_padded)  ## Note: this is not necessary --> [prev .. Note the square brackets .. converting singleton into array [of size 1] ]
 
         context_words = [[self.word_vocab.get_id(w) for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
         # max_ctx_len = len(max(context_words, key=lambda x: len(x)))

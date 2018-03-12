@@ -76,6 +76,16 @@ def create_parser():
                         help='evaluate model on evaluation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
+    parser.add_argument('--wordemb-size', default=300, type=int,
+                        help='size of the word-embeddings to be used in the simple_MLP_embed model (default: 300)')
+    parser.add_argument('--hidden-size', default=50, type=int,
+                        help='size of the hidden layer to be used in the simple_MLP_embed model (default: 50)')
+    parser.add_argument('--pretrained-wordemb', default=True, type=str2bool, metavar='BOOL',
+                        help='Use pre-trained word embeddings to be loaded from disk, if True; else random initialization of word-emb (default: True)')
+    parser.add_argument('--update-pretrained-wordemb', default=False, type=str2bool, metavar='BOOL',
+                        help='Update the pre-trained word embeddings during training, if True; else keep them fixed (default: False)')
+    parser.add_argument('--word-noise', default='drop:1', type=str,
+                        help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
     return parser
 
 

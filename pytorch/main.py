@@ -75,6 +75,9 @@ def main(context):
         if args.dataset in ['conll', 'ontonotes']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
+            model_params['wordemb_size'] = args.wordemb_size
+            model_params['hidden_size'] = args.hidden_size
+            model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
 
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
@@ -90,9 +93,8 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
-        ## todo: make this a parameter --> update embeddings / or not
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
         optimizer = torch.optim.SGD(filtered_parameters, args.lr,
@@ -189,7 +191,7 @@ def create_data_loaders(train_transformation,
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.NECDataset(traindir, train_transformation)
+        dataset = datasets.NECDataset(traindir, args, train_transformation)
 
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
@@ -222,7 +224,7 @@ def create_data_loaders(train_transformation,
         #     )
         ############################################################################################################
 
-        dataset_test = datasets.NECDataset(evaldir, eval_transformation) ## NOTE: test data is the same as train data
+        dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,

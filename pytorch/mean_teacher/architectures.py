@@ -25,18 +25,16 @@ from .utils import export, parameter_count
 #         super().__init__()
 
 @export
-def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970):
+def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False):
 
-    # todo: parameterize these arguments as well
-    embedding_size = 300 # fyi: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
-    hidden_size = 50
+    # Note: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
 
-    model = FeedForwardMLPEmbed(word_vocab_size, embedding_size, hidden_size, num_classes, word_vocab_embed)
+    model = FeedForwardMLPEmbed(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
 
 
 class FeedForwardMLPEmbed(nn.Module):
-    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed):
+    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed, update_pretrained_wordemb):
         super().__init__()
         self.embedding_size = embedding_size
         self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size)
@@ -48,10 +46,11 @@ class FeedForwardMLPEmbed(nn.Module):
             self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
-            # NOTE: do not update the emebddings # todo: make this a parameter
+            if update_pretrained_wordemb is False:
+            # NOTE: do not update the emebddings
             # https://discuss.pytorch.org/t/how-to-exclude-embedding-layer-from-model-parameters/1283
-            self.entity_embeddings.weight.detach_()
-            self.pat_embeddings.weight.detach_()
+                self.entity_embeddings.weight.detach_()
+                self.pat_embeddings.weight.detach_()
 
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
