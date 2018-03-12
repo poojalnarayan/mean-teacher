@@ -227,6 +227,7 @@ class NECDataset(Dataset):
         entity_datum = torch.LongTensor(entity_words_padded)
 
         context_words_str = [[w for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
+        context_words = [[self.word_vocab.get_id(w) for w in self.context_vocab.get_word(ctxId).split(" ")] for ctxId in self.contexts[idx]]
 
         if self.transform is not None:
             # 1. Replace word with synonym word in Wordnet / NIL (whichever is enabled)
@@ -247,6 +248,8 @@ class NECDataset(Dataset):
                     for word_id in new_replaced_word_ids:
                         word_embed = self.sanitise_and_lookup_embedding(word_id)
                         self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
+
+                print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
             context_words_dropout = list()
             context_words_dropout.append([[self.word_vocab.get_id(w)
