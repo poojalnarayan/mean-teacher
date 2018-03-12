@@ -244,6 +244,11 @@ def create_data_loaders(train_transformation,
                                                   pin_memory=pin_memory,
                                                   drop_last=False)
 
+        LOG.info("Number of labeled datapoints in test dataset : " + str(sum([1 for i in dataset_test.lbl if i != -1])))
+        LOG.info("Number of un-labeled datapoints in test dataset : " + str(sum([1 for i in dataset_test.lbl if i == -1])))
+        LOG.info("Number of labeled datapoints in train dataset : " + str(sum([1 for i in dataset.lbl if i != -1])))
+        LOG.info("Number of un-labeled datapoints in train dataset : " + str(sum([1 for i in dataset.lbl if i == -1])))
+
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
     elif args.dataset in ['riedel10', 'gids']:
