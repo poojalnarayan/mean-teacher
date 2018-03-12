@@ -249,7 +249,7 @@ class NECDataset(Dataset):
                         word_embed = self.sanitise_and_lookup_embedding(word_id)
                         self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
 
-                print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
+                # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
             context_words_dropout = list()
             context_words_dropout.append([[self.word_vocab.get_id(w)

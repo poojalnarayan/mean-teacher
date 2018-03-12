@@ -296,6 +296,7 @@ class RandomPatternWordNoise:
                 if replacement is not None:
                     break
 
+        print ("word: " + str(word_str) + " word replacement: " + str(replacement))
         return replacement
 
     def __call__(self, datums, entity_token):
