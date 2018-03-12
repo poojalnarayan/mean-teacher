@@ -61,7 +61,7 @@ def ontonotes():
 
     if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
         addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
-     else:
+    else:
         assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
 
     return {
