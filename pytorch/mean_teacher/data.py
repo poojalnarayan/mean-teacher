@@ -9,6 +9,7 @@ import numpy as np
 from torch.utils.data.sampler import Sampler
 import torch
 import random
+from nltk.corpus import wordnet as wn
 
 LOG = logging.getLogger('main')
 NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
@@ -275,11 +276,27 @@ class TransformTwiceNEC:
         return out1, out2
 
 
-class RandomPatternDropout:
+class RandomPatternWordNoise:
 
-    def __init__(self, number_words, replace):
+    def __init__(self, number_words, replace, noise_type):
         self.number_words = number_words
         self.replace = replace
+        self.noise_type = noise_type
+
+    @staticmethod
+    def replace_with_synonym(word_str):
+        wordnet_synsets = wn.synsets(word_str)
+
+        replacement = None
+        for synset in wordnet_synsets:
+            for lemma in synset.lemma_names():
+                if lemma != word_str:
+                    replacement = lemma
+                    break
+                if replacement is not None:
+                    break
+
+        return replacement
 
     def __call__(self, datums, entity_token):
 
@@ -292,7 +309,11 @@ class RandomPatternDropout:
             to_replace = random.sample(to_replace, num_words_to_dropout)
             for w in datum:
                 if w in to_replace:
-                    dropout_datum.append(self.replace)
+                    if self.noise_type == 'drop':  # Dropout .. replace with NIL word
+                        dropout_datum.append(self.replace)
+                    else:  # Replace .. find a synonym of the word using wordnet
+                        replaced_synonym = self.replace_with_synonym(w)
+                        dropout_datum.append(replaced_synonym)
                 else:
                     dropout_datum.append(w)
             dropout_datums.append(dropout_datum)
