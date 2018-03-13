@@ -59,8 +59,7 @@ def cifar10():
 @export
 def ontonotes():
 
-    num_words_to_dropout = 1  # todo: parameterize this ?
-    dropout = data.RandomPatternDropout(num_words_to_dropout, NECDataset.OOV_ID)
+    dropout = data.RandomPatternDropout(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV_ID)
     # todo: Add the replace (from wordnet) noise functionality
 
     return {
