@@ -12,7 +12,7 @@ from .utils import export, parameter_count
 # https://stackoverflow.com/questions/34240703/whats-the-difference-between-softmax-and-softmax-cross-entropy-with-logits
 
 ###############
-#### TODO: Add the emboot objective functions as another parameter
+#### TODO: Add the emboot objective functions as another parameter -- NO longer necessary at least for the COLING submission
 ###############
 # @export
 # def pushpull_embed(pretrained=True, **kwargs):
@@ -24,6 +24,75 @@ from .utils import export, parameter_count
 #     def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz):
 #         super().__init__()
 
+##############################################
+##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
+##############################################
+@export
+def custom_embed(pretrained=True, word_vocab_size=7970, word_embedding_size=300, lstm_hidden_size=100, hidden_size=300, output_size=4, word_vocab_embed=None, update_pretrained_wordemb=False):
+
+    model = SeqModelCustomEmbed(word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb)
+    return model
+
+# todo: Is padding the way done here ok ?
+class SeqModelCustomEmbed(nn.Module):
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb): #todo: add lstm parameters
+        super().__init__()
+        self.embedding_size = word_embedding_size
+        self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+
+        if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
+            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
+            if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
+                self.entity_embeddings.weight.detach_()
+                self.pat_embeddings.weight.detach_()
+
+        # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
+        self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+
+        # Note: Size of linear layer = [(lstm_hidden_size * 2) bi-LSTM ] * 2 --> concat of entity and context lstm out
+        self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
+        self.activation = nn.ReLU()  # non-linear activation
+        self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
+
+    # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
+    def forward(self, entity, pattern):
+        entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        pattern_split = torch.unbind(pattern, dim=1)  # split the 2D list of list of set of patterns into individual patterns of words
+        pattern_word_embed_list = [self.pat_word_embeddings(p).permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
+                                  for p in pattern_split] # list of pattern word embeddings (one for each pattern of words)
+
+        ###############################################
+        # bi-LSTM computation here
+
+        _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
+
+        pattern_lstm_out_list = list()
+        for pattern_embed in pattern_word_embed_list:
+            _, (pattern_lstm_out, _) = self.lstm_patterns(pattern_embed)  # hidden state is initialized to 0 if not provided
+            pattern_lstm_out_list.append(torch.unsqueeze(torch.cat([pattern_lstm_out[0], pattern_lstm_out[1]], 1), 0)) # roll out the 2 tuple output each of the LSTMs and add to the list
+        pattern_lstm_out = torch.cat(pattern_lstm_out_list, 0)
+
+        # compute the average of all the pattern lstms outputs
+        pattern_lstm_out_avg = torch.mean(pattern_lstm_out, 0)
+
+        # concatenate the entity_lstm and avgeraged pattern_lstm representations
+        entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out_avg], dim=1)
+        ###############################################
+
+        res = self.layer1(entity_and_pattern_lstm_out)
+        res = self.activation(res)
+        res = self.layer2(res)
+        return res
+
+##############################################
+##### Simple architecture where the entity and pattern embeddings are computed by an average
+##############################################
 @export
 def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False):
 
