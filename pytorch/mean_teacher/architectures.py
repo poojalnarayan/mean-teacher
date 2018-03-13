@@ -70,6 +70,10 @@ class SeqModelCustomEmbed(nn.Module):
         ###############################################
         # bi-LSTM computation here
 
+        # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
+        self.lstm_entities.flatten_parameters()
+        self.lstm_patterns.flatten_parameters()
+
         _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
         entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
 
