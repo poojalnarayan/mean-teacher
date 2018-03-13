@@ -44,12 +44,12 @@ class SeqModelCustomEmbed(nn.Module):
 
         if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
             print("Using a pre-initialized word-embedding vector .. loaded from disk")
-            self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
-                self.entity_embeddings.weight.detach_()
-                self.pat_embeddings.weight.detach_()
+                self.entity_word_embeddings.weight.detach_()
+                self.pat_word_embeddings.weight.detach_()
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
