@@ -28,9 +28,9 @@ from .utils import export, parameter_count
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def custom_embed(pretrained=True, word_vocab_size=7970, word_embedding_size=300, lstm_hidden_size=100, hidden_size=300, output_size=4, word_vocab_embed=None, update_pretrained_wordemb=False):
+def custom_embed(pretrained=True, word_vocab_size=7970, word_embedding_size=300, lstm_hidden_size=100, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False):
 
-    model = SeqModelCustomEmbed(word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb)
+    model = SeqModelCustomEmbed(word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
 
 # todo: Is padding the way done here ok ?
