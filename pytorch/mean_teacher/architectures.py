@@ -75,12 +75,12 @@ class SeqModelCustomEmbed(nn.Module):
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, entity, pattern):
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        print ("entity_word_embed = " + str(entity_word_embed.size()))
+        # print ("entity_word_embed = " + str(entity_word_embed.size()))
         pattern_split = torch.unbind(pattern, dim=1)  # split the 2D list of list of set of patterns into individual patterns of words
         pattern_word_embed_list = [self.pat_word_embeddings(p).permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
                                   for p in pattern_split] # list of pattern word embeddings (one for each pattern of words)
-        print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
-        print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
+        # print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        # print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
 
         ###############################################
         # bi-LSTM computation here
@@ -90,24 +90,24 @@ class SeqModelCustomEmbed(nn.Module):
         self.lstm_patterns.flatten_parameters()
 
         _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
-        print ("entity_lstm_out (pre) = " + str(entity_lstm_out.size()))
+        # print ("entity_lstm_out (pre) = " + str(entity_lstm_out.size()))
         entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
-        print ("entity_lstm_out (post) = " + str(entity_lstm_out.size()))
+        # print ("entity_lstm_out (post) = " + str(entity_lstm_out.size()))
 
         pattern_lstm_out_list = list()
         for pattern_embed in pattern_word_embed_list:
             _, (pattern_lstm_out, _) = self.lstm_patterns(pattern_embed)  # hidden state is initialized to 0 if not provided
             pattern_lstm_out_list.append(torch.unsqueeze(torch.cat([pattern_lstm_out[0], pattern_lstm_out[1]], 1), 0)) # roll out the 2 tuple output each of the LSTMs and add to the list
         pattern_lstm_out = torch.cat(pattern_lstm_out_list, 0)
-        print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        # print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
 
         # compute the average of all the pattern lstms outputs
         pattern_lstm_out_avg = torch.mean(pattern_lstm_out, 0)
-        print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
+        # print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
 
         # concatenate the entity_lstm and avgeraged pattern_lstm representations
         entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out_avg], dim=1)
-        print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        # print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
         ###############################################
 
         res = self.layer1(entity_and_pattern_lstm_out)

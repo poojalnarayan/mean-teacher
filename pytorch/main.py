@@ -84,7 +84,12 @@ def main(context):
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
-        model = nn.DataParallel(model).cuda()
+        ######### NOTE: RNN with data parallel seems to have some issues with sharding the minibatches across GPUs and collecting them having differnt dims
+        ######### 1. https://discuss.pytorch.org/t/dataparallel-lstm-gru-wrong-hidden-batch-size-8-gpus/6701/4
+        ######### 2. https://discuss.pytorch.org/t/multi-layer-rnn-with-dataparallel/4450/2
+        ######### 3. https://stackoverflow.com/questions/44595338/how-to-parallelize-rnn-function-in-pytorch-with-dataparallel
+        ######### Following 3. -> most simple at the moment and seems to be working without exceptions
+        model = nn.DataParallel(model, dim=1).cuda()
         # else:
         #     model = nn.DataParallel(model).cpu()
 
@@ -393,8 +398,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
         if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
-            print("ema_entity_var = " + str(ema_entity_var.size()))
-            print("ema_patterns_var = " + str(ema_patterns_var.size()))
+            # print("ema_entity_var = " + str(ema_entity_var.size()))
+            # print("ema_patterns_var = " + str(ema_patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
