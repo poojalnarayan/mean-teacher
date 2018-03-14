@@ -169,6 +169,9 @@ def main(context):
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint_path, epoch + 1)
 
+    # todo: for testing only .. to comment later
+    LOG.info("For testing only; Comment the following line of code--------------------------------")
+    validate(eval_loader, model, validation_log, global_step, 0, dataset, context.result_dir, "student")
     LOG.info("--------Total end to end time %s seconds ----------- " % (time.time() - time_start))
 
 
@@ -614,8 +617,8 @@ def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, mod
     # dataset_id_list = list()
 
     for min_batch_id, datapoint in enumerate(custom_embeddings_minibatch):
-        mention_embeddings_batch = datapoint[0].data.numpy()
-        patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
+        mention_embeddings_batch = datapoint[0].cpu().data.numpy()
+        patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).cpu().data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
         # min_batch_sz = datapoint[2]
 
         # compute the custom entity embeddings
