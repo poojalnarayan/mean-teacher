@@ -59,7 +59,9 @@ def main(context):
     num_classes = dataset_config.pop('num_classes')
 
     if args.dataset in ['conll', 'ontonotes']:
-        train_loader, eval_loader, word_vocab_embed, word_vocab_size = create_data_loaders(**dataset_config, args=args)
+        train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
+        word_vocab_embed = dataset.word_vocab_embed,
+        word_vocab_size = dataset.word_vocab.size()
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
@@ -124,9 +126,9 @@ def main(context):
 
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch)
+        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir)
         LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch)
+        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -138,9 +140,9 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1)
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset, context.result_dir)
             LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1)
+            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset, context.result_dir)
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
             is_best = ema_prec1 > best_prec1
             best_prec1 = max(ema_prec1, best_prec1)
@@ -299,7 +301,7 @@ def create_data_loaders(train_transformation,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes']:
-        return train_loader, eval_loader, dataset.word_vocab_embed, dataset.word_vocab.size()
+        return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader
 
@@ -371,7 +373,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
+            model_out, _, _ = model(entity_var, patterns_var)
+        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
         else:
@@ -464,7 +469,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             })
 
 
-def validate(eval_loader, model, log, global_step, epoch):
+def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
     meters = AverageMeterSet()
 
@@ -472,6 +477,16 @@ def validate(eval_loader, model, log, global_step, epoch):
     model.eval() ### From the documentation (nn.module,py) : i) Sets the module in evaluation mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
 
     end = time.time()
+
+    save_custom_embed_condition = args.arch == 'custom_embed' \
+                                  and args.save_custom_embedding \
+                                  and epoch == args.epochs  # todo: only in the final epoch or best_epoch ?
+
+    if save_custom_embed_condition:
+        # Note: contains a tuple: (custom_entity_embed, custom_patterns_embed, min-batch-size)
+        # enumerating the list of tuples gives the minibatch_id
+        custom_embeddings_minibatch = list()
+
     for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
@@ -502,7 +517,11 @@ def validate(eval_loader, model, log, global_step, epoch):
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         # compute output
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+            output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
+            if save_custom_embed_condition:
+                custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed, minibatch_size))
+        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
@@ -546,7 +565,63 @@ def validate(eval_loader, model, log, global_step, epoch):
         **meters.sums()
     })
 
+    if save_custom_embed_condition:
+        save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir)
     return meters['top1'].avg
+
+
+def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir):
+
+    start_time = time.time()
+    mention_embeddings = dict()
+    pattern_embeddings = dict()
+
+    for min_batch_id, datapoint in enumerate(custom_embeddings_minibatch):
+        mention_embeddings_batch = datapoint[0].data.numpy()
+        patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
+        min_batch_sz = datapoint[2]
+
+        # compute the custom entity embeddings
+        for idx, embed in enumerate(mention_embeddings_batch):
+            dataset_id = (min_batch_id * min_batch_sz) + idx
+            mention_str = dataset.entity_vocab.get_word(dataset.mentions[dataset_id])
+            if mention_str in mention_embeddings:
+                prev_embed = mention_embeddings[mention_str]
+                np.mean([prev_embed, embed], axis=0)
+            else:
+                mention_embeddings[mention_str] = embed
+
+        # compute the custom pattern embeddings
+        for idx, embed_arr in enumerate(patterns_embeddings_batch):
+            dataset_id = (min_batch_id * min_batch_sz) + idx
+            patterns_arr = [dataset.context_vocab.get_word(ctxId) for ctxId in dataset.contexts[dataset_id]]
+            num_patterns = len(patterns_arr)
+
+            for i in range(num_patterns):
+                embed = embed_arr[i]
+                pattern_str = patterns_arr[i]
+                if pattern_str in pattern_embeddings:
+                    prev_embed = pattern_embeddings[pattern_str]
+                    np.mean([prev_embed, embed], axis=0)
+                else:
+                    pattern_embeddings[pattern_str] = embed
+
+    entity_embed_file = os.path.join(result_dir, "entity_embed.txt")
+    with open(entity_embed_file) as ef:
+        for string, embed in mention_embeddings.items():
+            ef.write(string + " " + " ".join([str(i) for i in embed]) + "\n")
+    ef.close()
+
+    pattern_embed_file = os.path.join(result_dir, "pattern_embed.txt")
+    with open(pattern_embed_file) as pf:
+        for string, embed in pattern_embeddings.items():
+            pf.write(string + " " + " ".join([str(i) for i in embed]) + "\n")
+    pf.close()
+
+    LOG.info("Saving the customs entity and pattern embeddings in dir :=> " + str(result_dir))
+    LOG.info("Size of entity embeddings :=> " + str(len(mention_embeddings)))
+    LOG.info("Size of pattern embeddings :=> " + str(len(pattern_embeddings)))
+    LOG.info("COMPLETED writing the files in " + str(time.time() - start_time) + " s.")
 
 
 def save_checkpoint(state, is_best, dirpath, epoch):

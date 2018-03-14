@@ -48,12 +48,22 @@ class SeqModelCustomEmbed(nn.Module):
             self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
+                print("NOT UPDATING the word embeddings ....")
                 self.entity_word_embeddings.weight.detach_()
                 self.pat_word_embeddings.weight.detach_()
+            else:
+                print("UPDATING the word embeddings ....")
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
         self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+
+        # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
+        #  in this case `entity_lstm_out` and `pattern_lstm_out`
+        # Note: saving these representations, so that when they are computed during forward, we can use these variables
+        # to dump the custom entity and pattern embeddings
+        # self.entity_lstm_out = None
+        # self.pattern_lstm_out = None
 
         # Note: Size of linear layer = [(lstm_hidden_size * 2) bi-LSTM ] * 2 --> concat of entity and context lstm out
         self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
@@ -93,7 +103,7 @@ class SeqModelCustomEmbed(nn.Module):
         res = self.layer1(entity_and_pattern_lstm_out)
         res = self.activation(res)
         res = self.layer2(res)
-        return res
+        return res, entity_lstm_out, pattern_lstm_out
 
 ##############################################
 ##### Simple architecture where the entity and pattern embeddings are computed by an average
@@ -121,10 +131,13 @@ class FeedForwardMLPEmbed(nn.Module):
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:
-            # NOTE: do not update the emebddings
-            # https://discuss.pytorch.org/t/how-to-exclude-embedding-layer-from-model-parameters/1283
+                # NOTE: do not update the emebddings
+                # https://discuss.pytorch.org/t/how-to-exclude-embedding-layer-from-model-parameters/1283
+                print ("NOT UPDATING the word embeddings ....")
                 self.entity_embeddings.weight.detach_()
                 self.pat_embeddings.weight.detach_()
+            else:
+                print("UPDATING the word embeddings ....")
 
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
