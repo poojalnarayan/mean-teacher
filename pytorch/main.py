@@ -13,6 +13,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
+import torch.cuda
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -60,7 +61,7 @@ def main(context):
 
     if args.dataset in ['conll', 'ontonotes']:
         train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
-        word_vocab_embed = dataset.word_vocab_embed,
+        word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
@@ -82,7 +83,10 @@ def main(context):
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
 
         model = model_factory(**model_params)
-        model = nn.DataParallel(model).cuda()
+        if torch.cuda.is_available():
+            model = nn.DataParallel(model).cuda()
+        else:
+            model = nn.DataParallel(model).cpu()
 
         if ema:
             for param in model.parameters():
@@ -126,9 +130,9 @@ def main(context):
 
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir)
+        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir, "student")
         LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir)
+        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -140,9 +144,9 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset, context.result_dir)
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset, context.result_dir, "student")
             LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset, context.result_dir)
+            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset, context.result_dir, "teacher")
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
             is_best = ema_prec1 > best_prec1
             best_prec1 = max(ema_prec1, best_prec1)
@@ -189,11 +193,18 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
+    if torch.cuda.is_available():
+        pin_memory = True
+    else:
+        pin_memory = False
+
     if args.dataset in ['conll', 'ontonotes']:
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
         dataset = datasets.NECDataset(traindir, args, train_transformation)
+        LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
+        LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
@@ -210,7 +221,7 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                   batch_sampler=batch_sampler,
                                                   num_workers=args.workers,
-                                                  pin_memory=True)
+                                                  pin_memory=pin_memory)
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
@@ -232,7 +243,7 @@ def create_data_loaders(train_transformation,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=True,
+                                                  pin_memory=pin_memory,
                                                   drop_last=False)
 
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
@@ -255,7 +266,7 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=True)
+                                                   pin_memory=pin_memory)
                                                    # drop_last=False)
                                                    # batch_size=args.batch_size)
                                                    # shuffle=True)
@@ -266,7 +277,7 @@ def create_data_loaders(train_transformation,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=True,
+                                                  pin_memory=pin_memory,
                                                   drop_last=False)
 
     else:
@@ -290,20 +301,21 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=True)
+                                                   pin_memory=pin_memory)
 
         eval_loader = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(evaldir, eval_transformation),
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2 * args.workers,  # Needs images twice as fast
-            pin_memory=True,
+            pin_memory=pin_memory,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader
+
 
 def update_ema_variables(model, ema_model, alpha, global_step):
     # Use the true average until the exponential average is more correct
@@ -315,7 +327,11 @@ def update_ema_variables(model, ema_model, alpha, global_step):
 def train(train_loader, model, ema_model, optimizer, epoch, log):
     global global_step
 
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
     elif args.consistency_type == 'kl':
@@ -361,7 +377,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             input_var = torch.autograd.Variable(input)
             ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        if torch.cuda.is_available():
+            target_var = torch.autograd.Variable(target.cuda(async=True))
+        else:
+            target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -469,8 +488,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             })
 
 
-def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+
     meters = AverageMeterSet()
 
     # switch to evaluate mode
@@ -486,6 +509,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
         # Note: contains a tuple: (custom_entity_embed, custom_patterns_embed, min-batch-size)
         # enumerating the list of tuples gives the minibatch_id
         custom_embeddings_minibatch = list()
+        # eval_loader.batch_size = 1
+        # LOG.info("NOTE: Setting the eval_loader's batch_size=1 .. to dump all the entity and pattern embeddings ....")
 
     for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
@@ -502,7 +527,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
             (input, target) = datapoint
             input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        if torch.cuda.is_available():
+            target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        else:
+            target_var = torch.autograd.Variable(target.cpu(), volatile=True)
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -520,7 +548,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
         if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
             output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
             if save_custom_embed_condition:
-                custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed, minibatch_size))
+                custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
         else:
@@ -566,24 +594,27 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir):
     })
 
     if save_custom_embed_condition:
-        save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir)
+        save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
     return meters['top1'].avg
 
 
-def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir):
+def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type):
 
     start_time = time.time()
     mention_embeddings = dict()
     pattern_embeddings = dict()
 
+    # dataset_id_list = list()
+
     for min_batch_id, datapoint in enumerate(custom_embeddings_minibatch):
         mention_embeddings_batch = datapoint[0].data.numpy()
         patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
-        min_batch_sz = datapoint[2]
+        # min_batch_sz = datapoint[2]
 
         # compute the custom entity embeddings
         for idx, embed in enumerate(mention_embeddings_batch):
-            dataset_id = (min_batch_id * min_batch_sz) + idx
+            dataset_id = (min_batch_id * args.batch_size) + idx  # NOTE: `mini_batch_sz` here is a bug (in last batch)!! So changing to args.batch_size
+            # dataset_id_list.append("ID="+str(min_batch_id)+"*"+str(min_batch_sz)+"+"+str(idx)+"="+str(dataset_id))
             mention_str = dataset.entity_vocab.get_word(dataset.mentions[dataset_id])
             if mention_str in mention_embeddings:
                 prev_embed = mention_embeddings[mention_str]
@@ -593,7 +624,7 @@ def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir):
 
         # compute the custom pattern embeddings
         for idx, embed_arr in enumerate(patterns_embeddings_batch):
-            dataset_id = (min_batch_id * min_batch_sz) + idx
+            dataset_id = (min_batch_id * args.batch_size) + idx  # NOTE: `mini_batch_sz` here is a bug (in last batch)!! So changing to args.batch_size
             patterns_arr = [dataset.context_vocab.get_word(ctxId) for ctxId in dataset.contexts[dataset_id]]
             num_patterns = len(patterns_arr)
 
@@ -606,22 +637,26 @@ def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir):
                 else:
                     pattern_embeddings[pattern_str] = embed
 
-    entity_embed_file = os.path.join(result_dir, "entity_embed.txt")
-    with open(entity_embed_file) as ef:
+    entity_embed_file = os.path.join(result_dir, model_type + "_entity_embed.txt")
+    with open(entity_embed_file, 'w') as ef:
         for string, embed in mention_embeddings.items():
-            ef.write(string + " " + " ".join([str(i) for i in embed]) + "\n")
+            ef.write(string + "\t" + " ".join([str(i) for i in embed]) + "\n")
+        # for string in dataset_id_list:
+        #     ef.write(string + "\n")
     ef.close()
 
-    pattern_embed_file = os.path.join(result_dir, "pattern_embed.txt")
-    with open(pattern_embed_file) as pf:
+    pattern_embed_file = os.path.join(result_dir, model_type + "_pattern_embed.txt")
+    with open(pattern_embed_file, 'w') as pf:
         for string, embed in pattern_embeddings.items():
-            pf.write(string + " " + " ".join([str(i) for i in embed]) + "\n")
+            pf.write(string + "\t" + " ".join([str(i) for i in embed]) + "\n")
     pf.close()
 
     LOG.info("Saving the customs entity and pattern embeddings in dir :=> " + str(result_dir))
     LOG.info("Size of entity embeddings :=> " + str(len(mention_embeddings)))
     LOG.info("Size of pattern embeddings :=> " + str(len(pattern_embeddings)))
-    LOG.info("COMPLETED writing the files in " + str(time.time() - start_time) + " s.")
+    LOG.info("COMPLETED writing the files in " + str(time.time() - start_time) + "s.")
+    # LOG.info("Size of dataset_id : " + str(len(dataset_id_list)))
+    # LOG.info("Size of dataset : " + str(len(dataset.mentions)))
 
 
 def save_checkpoint(state, is_best, dirpath, epoch):

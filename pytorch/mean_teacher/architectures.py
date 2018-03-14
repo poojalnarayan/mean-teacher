@@ -24,6 +24,7 @@ from .utils import export, parameter_count
 #     def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz):
 #         super().__init__()
 
+
 ##############################################
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
@@ -33,6 +34,7 @@ def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden
     lstm_hidden_size = 100
     model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
+
 
 # todo: Is padding the way done here ok ?
 class SeqModelCustomEmbed(nn.Module):
