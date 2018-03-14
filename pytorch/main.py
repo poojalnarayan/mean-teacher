@@ -13,7 +13,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
-import torch.cuda
+# import torch.cuda
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -83,10 +83,10 @@ def main(context):
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
 
         model = model_factory(**model_params)
-        if torch.cuda.is_available():
-            model = nn.DataParallel(model).cuda()
-        else:
-            model = nn.DataParallel(model).cpu()
+        # if torch.cuda.is_available():
+        model = nn.DataParallel(model).cuda()
+        # else:
+        #     model = nn.DataParallel(model).cpu()
 
         if ema:
             for param in model.parameters():
@@ -193,10 +193,10 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    if torch.cuda.is_available():
-        pin_memory = True
-    else:
-        pin_memory = False
+    # if torch.cuda.is_available():
+    #     pin_memory = True
+    # else:
+    #     pin_memory = False
 
     if args.dataset in ['conll', 'ontonotes']:
 
@@ -221,7 +221,7 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                   batch_sampler=batch_sampler,
                                                   num_workers=args.workers,
-                                                  pin_memory=pin_memory)
+                                                  pin_memory=True)
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
@@ -243,7 +243,7 @@ def create_data_loaders(train_transformation,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=pin_memory,
+                                                  pin_memory=True,
                                                   drop_last=False)
 
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
@@ -266,7 +266,7 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=pin_memory)
+                                                   pin_memory=True)
                                                    # drop_last=False)
                                                    # batch_size=args.batch_size)
                                                    # shuffle=True)
@@ -277,7 +277,7 @@ def create_data_loaders(train_transformation,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=pin_memory,
+                                                  pin_memory=True,
                                                   drop_last=False)
 
     else:
@@ -301,14 +301,14 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=pin_memory)
+                                                   pin_memory=True)
 
         eval_loader = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(evaldir, eval_transformation),
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2 * args.workers,  # Needs images twice as fast
-            pin_memory=pin_memory,
+            pin_memory=True,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes']:
@@ -327,10 +327,10 @@ def update_ema_variables(model, ema_model, alpha, global_step):
 def train(train_loader, model, ema_model, optimizer, epoch, log):
     global global_step
 
-    if torch.cuda.is_available():
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-    else:
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+    # if torch.cuda.is_available():
+    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    # else:
+    #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
@@ -377,10 +377,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             input_var = torch.autograd.Variable(input)
             ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        if torch.cuda.is_available():
-            target_var = torch.autograd.Variable(target.cuda(async=True))
-        else:
-            target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
+        # if torch.cuda.is_available():
+        target_var = torch.autograd.Variable(target.cuda(async=True))
+        # else:
+        #     target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -491,10 +491,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
-    if torch.cuda.is_available():
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-    else:
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+    # if torch.cuda.is_available():
+    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    # else:
+    #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
     meters = AverageMeterSet()
 
@@ -529,10 +529,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             (input, target) = datapoint
             input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        if torch.cuda.is_available():
-            target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
-        else:
-            target_var = torch.autograd.Variable(target.cpu(), volatile=True)
+        # if torch.cuda.is_available():
+        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        # else:
+        #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
