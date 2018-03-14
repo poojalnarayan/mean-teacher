@@ -89,7 +89,9 @@ def main(context):
         ######### 2. https://discuss.pytorch.org/t/multi-layer-rnn-with-dataparallel/4450/2
         ######### 3. https://stackoverflow.com/questions/44595338/how-to-parallelize-rnn-function-in-pytorch-with-dataparallel
         ######### Following 3. -> most simple at the moment and seems to be working without exceptions
-        model = nn.DataParallel(model, dim=1).cuda()
+        #model = nn.DataParallel(model, dim=1).cuda()
+        LOG.info("--------------------IMPORTANT: REMOVING nn.DataParallel for the moment --------------------")
+        model = model.cuda()  # Note: Disabling data parallelism for now 
         # else:
         #     model = nn.DataParallel(model).cpu()
 
@@ -169,9 +171,9 @@ def main(context):
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint_path, epoch + 1)
 
-    # todo: for testing only .. to comment later
-    LOG.info("For testing only; Comment the following line of code--------------------------------")
-    validate(eval_loader, model, validation_log, global_step, 0, dataset, context.result_dir, "student")
+    # for testing only .. commented
+    # LOG.info("For testing only; Comment the following line of code--------------------------------")
+    # validate(eval_loader, model, validation_log, global_step, 0, dataset, context.result_dir, "student")
     LOG.info("--------Total end to end time %s seconds ----------- " % (time.time() - time_start))
 
 
@@ -372,18 +374,18 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
             input_patterns = input[1]
-            entity_var = torch.autograd.Variable(input_entity)
-            patterns_var = torch.autograd.Variable(input_patterns)
+            entity_var = torch.autograd.Variable(input_entity).cuda()
+            patterns_var = torch.autograd.Variable(input_patterns).cuda()
 
             ema_input_entity = ema_input[0]
             ema_input_patterns = ema_input[1]
-            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True)
-            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True)
+            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
+            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
 
         else:
             ((input, ema_input), target) = datapoint
-            input_var = torch.autograd.Variable(input)
-            ema_input_var = torch.autograd.Variable(ema_input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+            input_var = torch.autograd.Variable(input).cuda()
+            ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         # if torch.cuda.is_available():
         target_var = torch.autograd.Variable(target.cuda(async=True))
@@ -401,8 +403,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
         if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
-            # print("ema_entity_var = " + str(ema_entity_var.size()))
-            # print("ema_patterns_var = " + str(ema_patterns_var.size()))
+            # print("entity_var = " + str(entity_var.size()))
+            # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
@@ -530,12 +532,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             patterns = datapoint[0][1]
             target = datapoint[1]
 
-            entity_var = torch.autograd.Variable(entity, volatile=True)
-            patterns_var = torch.autograd.Variable(patterns, volatile=True)
+            entity_var = torch.autograd.Variable(entity, volatile=True).cuda()
+            patterns_var = torch.autograd.Variable(patterns, volatile=True).cuda()
 
         else:
             (input, target) = datapoint
-            input_var = torch.autograd.Variable(input, volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+            input_var = torch.autograd.Variable(input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         # if torch.cuda.is_available():
         target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
@@ -633,11 +635,22 @@ def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, mod
                 mention_embeddings[mention_str] = embed
 
         # compute the custom pattern embeddings
+        # print("==========================")
+        # print("datapoint[0] (sz) = " + str(datapoint[0].size()))
+        # print("datapoint[1] (sz) = " + str(datapoint[1].size()))
+        # print("patterns_embeddings_batch (sz) = " + str(patterns_embeddings_batch.shape))
+        # print("==========================")
         for idx, embed_arr in enumerate(patterns_embeddings_batch):
             dataset_id = (min_batch_id * args.batch_size) + idx  # NOTE: `mini_batch_sz` here is a bug (in last batch)!! So changing to args.batch_size
             patterns_arr = [dataset.context_vocab.get_word(ctxId) for ctxId in dataset.contexts[dataset_id]]
             num_patterns = len(patterns_arr)
 
+            # print("-------------------------------------------------")
+            # print("Patterns Arr : " + str(patterns_arr))
+            # print("Num Patterns : " + str(num_patterns))
+            # print("dataset_id : " + str(dataset_id))
+            # print("embed_arr (sz) : " + str(embed_arr.shape))
+            # print("-------------------------------------------------")
             for i in range(num_patterns):
                 embed = embed_arr[i]
                 pattern_str = patterns_arr[i]
