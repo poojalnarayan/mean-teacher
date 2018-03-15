@@ -1,5 +1,5 @@
 import torch
-import logging
+# import logging
 import torch.nn as nn
 import os
 from torch.utils.data.sampler import BatchSampler
@@ -9,12 +9,12 @@ from mean_teacher import architectures, datasets, cli
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
 
-LOG = logging.getLogger('main')
+# LOG = logging.getLogger('main')
 
 
 def create_model(arch, num_classes, word_vocab_embed, word_vocab_size,
                  wordemb_size, hidden_size, ema=False):
-    LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
+    print("=> creating {pretrained}{ema}model '{arch}'".format(
         pretrained='pre-trained ' if False else '',
         ema='EMA ' if ema else '',
         arch=arch))
@@ -105,21 +105,21 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
         end = time.time()
 
         if i % args.print_freq == 0:
-            LOG.info(
+            print(
                 'Test: [{0}/{1}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
 
-    LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
+    print(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
           .format(top1=meters['top1'], class_loss=meters['class_loss']))
 
-    LOG.info("Writing the predictions and the gold labels to the file :=> " + result_filename)
-    with open(result_file_name+"_"+model_type+"_.txt", 'w') as rf:
+    print("Writing the predictions and the gold labels to the file :=> " + result_filename)
+    with open(result_file_name+"_"+model_type+".txt", 'w') as rf:
         for item in entity_prediction_gold_list:
             rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\n")
     rf.close()
-    LOG.info("DONE ..")
+    print("DONE ..")
     return meters['top1'].avg
 
 
@@ -145,7 +145,7 @@ def create_data_loaders(train_transformation,
                         args):
 
     evaldir = os.path.join(datadir, args.train_subdir)  # NOTE: test data is the same as train data. To load the word_vectors using the train_subdir
-    LOG.info("evaldir : " + evaldir)
+    print("evaldir : " + evaldir)
 
     dataset_test = datasets.NECDataset(evaldir, args, eval_transformation)
 
