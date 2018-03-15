@@ -155,16 +155,16 @@ def create_data_loaders(train_transformation,
                                               pin_memory=True,
                                               drop_last=False)
 
-    return eval_loader, dataset_test.word_vocab_embed, dataset_test.word_vocab.size()
+    return eval_loader, dataset_test
 
 
 if __name__ == '__main__':
 
     # 1. Set the following arguments
     ckpt_file = sys.argv[1]  # "best.ckpt"
-    dataset = sys.argv[2]  # 'conll'
+    dataset_name = sys.argv[2]  # 'conll'
     print ("Loading the checkpoint from : " + ckpt_file)
-    print ("Working on the dataset :=> " + dataset)
+    print ("Working on the dataset :=> " + dataset_name)
 
     result_file_name = "predictions"
     word_embed_size = 300
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     ckpt = torch.load(ckpt_file)
     arch = ckpt['arch']
     parser = cli.create_parser()
-    parser.set_defaults(dataset=dataset,
+    parser.set_defaults(dataset=dataset_name,
                         train_subdir='train',
                         eval_subdir='val',
                         arch=arch,
@@ -187,8 +187,9 @@ if __name__ == '__main__':
     # 3. Load the eval data
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    eval_loader, word_vocab_embed, word_vocab_size = \
-        create_data_loaders(**dataset_config, args=args)
+    eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
+    word_vocab_embed = dataset.word_vocab_embed
+    word_vocab_size = dataset.word_vocab.size()
 
     # 4. Load the models
     student_model = create_model(arch, num_classes, word_vocab_embed,
@@ -202,8 +203,8 @@ if __name__ == '__main__':
     teacher_model.load_state_dict(ckpt['ema_state_dict'])
 
     # 6. Call the evaluation code AND # 7. Generate the predictions file for the student model and the teacher model
-    predict_validate(eval_loader, student_model, "student", args.arch, args.dataset, args.batch_size, result_file_name)
-    predict_validate(eval_loader, teacher_model, "teacher", args.arch, args.dataset, args.batch_size, result_file_name)
+    predict_validate(eval_loader, student_model, "student", args.arch, dataset, args.batch_size, result_file_name)
+    predict_validate(eval_loader, teacher_model, "teacher", args.arch, dataset, args.batch_size, result_file_name)
 
 
 
