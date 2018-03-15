@@ -42,7 +42,8 @@ def generate_prediction_minibatch(min_batch_id, mini_batch_outputs, dataset, bat
 
     min_batch_predictions_gold = list()
     softmax = nn.Softmax(dim=1)
-    results = torch.max(softmax(mini_batch_outputs), dim=1)
+    res = torch.max(softmax(mini_batch_outputs), dim=1)
+    results = list(zip(res[0].data, res[1].data))
 
     for idx, (max_value, predictionId) in enumerate(results):
         dataset_id = (min_batch_id * batch_size) + idx
