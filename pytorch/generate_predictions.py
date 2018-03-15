@@ -114,8 +114,9 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
     print(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
           .format(top1=meters['top1'], class_loss=meters['class_loss']))
 
+    result_filename += "_"+model_type+".txt"
     print("Writing the predictions and the gold labels to the file :=> " + result_filename)
-    with open(result_file_name+"_"+model_type+".txt", 'w') as rf:
+    with open(result_filename, 'w') as rf:
         for item in entity_prediction_gold_list:
             rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\n")
     rf.close()
