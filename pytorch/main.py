@@ -169,6 +169,7 @@ def main(context):
                 'ema_state_dict': ema_model.state_dict(),
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
+                'dataset' : args.dataset,
             }, is_best, checkpoint_path, epoch + 1)
 
     # for testing only .. commented
