@@ -143,10 +143,10 @@ def create_data_loaders(train_transformation,
                         datadir,
                         args):
 
-    evaldir = os.path.join(datadir, args.eval_subdir)
+    evaldir = os.path.join(datadir, args.train_subdir)  # NOTE: test data is the same as train data. To load the word_vectors using the train_subdir
     LOG.info("evaldir : " + evaldir)
 
-    dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
+    dataset_test = datasets.NECDataset(evaldir, args, eval_transformation)
 
     eval_loader = torch.utils.data.DataLoader(dataset_test,
                                               batch_size=args.batch_size,
