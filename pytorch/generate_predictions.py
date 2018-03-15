@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
     result_file_name = "predictions"
     word_embed_size = 300
-    hidden_size = 500
+    hidden_size = 300
     batch_size = 64
 
     # 2. Initialize the configuration
