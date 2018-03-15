@@ -117,7 +117,7 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
     LOG.info("Writing the predictions and the gold labels to the file :=> " + result_filename)
     with open(result_file_name+"_"+model_type+"_.txt", 'w') as rf:
         for item in entity_prediction_gold_list:
-            rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + item[3] + "\n")
+            rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\n")
     rf.close()
     LOG.info("DONE ..")
     return meters['top1'].avg
@@ -164,10 +164,10 @@ if __name__ == '__main__':
     # 1. Set the following arguments
     ckpt_file = sys.argv[1]  # "best.ckpt"
     dataset_name = sys.argv[2]  # 'conll'
+    result_file_name = sys.argv[3]  # "predictions"
     print ("Loading the checkpoint from : " + ckpt_file)
     print ("Working on the dataset :=> " + dataset_name)
 
-    result_file_name = "predictions"
     word_embed_size = 300
     hidden_size = 300
     batch_size = 64
