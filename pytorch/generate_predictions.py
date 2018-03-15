@@ -161,8 +161,10 @@ def create_data_loaders(train_transformation,
 if __name__ == '__main__':
 
     # 1. Set the following arguments
-    ckpt_file = sys.argv[0]  # "best.ckpt"
-    dataset = sys.argv[1]  # 'conll'
+    ckpt_file = sys.argv[1]  # "best.ckpt"
+    dataset = sys.argv[2]  # 'conll'
+    print ("Loading the checkpoint from : " + ckpt_file)
+    print ("Working on the dataset :=> " + dataset)
 
     result_file_name = "predictions"
     word_embed_size = 300
