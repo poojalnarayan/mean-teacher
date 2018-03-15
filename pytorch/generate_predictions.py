@@ -42,14 +42,15 @@ def generate_prediction_minibatch(min_batch_id, mini_batch_outputs, dataset, bat
 
     min_batch_predictions_gold = list()
     softmax = nn.Softmax(dim=1)
-    res = torch.max(softmax(mini_batch_outputs), dim=1)
-    results = list(zip(res[0].data, res[1].data))
+    scores = softmax(mini_batch_outputs)
+    res_max = torch.max(scores, dim=1)
+    results = list(zip(res_max[0].data, res_max[1].data))
 
     for idx, (max_value, predictionId) in enumerate(results):
         dataset_id = (min_batch_id * batch_size) + idx
         mention_str = dataset.entity_vocab.get_word(dataset.mentions[dataset_id])
         gold_label = dataset.labels_str[dataset_id]
-        min_batch_predictions_gold.append((mention_str, gold_label, category_labels[predictionId], max_value))
+        min_batch_predictions_gold.append((mention_str, gold_label, category_labels[predictionId], max_value, list(scores[idx])))
 
     return min_batch_predictions_gold
 
@@ -118,7 +119,8 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
     print("Writing the predictions and the gold labels to the file :=> " + result_filename)
     with open(result_filename, 'w') as rf:
         for item in entity_prediction_gold_list:
-            rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\n")
+            scores = ", ".join(item[4])
+            rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\t" + scores+"\n")
     rf.close()
     print("DONE ..")
     return meters['top1'].avg
