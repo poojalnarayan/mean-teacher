@@ -38,3 +38,4 @@ To reproduce the ImageNet results of the paper run `python -m experiments.imagen
 ----------- 
 
 Relation extraction changes in this branch
+also merged nec_expts branch into this 
