@@ -93,7 +93,6 @@ def conll():
 #     return fields
 ######################################################################
 
-
 class NECDataset(Dataset):
 
     PAD = "@PADDING"
@@ -301,6 +300,188 @@ class NECDataset(Dataset):
 
         # return dataset
         ######################################################################
+
+#fan: add Riedel() and class REDataset
+@export
+def riedel():
+
+    if REDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
+        addNoise = data.RandomPatternWordNoise(REDataset.NUM_WORDS_TO_REPLACE, REDataset.OOV, REDataset.WORD_NOISE_TYPE)
+    else:
+        assert False, "Unknown type of noise {}".format(REDataset.WORD_NOISE_TYPE)
+
+    return {
+        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'eval_transformation': None,
+        'datadir': 'data-local/re/Riedel2010',
+        'num_classes': 53
+    }
+
+class REDataset(Dataset):
+
+    PAD = "@PADDING"
+    OOV = "</s>"
+    ENTITY = "@ENTITY"
+    OOV_ID = 0
+    ENTITY_ID = -1
+    NUM_WORDS_TO_REPLACE = 1
+    WORD_NOISE_TYPE = "drop"
+
+    def __init__(self, dir, args, transform=None):
+
+        dataset_file = dir + "/train.txt"
+        w2vfile = dir + "/../../vectors.goldbergdeps.txt"
+
+        self.args = args
+        self.entities1_words, self.entities2_words, self.sentences_words, self.labels_str, self.word_vocab,\
+            self.chunks_left, self.chunks_inbetween, self.chunks_right, self.max_entity_len, self.max_sentence_len \
+            = Datautils.read_re_data(dataset_file)
+
+        if args.pretrained_wordemb:
+            if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
+                self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
+                self.word_vocab_embed = self.create_word_vocab_embed()
+        else:
+            print("Not loading the pretrained embeddings ... ")
+            assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
+                                                   "--update-pretrained-wordemb = {}".format(args.update_pretrained_wordemb)
+            self.word_vocab_embed = None
+
+        # NOTE: Setting some class variables
+        REDataset.OOV_ID = self.word_vocab.get_id(REDataset.OOV)
+        REDataset.ENTITY_ID = self.word_vocab.get_id(REDataset.ENTITY)
+
+        type_of_noise, size_of_noise = args.word_noise.split(":")
+        REDataset.WORD_NOISE_TYPE = type_of_noise
+        REDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
+
+        categories = sorted(list({l for l in self.labels_str}))
+        self.lbl = [categories.index(l) for l in self.labels_str]
+
+        self.transform = transform
+
+    def __getitem__(self, idx):
+        entity1_words_id = [self.word_vocab.get_id(w) for w in self.entities1_words[idx]]   #entity1_words: a list of ids
+        entity2_words_id = [self.word_vocab.get_id(w) for w in self.entities2_words[idx]]
+        entity1_words_id_padded = self.pad_item(entity1_words_id, isPattern=False)
+        entity2_words_id_padded = self.pad_item(entity2_words_id, isPattern=False)
+        entity1_datum = torch.LongTensor(entity1_words_id_padded)
+        entity2_datum = torch.LongTensor(entity2_words_id_padded)
+
+        sentence_words_id = [self.word_vocab.get_id(w) for w in self.sentences_words[idx]]
+
+        if self.transform is not None:
+
+            sentence_words_dropout = self.transform([self.sentences_words[idx]], REDataset.ENTITY)   # fan: replaced by REDataset.ENTITY?
+
+            # if NECDataset.WORD_NOISE_TYPE == 'replace':
+            #     assert len(
+            #         context_words_dropout_str) == 2, "There is some issue with TransformTwice ... "  # todo: what if we do not want to use the teacher ?
+            #     new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
+            #                           for w in ctx
+            #                           if not self.word_vocab.contains(w)]
+            #
+            #     # 2. Add word to word vocab (expand vocab)
+            #     new_replaced_word_ids = [self.word_vocab.add(w, count=1)
+            #                              for w in new_replaced_words]
+            #
+            #     # 3. Add the replaced words to the word_vocab_embed (if using pre-trained embedding)
+            #     if self.args.pretrained_wordemb:
+            #         for word_id in new_replaced_word_ids:
+            #             word_embed = self.sanitise_and_lookup_embedding(word_id)
+            #             self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
+            #
+            #     # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
+
+            sentence_words_id_dropout = list()
+            sentence_words_id_dropout.append([self.word_vocab.get_id(w)
+                                           for w in ctx]
+                                          for ctx in sentence_words_dropout[0])
+            sentence_words_id_dropout.append([self.word_vocab.get_id(w)
+                                           for w in ctx]
+                                          for ctx in sentence_words_dropout[1])
+
+            if len(sentence_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
+                sentence_words_padded_0 = self.pad_item(sentence_words_id_dropout[0])
+                sentence_words_padded_1 = self.pad_item(sentence_words_id_dropout[1])
+                sentence_datums = (torch.LongTensor(sentence_words_padded_0), torch.LongTensor(sentence_words_padded_1))
+            # else:  # todo: change this to an assert (if we are always using the student and teacher networks)
+            #     context_words_padded = self.pad_item(context_words_dropout)
+            #     context_datums = torch.LongTensor(context_words_padded)
+        else:
+            sentence_words_padded = self.pad_item(sentence_words_id)
+            sentence_datums = torch.LongTensor(sentence_words_padded)
+
+        # print ("label : " + self.labels[idx])
+        # print ("label id : " + str(self.label_ids_all[idx]))
+        label = self.lbl[idx]  # Note: .. no need to create a tensor variable
+
+        if self.transform is not None:
+            return (entity1_datum, entity2_datum, sentence_datums[0]), (entity1_datum, entity2_datum, sentence_datums[1]), label
+        else:
+            return (entity1_datum, entity2_datum, sentence_datums), label
+
+        ##### USING Torchtext ... now reverting to using custom code
+        # print ("Dir in NECDataset : " + dir)
+        # data_file = "training_data_with_labels_emboot.filtered.txt.processed"
+        #
+        # LABEL = Field(sequential=False, use_vocab=True)
+        # ENTITY = Field(sequential=False, use_vocab=True, lower=True)
+        # PATTERN = Field(sequential=True, use_vocab=True, lower=True, tokenize=simple_tokenizer)
+        #
+        # datafields = [("label", LABEL), ("entity", ENTITY), ("patterns", PATTERN)]
+        # dataset, _ = TabularDataset.splits(path=dir, train=data_file, validation=data_file, format='tsv',
+        #                                  fields=datafields)
+        #
+        # LABEL.build_vocab(dataset)
+        # ENTITY.build_vocab(dataset)
+        # PATTERN.build_vocab(dataset)
+
+        # APPLY THE TRANSFORMATION HERE
+        # transform = transform
+
+        # return dataset
+        ######################################################################
+
+    def sanitise_and_lookup_embedding(self, word):
+        sanitised_word = Gigaword.sanitiseWord(word)
+
+        if sanitised_word in self.lookupGiga:
+            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[sanitised_word]])
+        else:
+            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<unk>"]])
+
+        return word_embed
+
+    def create_word_vocab_embed(self):
+
+        word_vocab_embed = list()
+
+        # leave last word = "@PADDING"
+        for word in self.word_vocab:
+            word_embed = self.sanitise_and_lookup_embedding(word)
+            word_vocab_embed.append(word_embed)
+
+        # NOTE: adding the embed for @PADDING
+        word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+        return np.array(word_vocab_embed).astype('float32')
+
+    def __len__(self):
+        return len(self.entities1_words)
+
+    def get_num_classes(self):
+        return len(list({l for l in self.lbl}))
+
+    def get_labels(self):
+        return self.lbl
+
+    def pad_item(self, dataitem, isSentence=True):
+        if isSentence: # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
+            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
+        else:  # Note: padding an entity (consisting of a seq of tokens)
+            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_entity_len - len(dataitem))
+
+        return dataitem_padded
 
 
 @export

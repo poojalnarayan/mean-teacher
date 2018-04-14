@@ -29,7 +29,7 @@ def create_model(arch, num_classes, word_vocab_embed, word_vocab_size,
     model_params['update_pretrained_wordemb'] = False
 
     model = model_factory(**model_params)
-    model = model.cuda()  # nn.DataParallel(model).cuda() .. # NOTE: Disabling data parallelism
+    model = model.cpu()  # nn.DataParallel(model).cpu() .. # NOTE: Disabling data parallelism
 
     if ema:
         for param in model.parameters():
@@ -56,7 +56,7 @@ def generate_prediction_minibatch(min_batch_id, mini_batch_outputs, dataset, bat
 
 
 def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, result_filename):
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
     meters = AverageMeterSet()
 
     category_labels = dict(enumerate(sorted(list({l for l in dataset.labels_str}))))
@@ -73,10 +73,10 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
         patterns = datapoint[0][1]
         target = datapoint[1]
 
-        entity_var = torch.autograd.Variable(entity, volatile=True).cuda()
-        patterns_var = torch.autograd.Variable(patterns, volatile=True).cuda()
+        entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
+        patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
 
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
+        target_var = torch.autograd.Variable(target.cpu(), volatile=True)
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -156,7 +156,7 @@ def create_data_loaders(train_transformation,
                                               batch_size=args.batch_size,
                                               shuffle=False,
                                               num_workers=2 * args.workers,
-                                              pin_memory=True,
+                                              pin_memory=False,
                                               drop_last=False)
 
     return eval_loader, dataset_test
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     print ("Working on the dataset :=> " + dataset_name)
 
     word_embed_size = 300
-    hidden_size = 300
+    hidden_size = 50
     batch_size = 64
 
     # 2. Initialize the configuration
