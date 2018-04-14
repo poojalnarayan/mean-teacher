@@ -34,3 +34,7 @@ Use `python main.py --help` to see other command line arguments.
 To reproduce the CIFAR-10 ResNet results of the paper run `python -m experiments.cifar10_test` using 4 GPUs.
 
 To reproduce the ImageNet results of the paper run `python -m experiments.imagenet_valid` using 10 GPUs.
+
+----------- 
+
+Relation extraction changes in this branch
