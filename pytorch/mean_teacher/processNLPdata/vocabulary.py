@@ -33,7 +33,10 @@ class Vocabulary(object):
 
     # get the id of a word
     def get_id(self, word):
-        return self.word_to_id.get(word)
+        if (word in self.word_to_id):
+            return self.word_to_id.get(word)
+        else:
+            return self.word_to_id.get(EOS)
 
     # get the word corresponding to an id
     def get_word(self, id):

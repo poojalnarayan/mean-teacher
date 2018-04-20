@@ -285,7 +285,7 @@ def create_data_loaders(train_transformation,
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
 
-        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test') 
+        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test')
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
@@ -487,7 +487,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # Todo: Fan
         # elif args.dataset in ['riedel'] and args.arch == 'custom_embed':
 
-        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
             ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_sentence_var, ema_left_chunk_var, ema_inbetween_chunk_var, ema_right_chunk_var)
             model_out = model(entity1_var, entity2_var, sentence_var, left_chunk_var, inbetween_chunk_var, right_chunk_var)
 

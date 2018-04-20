@@ -452,6 +452,7 @@ class REDataset(Dataset):
             if len(sentence_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
                 sentence_words_padded_0 = self.pad_item(sentence_words_id_dropout[0], 'sentence')
                 sentence_words_padded_1 = self.pad_item(sentence_words_id_dropout[1], 'sentence')
+
                 sentence_datums = (torch.LongTensor(sentence_words_padded_0), torch.LongTensor(sentence_words_padded_1))
 
                 left_words_padded_0 = self.pad_item(left_words_id_dropout[0], 'left')
