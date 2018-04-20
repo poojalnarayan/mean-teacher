@@ -2,7 +2,6 @@
 
 import numpy as np
 from collections import defaultdict
-from .vocabulary import Vocabulary
 
 
 class Datautils:
@@ -54,7 +53,9 @@ class Datautils:
 
         max_entity_len = 0
         max_sentence_len = 0
-        vocabulary = Vocabulary()
+        max_left_len = 0
+        max_right_len = 0
+        max_inbetween_len = 0
 
         with open(filename) as f:
             for line in f:
@@ -74,23 +75,32 @@ class Datautils:
                 inbetween_str = sentence_str.partition("@ENTITY")[2].partition("@ENTITY")[0]
                 right_str = sentence_str.partition("@ENTITY")[2].partition("@ENTITY")[2]
 
-                chunks_left.append(left_str.split(' '))
-                chunks_inbetween.append(inbetween_str.split(' '))
-                chunks_right.append(right_str.split(' ')[:-1])
-                sentences_words = sentence_str.split(' ')[:-1]    #the last word is "###END###"
+                sentences_words = sentence_str.split(' ')[:-1]  # the last word is "###END###"
+                left_words = left_str.split(' ')
+                inbetween_words = inbetween_str.split(' ')
+                right_words = right_str.split(' ')[:-1]
 
-                if len(sentences_words) > max_sentence_len:
+                if (len(sentences_words) > max_sentence_len):
                     max_sentence_len = len(sentences_words)
+                if (len(left_words) > max_left_len):
+                    max_left_len = len(left_words)
+                if (len(inbetween_words) > max_inbetween_len):
+                    max_inbetween_len = len(inbetween_words)
+                if (len(right_words) > max_right_len):
+                    max_right_len = len(right_words)
 
-                vocabulary.add(word for word in entities1_words)
-                vocabulary.add(word for word in entities2_words)
-                vocabulary.add(word for word in sentences_words)
+                # if (len(inbetween_words) == 1030):
+                #     print("1030")
+                #     print (line)
+
                 entities1.append(entities1_words)
                 entities2.append(entities2_words)
                 sentences.append(sentences_words)
-        vocabulary.add("@PADDING", 0)
+                chunks_left.append(left_words)
+                chunks_inbetween.append(inbetween_words)
+                chunks_right.append(right_words)
 
-        return entities1, entities2, sentences, labels, vocabulary, chunks_left, chunks_inbetween, chunks_right, max_entity_len, max_sentence_len
+        return entities1, entities2, sentences, labels, chunks_left, chunks_inbetween, chunks_right, max_entity_len, max_sentence_len, max_left_len, max_inbetween_len, max_right_len
 
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context

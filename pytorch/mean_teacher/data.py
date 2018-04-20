@@ -305,7 +305,10 @@ class RandomPatternWordNoise:
         for datum in datums:
             dropout_datum = list()
             to_replace = list(datum)
-            to_replace.remove(entity_token)
+
+            if(entity_token in to_replace):
+                to_replace.remove(entity_token)
+
             num_words_to_dropout = min(self.number_words, len(datum) - 1)
             to_replace = random.sample(to_replace, num_words_to_dropout)
             for w in datum:

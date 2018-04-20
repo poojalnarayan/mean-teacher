@@ -1,11 +1,12 @@
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 import torch
-
+import io
 from . import data
 from .utils import export
 
 from .processNLPdata.processNECdata import *
+from itertools import chain
 
 @export
 def imagenet():
@@ -301,7 +302,7 @@ class NECDataset(Dataset):
         # return dataset
         ######################################################################
 
-#fan: add Riedel() and class REDataset
+#fan: add dataset riedel() and class REDataset
 @export
 def riedel():
 
@@ -327,15 +328,67 @@ class REDataset(Dataset):
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
 
-    def __init__(self, dir, args, transform=None):
+    def __init__(self, dir, args, transform=None, type='train'):
 
-        dataset_file = dir + "/train.txt"
+        dataset_file = dir + "/" + type + ".txt"
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
-        self.entities1_words, self.entities2_words, self.sentences_words, self.labels_str, self.word_vocab,\
-            self.chunks_left, self.chunks_inbetween, self.chunks_right, self.max_entity_len, self.max_sentence_len \
-            = Datautils.read_re_data(dataset_file)
+
+        if args.eval_subdir not in dir:
+            self.entities1_words, self.entities2_words, self.sentences_words, self.labels_str,\
+                self.chunks_left_words, self.chunks_inbetween_words, self.chunks_right_words, \
+                self.max_entity_len, self.max_sentence_len, self.max_left_len, self.max_inbetween_len, self.max_right_len \
+                = Datautils.read_re_data(dataset_file)
+
+            # print(self.entities1_words[0])
+            # print(self.entities2_words[0])
+            # print(self.sentences_words[0])
+            # print(self.labels_str[0])
+            # print(self.chunks_left_words[0])
+            # print(self.chunks_inbetween_words[0])
+            # print(self.chunks_right_words[0])
+            print(self.max_entity_len)
+            print(self.max_sentence_len)
+            print(self.max_left_len)
+            print(self.max_inbetween_len)
+            print(self.max_right_len)
+
+            self.word_vocab = Vocabulary()
+            for word in chain.from_iterable(zip(*self.entities1_words)):
+                self.word_vocab.add(word)
+            for word in chain.from_iterable(zip(*self.entities2_words)):
+                self.word_vocab.add(word)
+            for word in chain.from_iterable(zip(*self.sentences_words)):
+                self.word_vocab.add(word)
+            self.word_vocab.add("@PADDING", 0)
+
+            vocab_file = dir + "/../vocabulary_train.txt"
+            self.word_vocab.to_file(vocab_file)
+
+            maxlen_file = dir + "/../maxlen_train.txt"
+            with io.open(maxlen_file, 'w', encoding='utf8') as f:
+                f.write(str(self.max_entity_len) + '\t' + str(self.max_sentence_len) + '\t' + str(self.max_left_len) + '\t' + str(self.max_inbetween_len) + '\t' + str(self.max_right_len))
+
+        else:
+            vocab_file = dir + "/../vocabulary_train.txt"
+            self.word_vocab = Vocabulary.from_file(vocab_file)
+
+            maxlen_file = dir + "/../maxlen_train.txt"
+            with io.open(maxlen_file, encoding='utf8') as f:
+                for line in f:
+                    [self.max_entity_len, self.max_sentence_len, self.max_left_len, self.max_inbetween_len, self.max_right_len] = line.split('\t')
+
+            # print(self.max_entity_len)
+            # print(self.max_sentence_len)
+            # print(self.max_left_len)
+            # print(self.max_inbetween_len)
+            # print(self.max_right_len)
+
+            self.entities1_words, self.entities2_words, self.sentences_words, self.labels_str, \
+                self.chunks_left_words, self.chunks_inbetween_words, self.chunks_right_words, \
+                _, _, _, _, _ \
+                = Datautils.read_re_data(dataset_file)
 
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
@@ -363,63 +416,81 @@ class REDataset(Dataset):
     def __getitem__(self, idx):
         entity1_words_id = [self.word_vocab.get_id(w) for w in self.entities1_words[idx]]   #entity1_words: a list of ids
         entity2_words_id = [self.word_vocab.get_id(w) for w in self.entities2_words[idx]]
-        entity1_words_id_padded = self.pad_item(entity1_words_id, isPattern=False)
-        entity2_words_id_padded = self.pad_item(entity2_words_id, isPattern=False)
+        entity1_words_id_padded = self.pad_item(entity1_words_id)
+        entity2_words_id_padded = self.pad_item(entity2_words_id)
         entity1_datum = torch.LongTensor(entity1_words_id_padded)
         entity2_datum = torch.LongTensor(entity2_words_id_padded)
 
         sentence_words_id = [self.word_vocab.get_id(w) for w in self.sentences_words[idx]]
+        left_words_id = [self.word_vocab.get_id(w) for w in self.chunks_left_words[idx]]
+        inbetween_words_id = [self.word_vocab.get_id(w) for w in self.chunks_inbetween_words[idx]]
+        right_words_id = [self.word_vocab.get_id(w) for w in self.chunks_right_words[idx]]
 
         if self.transform is not None:
 
-            sentence_words_dropout = self.transform([self.sentences_words[idx]], REDataset.ENTITY)   # fan: replaced by REDataset.ENTITY?
-
-            # if NECDataset.WORD_NOISE_TYPE == 'replace':
-            #     assert len(
-            #         context_words_dropout_str) == 2, "There is some issue with TransformTwice ... "  # todo: what if we do not want to use the teacher ?
-            #     new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
-            #                           for w in ctx
-            #                           if not self.word_vocab.contains(w)]
-            #
-            #     # 2. Add word to word vocab (expand vocab)
-            #     new_replaced_word_ids = [self.word_vocab.add(w, count=1)
-            #                              for w in new_replaced_words]
-            #
-            #     # 3. Add the replaced words to the word_vocab_embed (if using pre-trained embedding)
-            #     if self.args.pretrained_wordemb:
-            #         for word_id in new_replaced_word_ids:
-            #             word_embed = self.sanitise_and_lookup_embedding(word_id)
-            #             self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
-            #
-            #     # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
+            sentence_words_dropout = self.transform([self.sentences_words[idx]], REDataset.ENTITY)
+            left_words_dropout = self.transform([self.chunks_left_words[idx]], REDataset.ENTITY)
+            inbetween_words_dropout = self.transform([self.chunks_inbetween_words[idx]], REDataset.ENTITY)
+            right_words_dropout = self.transform([self.chunks_right_words[idx]], REDataset.ENTITY)
 
             sentence_words_id_dropout = list()
-            sentence_words_id_dropout.append([self.word_vocab.get_id(w)
-                                           for w in ctx]
-                                          for ctx in sentence_words_dropout[0])
-            sentence_words_id_dropout.append([self.word_vocab.get_id(w)
-                                           for w in ctx]
-                                          for ctx in sentence_words_dropout[1])
+            sentence_words_id_dropout.append([self.word_vocab.get_id(w) for w in sentence_words_dropout[0][0]])
+            sentence_words_id_dropout.append([self.word_vocab.get_id(w) for w in sentence_words_dropout[1][0]])
+
+            left_words_id_dropout = list()
+            left_words_id_dropout.append([self.word_vocab.get_id(w) for w in left_words_dropout[0][0]])
+            left_words_id_dropout.append([self.word_vocab.get_id(w) for w in left_words_dropout[1][0]])
+
+            inbetween_words_id_dropout = list()
+            inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[0][0]])
+            inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
+
+            right_words_id_dropout = list()
+            right_words_id_dropout.append([self.word_vocab.get_id(w) for w in right_words_dropout[0][0]])
+            right_words_id_dropout.append([self.word_vocab.get_id(w) for w in right_words_dropout[1][0]])
 
             if len(sentence_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
-                sentence_words_padded_0 = self.pad_item(sentence_words_id_dropout[0])
-                sentence_words_padded_1 = self.pad_item(sentence_words_id_dropout[1])
+                sentence_words_padded_0 = self.pad_item(sentence_words_id_dropout[0], 'sentence')
+                sentence_words_padded_1 = self.pad_item(sentence_words_id_dropout[1], 'sentence')
                 sentence_datums = (torch.LongTensor(sentence_words_padded_0), torch.LongTensor(sentence_words_padded_1))
+
+                left_words_padded_0 = self.pad_item(left_words_id_dropout[0], 'left')
+                left_words_padded_1 = self.pad_item(left_words_id_dropout[1], 'left')
+                left_datums = (torch.LongTensor(left_words_padded_0), torch.LongTensor(left_words_padded_1))
+
+                inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
+                inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
+                inbetween_datums = (torch.LongTensor(inbetween_words_padded_0), torch.LongTensor(inbetween_words_padded_1))
+
+                right_words_padded_0 = self.pad_item(right_words_id_dropout[0], 'right')
+                right_words_padded_1 = self.pad_item(right_words_id_dropout[1], 'right')
+                right_datums = (torch.LongTensor(right_words_padded_0), torch.LongTensor(right_words_padded_1))
+
             # else:  # todo: change this to an assert (if we are always using the student and teacher networks)
             #     context_words_padded = self.pad_item(context_words_dropout)
             #     context_datums = torch.LongTensor(context_words_padded)
+
         else:
-            sentence_words_padded = self.pad_item(sentence_words_id)
+            sentence_words_padded = self.pad_item(sentence_words_id, 'sentence')
             sentence_datums = torch.LongTensor(sentence_words_padded)
+
+            left_words_padded = self.pad_item(left_words_id, 'left')
+            left_datums = torch.LongTensor(left_words_padded)
+
+            inbetween_words_padded = self.pad_item(inbetween_words_id, 'inbetween')
+            inbetween_datums = torch.LongTensor(inbetween_words_padded)
+
+            right_words_padded = self.pad_item(right_words_id, 'right')
+            right_datums = torch.LongTensor(right_words_padded)
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
-            return (entity1_datum, entity2_datum, sentence_datums[0]), (entity1_datum, entity2_datum, sentence_datums[1]), label
+            return (entity1_datum, entity2_datum, sentence_datums[0],left_datums[0], inbetween_datums[0], right_datums[0]), (entity1_datum, entity2_datum, sentence_datums[1],left_datums[1], inbetween_datums[1], right_datums[1]), label
         else:
-            return (entity1_datum, entity2_datum, sentence_datums), label
+            return (entity1_datum, entity2_datum, sentence_datums, left_datums, inbetween_datums, right_datums), label
 
         ##### USING Torchtext ... now reverting to using custom code
         # print ("Dir in NECDataset : " + dir)
@@ -443,11 +514,11 @@ class REDataset(Dataset):
         # return dataset
         ######################################################################
 
-    def sanitise_and_lookup_embedding(self, word):
-        sanitised_word = Gigaword.sanitiseWord(word)
+    def sanitise_and_lookup_embedding(self, word_id):
+        word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
 
-        if sanitised_word in self.lookupGiga:
-            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[sanitised_word]])
+        if word in self.lookupGiga:
+            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
         else:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<unk>"]])
 
@@ -458,8 +529,8 @@ class REDataset(Dataset):
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
-        for word in self.word_vocab:
-            word_embed = self.sanitise_and_lookup_embedding(word)
+        for word_id in range(0, self.word_vocab.size() - 1):
+            word_embed = self.sanitise_and_lookup_embedding(word_id)
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
@@ -475,11 +546,17 @@ class REDataset(Dataset):
     def get_labels(self):
         return self.lbl
 
-    def pad_item(self, dataitem, isSentence=True):
-        if isSentence: # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
+    def pad_item(self, dataitem, type='entity'):
+        if (type is 'sentence'): # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
             dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
-        else:  # Note: padding an entity (consisting of a seq of tokens)
+        elif (type is 'entity'):  # Note: padding an entity (consisting of a seq of tokens)
             dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_entity_len - len(dataitem))
+        elif (type is 'left'):
+            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_left_len - len(dataitem))
+        elif (type is 'inbetween'):
+            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_inbetween_len - len(dataitem))
+        elif (type is 'right'):
+            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_right_len - len(dataitem))
 
         return dataitem_padded
 
