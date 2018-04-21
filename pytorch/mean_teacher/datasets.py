@@ -2,7 +2,32 @@ import torchvision.transforms as transforms
 
 from . import data
 from .utils import export
+from torch.utils.data import Dataset
+from .processILPdata.family_data import Data as FamilyData
 
+@export
+def family():
+
+    return {
+        'train_transformation': None,
+        'eval_transformation': None,
+        'datadir': 'data-local/neuralilp/family/',
+        'num_classes': 1000 #todo: what should be filled here??
+    }
+
+class ILP_dataset(Dataset):
+    def __init__(self):
+        ## TODO: parameterize, currently hard-coded
+        datadir = 'data-local/neuralilp/family/'
+        # NOTE: removing these params
+        # seed = 33
+        # type_check = False
+        # no_extra_facts = False
+        # domain_size = 128
+        # Note: setting 'share_db = true'
+
+        type = 'train' # or 'test' or 'valid'
+        self.family_data = FamilyData(datadir, type)
 
 @export
 def imagenet():
