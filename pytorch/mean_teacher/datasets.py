@@ -1,9 +1,14 @@
 import torchvision.transforms as transforms
 
-from . import data
-from .utils import export
+# from . import data
+# from .utils import export
+# from torch.utils.data import Dataset
+# from .processILPdata.family_data import Data as FamilyData
+
+import data
+from utils import export
 from torch.utils.data import Dataset
-from .processILPdata.family_data import Data as FamilyData
+from processILPdata.family_data import Data as FamilyData
 
 @export
 def family():
@@ -16,9 +21,9 @@ def family():
     }
 
 class ILP_dataset(Dataset):
-    def __init__(self):
+    def __init__(self, datadir, dataset_type):
         ## TODO: parameterize, currently hard-coded
-        datadir = 'data-local/neuralilp/family/'
+        # datadir = 'data-local/neuralilp/family/'
         # NOTE: removing these params
         # seed = 33
         # type_check = False
@@ -26,8 +31,33 @@ class ILP_dataset(Dataset):
         # domain_size = 128
         # Note: setting 'share_db = true'
 
-        type = 'train' # or 'test' or 'valid'
-        self.family_data = FamilyData(datadir, type)
+        # dataset_type = 'train'  # or 'test' or 'valid'
+        self.dataset_type = dataset_type
+        self.family_data = FamilyData(datadir, dataset_type)
+
+    def __getitem__(self, idx):
+        # TODO: Can we clean this up ?
+        if self.dataset_type == 'train':
+            query, head, tail = self.family_data.train[idx]
+        elif self.dataset_type == 'test':
+            query, head, tail = self.family_data.test[idx]
+        elif self.dataset_type == 'valid':
+            query, head, tail = self.family_data.valid[idx]
+        else:
+            assert False, "Wrong dataset type .. " + self.dataset_type
+
+        return query, head, tail #, self.family_data.augmented_mdb  # TODO: the last argument must be checked and made compatible with the model requirement
+
+    def __len__(self):
+        # TODO: Can we clean this up ?
+        if self.dataset_type == 'train':
+            return len(self.family_data.train)
+        elif self.dataset_type == 'test':
+            return len(self.family_data.test)
+        elif self.dataset_type == 'valid':
+            return len(self.family_data.valid)
+        else:
+            assert False, "Wrong dataset type .. " + self.dataset_type
 
 @export
 def imagenet():

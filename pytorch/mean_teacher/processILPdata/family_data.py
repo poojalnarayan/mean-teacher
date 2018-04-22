@@ -46,7 +46,8 @@ class Data(object):
         self.num_operator = 2 * self.num_relation
 
         # get rules for queries and their inverses appeared in train and test
-        self.query_for_rules = list(set(zip(*self.train)[0]) | set(zip(*self.test)[0]) | set(zip(*self._augment_with_reverse(self.train))[0]) | set(zip(*self._augment_with_reverse(self.test))[0]))
+        # Note: https://stackoverflow.com/questions/27431390/typeerror-zip-object-is-not-subscriptable
+        # self.query_for_rules = list(set(next(zip(*self.train))) | set(next(zip(*self.test))) | set(next(zip(*self._augment_with_reverse(self.train)))) | set(next(zip(*self._augment_with_reverse(self.test)))))
         self.parser = self._create_parser()
 
     def _create_parser(self):

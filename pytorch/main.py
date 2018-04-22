@@ -21,7 +21,6 @@ from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
 
-
 LOG = logging.getLogger('main')
 
 args = None
@@ -142,39 +141,63 @@ def create_data_loaders(train_transformation,
                         eval_transformation,
                         datadir,
                         args):
-    traindir = os.path.join(datadir, args.train_subdir)
-    evaldir = os.path.join(datadir, args.eval_subdir)
 
-    assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
+    if args.dataset == 'family':
+        dataset = datasets.ILP_dataset(datadir, 'train')
+        # TODO: For now not consider the teacher-student arch .. but just the supervised mode
+        assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
+        train_dataset_size = dataset.__len__()
+        sampler = SubsetRandomSampler(list(range(0, train_dataset_size)))  # TODO: generate labeled indices .. for now using all the examples in train
+        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=False)
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers,
+                                                   pin_memory=False)  # todo: gpu later
 
-    dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
+        dataset_test = datasets.ILP_dataset(datadir, 'test')
 
-    if args.labels:
-        with open(args.labels) as f:
-            labels = dict(line.split(' ') for line in f.read().splitlines())
-        labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
-
-    if args.exclude_unlabeled:
-        sampler = SubsetRandomSampler(labeled_idxs)
-        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-    elif args.labeled_batch_size:
-        batch_sampler = data.TwoStreamBatchSampler(
-            unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        eval_loader = torch.utils.data.DataLoader(
+            dataset_test,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=2 * args.workers,  # Needs images twice as fast
+            pin_memory=False,  # todo: gpu later
+            drop_last=False)
     else:
-        assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
-    train_loader = torch.utils.data.DataLoader(dataset,
-                                               batch_sampler=batch_sampler,
-                                               num_workers=args.workers,
-                                               pin_memory=True)
+        traindir = os.path.join(datadir, args.train_subdir)
+        evaldir = os.path.join(datadir, args.eval_subdir)
 
-    eval_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.ImageFolder(evaldir, eval_transformation),
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=2 * args.workers,  # Needs images twice as fast
-        pin_memory=True,
-        drop_last=False)
+        assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
+
+        dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
+
+        if args.labels:
+            with open(args.labels) as f:
+                labels = dict(line.split(' ') for line in f.read().splitlines())
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
+
+        if args.exclude_unlabeled:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
+
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers,
+                                                   pin_memory=True)
+
+        eval_loader = torch.utils.data.DataLoader(
+            torchvision.datasets.ImageFolder(evaldir, eval_transformation),
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=2 * args.workers,  # Needs images twice as fast
+            pin_memory=True,
+            drop_last=False)
 
     return train_loader, eval_loader
 
