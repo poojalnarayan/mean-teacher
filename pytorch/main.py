@@ -423,7 +423,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
             ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
-        # Todo: Fan
         elif args.dataset in ['riedel']:
             input = datapoint[0]
             ema_input = datapoint[1]

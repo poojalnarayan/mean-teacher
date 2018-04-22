@@ -60,14 +60,6 @@ class Datautils:
         with open(filename) as f:
             for line in f:
                 vals = line.strip().split('\t')
-                labels.append(vals[4])
-                entities1_words = vals[2].strip().split('_')
-                entities2_words = vals[3].strip().split('_')
-
-                if len(entities1_words) > max_entity_len:
-                    max_entity_len = len(entities1_words)
-                if len(entities2_words) > max_entity_len:
-                    max_entity_len = len(entities2_words)
 
                 sentence_str = vals[5].strip().replace(vals[2], "@ENTITY", 1)
                 sentence_str = sentence_str.replace(vals[3], "@ENTITY", 1)
@@ -80,25 +72,31 @@ class Datautils:
                 inbetween_words = inbetween_str.split(' ')
                 right_words = right_str.split(' ')[:-1]
 
-                if (len(sentences_words) > max_sentence_len):
-                    max_sentence_len = len(sentences_words)
-                if (len(left_words) > max_left_len):
-                    max_left_len = len(left_words)
-                if (len(inbetween_words) > max_inbetween_len):
-                    max_inbetween_len = len(inbetween_words)
-                if (len(right_words) > max_right_len):
-                    max_right_len = len(right_words)
+                if (len(sentences_words) <= 100) and (len(inbetween_words) <= 40):   # filter out noise
+                    labels.append(vals[4])
+                    entities1_words = vals[2].strip().split('_')
+                    entities2_words = vals[3].strip().split('_')
 
-                # if (len(inbetween_words) == 1030):
-                #     print("1030")
-                #     print (line)
+                    if len(entities1_words) > max_entity_len:
+                        max_entity_len = len(entities1_words)
+                    if len(entities2_words) > max_entity_len:
+                        max_entity_len = len(entities2_words)
 
-                entities1.append(entities1_words)
-                entities2.append(entities2_words)
-                sentences.append(sentences_words)
-                chunks_left.append(left_words)
-                chunks_inbetween.append(inbetween_words)
-                chunks_right.append(right_words)
+                    if len(sentences_words) > max_sentence_len:
+                        max_sentence_len = len(sentences_words)
+                    if len(left_words) > max_left_len:
+                        max_left_len = len(left_words)
+                    if len(inbetween_words) > max_inbetween_len:
+                        max_inbetween_len = len(inbetween_words)
+                    if len(right_words) > max_right_len:
+                        max_right_len = len(right_words)
+
+                    entities1.append(entities1_words)
+                    entities2.append(entities2_words)
+                    sentences.append(sentences_words)
+                    chunks_left.append(left_words)
+                    chunks_inbetween.append(inbetween_words)
+                    chunks_right.append(right_words)
 
         return entities1, entities2, sentences, labels, chunks_left, chunks_inbetween, chunks_right, max_entity_len, max_sentence_len, max_left_len, max_inbetween_len, max_right_len
 
