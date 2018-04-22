@@ -316,7 +316,7 @@ def riedel():
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
         'datadir': 'data-local/re/Riedel2010',
-        'num_classes': 53
+        'num_classes': 56
     }
 
 class REDataset(Dataset):
