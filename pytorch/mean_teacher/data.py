@@ -309,8 +309,10 @@ class RandomPatternWordNoise:
             if(entity_token in to_replace):
                 to_replace.remove(entity_token)
 
-            num_words_to_dropout = min(self.number_words, len(datum) - 1)
-            to_replace = random.sample(to_replace, num_words_to_dropout)
+            num_words_to_dropout = min(self.number_words, len(to_replace) - 1)
+            if num_words_to_dropout > 0:
+                to_replace = random.sample(to_replace, num_words_to_dropout)
+
             for w in datum:
                 if w in to_replace:
                     if self.noise_type == 'drop':  # Dropout .. replace with NIL word

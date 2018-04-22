@@ -115,6 +115,7 @@ class NECDataset(Dataset):
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
+
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
@@ -348,11 +349,20 @@ class REDataset(Dataset):
             # print(self.chunks_left_words[0])
             # print(self.chunks_inbetween_words[0])
             # print(self.chunks_right_words[0])
-            print(self.max_entity_len)
-            print(self.max_sentence_len)
-            print(self.max_left_len)
-            print(self.max_inbetween_len)
-            print(self.max_right_len)
+            # print(self.max_entity_len)
+            # print(self.max_sentence_len)
+            # print(self.max_left_len)
+            # print(self.max_inbetween_len)
+            # print(self.max_right_len)
+
+            # sentence_length = dir + "/../sentence_length.txt"
+            # with io.open(sentence_length, 'w', encoding='utf8') as f:
+            #     for i in range(len(self.sentences_words)):
+            #         f.write(str(len(self.sentences_words[i])) + '\n')
+            inbetween_length = dir + "/../inbetween_length.txt"
+            with io.open(inbetween_length, 'w', encoding='utf8') as f:
+                for i in range(len(self.chunks_inbetween_words)):
+                    f.write(str(len(self.chunks_inbetween_words[i])) + '\n')
 
             self.word_vocab = Vocabulary()
             for word in chain.from_iterable(zip(*self.entities1_words)):
@@ -363,6 +373,8 @@ class REDataset(Dataset):
                 self.word_vocab.add(word)
             self.word_vocab.add("@PADDING", 0)
 
+            # print('word_vocab——size')
+            # print(self.word_vocab.size())
             vocab_file = dir + "/../vocabulary_train.txt"
             self.word_vocab.to_file(vocab_file)
 
@@ -410,7 +422,8 @@ class REDataset(Dataset):
 
         categories = sorted(list({l for l in self.labels_str}))
         self.lbl = [categories.index(l) for l in self.labels_str]
-
+        # print(type)
+        # print(categories)
         self.transform = transform
 
     def __getitem__(self, idx):
@@ -452,6 +465,7 @@ class REDataset(Dataset):
             if len(sentence_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
                 sentence_words_padded_0 = self.pad_item(sentence_words_id_dropout[0], 'sentence')
                 sentence_words_padded_1 = self.pad_item(sentence_words_id_dropout[1], 'sentence')
+
                 sentence_datums = (torch.LongTensor(sentence_words_padded_0), torch.LongTensor(sentence_words_padded_1))
 
                 left_words_padded_0 = self.pad_item(left_words_id_dropout[0], 'left')
