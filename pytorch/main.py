@@ -663,7 +663,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         # # Todo: Fan
         # elif args.dataset in ['riedel']and args.arch == 'custom_embed':
 
-        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
             output1 = model(entity1_var, entity2_var, sentence_var, left_chunk_var, inbetween_chunk_var, right_chunk_var)
 
         else:

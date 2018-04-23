@@ -316,7 +316,7 @@ def riedel():
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
         'datadir': 'data-local/re/Riedel2010',
-        'num_classes': 53
+        'num_classes': 56
     }
 
 class REDataset(Dataset):
@@ -355,15 +355,6 @@ class REDataset(Dataset):
             # print(self.max_inbetween_len)
             # print(self.max_right_len)
 
-            # sentence_length = dir + "/../sentence_length.txt"
-            # with io.open(sentence_length, 'w', encoding='utf8') as f:
-            #     for i in range(len(self.sentences_words)):
-            #         f.write(str(len(self.sentences_words[i])) + '\n')
-            inbetween_length = dir + "/../inbetween_length.txt"
-            with io.open(inbetween_length, 'w', encoding='utf8') as f:
-                for i in range(len(self.chunks_inbetween_words)):
-                    f.write(str(len(self.chunks_inbetween_words[i])) + '\n')
-
             self.word_vocab = Vocabulary()
             for word in chain.from_iterable(zip(*self.entities1_words)):
                 self.word_vocab.add(word)
@@ -389,7 +380,7 @@ class REDataset(Dataset):
             maxlen_file = dir + "/../maxlen_train.txt"
             with io.open(maxlen_file, encoding='utf8') as f:
                 for line in f:
-                    [self.max_entity_len, self.max_sentence_len, self.max_left_len, self.max_inbetween_len, self.max_right_len] = line.split('\t')
+                    [self.max_entity_len, self.max_sentence_len, self.max_left_len, self.max_inbetween_len, self.max_right_len] = [int(v) for v in line.split('\t')]
 
             # print(self.max_entity_len)
             # print(self.max_sentence_len)
