@@ -46,7 +46,9 @@ class ILP_dataset(Dataset):
         else:
             assert False, "Wrong dataset type .. " + self.dataset_type
 
-        return query, head, tail #, self.family_data.augmented_mdb  # TODO: the last argument must be checked and made compatible with the model requirement
+        ## todo: need to augment with reverse... ??
+        ## todo: Also need to pass the matrix_db per batch (filtered out by removing facts in the current mini-batch) check: @NuralLP:data.py - lines 336-339 .. not sure how ??
+        return query, head, tail
 
     def __len__(self):
         # TODO: Can we clean this up ?

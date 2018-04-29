@@ -7,7 +7,141 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Variable, Function
 
+import torch_extras  # Note: https://github.com/mrdrozdov-github/pytorch-extras
+import torch.sparse # Note: http://pytorch.org/docs/stable/sparse.html
+setattr(torch, 'one_hot', torch_extras.one_hot)
+
 from .utils import export, parameter_count
+
+@export
+def neurallp():
+
+    # hyperparams here, currently hard-coded, todo: parameterize
+    num_step = 3
+    num_layer = 1
+    num_relation = 12
+    query_embed_size = 128
+    rnn_state_size = 128
+
+    model = NeuralLP()
+    return model
+
+## todo: Implement this ...
+class NeuralLP(nn.Module):
+    def __init__(self):
+        ## hyper-params
+        self.num_step = 3
+        self.num_layer = 1
+        self.num_relation = 12
+        self.query_embed_size = 128
+        self.rnn_state_size = 64  # todo: change this to 128
+        self.num_entity = 3007  # todo: = family_data.num_entity
+
+        self.num_query = self.num_relation * 2
+        self.num_operator = self.num_relation * 2
+
+        ### input embedding layer
+        self.query_embedding = nn.Embedding(self.num_query + 1, self.query_embed_size)
+
+        ### rnn_input layer
+        ## NOTE: by default LSTM hidden state is initialized to 0
+        self.lstm_layer = nn.LSTM(self.query_embed_size, self.rnn_state_size, num_layers=self.num_layer)  # todo: is it bidirectional?
+
+        ### linear layer
+        self.W_b = nn.Linear(self.rnn_state_size, self.num_operator, bias=True)
+        self.softmax_layer = nn.Softmax(dim=2)
+
+        ### softmax over memories
+        self.softmax_mem = nn.Softmax(dim=1)
+
+    def forward(self, triples, matrix_db):
+
+        ## NOTE: q = torch.autograd.Variable(torch.LongTensor( queries))
+
+        (qq, hh, tt) = triples
+        queries = [ [q] * (self.num_step - 1) + [self.num_query] for q in qq]
+        queries_var = torch.autograd.Variable(torch.LongTensor(queries))
+
+        ## input embedding --> rnn_inputs
+        rnn_inputs = self.query_embedding(queries_var).permute(1, 0, 2)   # lines: @NeuralLP:model.py 88-94
+
+        ## lstm over the rnn_inputs --> rnn_outputs
+        rnn_outputs, final_state = self.lstm_layer(rnn_inputs)   # lines: @NeuralLP:model.py 96-108
+
+        ## attention operators
+        # --
+        # attention_operators: a list of num_step lists,
+        # each inner list has num_operator tensors,
+        # each tensor of size (batch_size, 1).
+        # Each tensor represents the attention over an operator.
+        # --
+        attention_operators = self.softmax_layer(self.W_b(rnn_outputs)).permute(0,2,1)  # lines: @NeuralLP:model.py 110-127
+
+        ## attention memories
+        # --
+        # attention_memories: (will be) a list of num_step tensors,
+        # each of size (batch_size, t+1),
+        # where t is the current step (zero indexed).
+        # Each tensor represents the attention over currently populated memory cells.
+        # --
+        attention_memories = list()
+
+        ## memories
+        # --
+        # memories: (will be) a tensor of size (batch_size, t+1, num_entity),
+        # where t is the current step (zero indexed)
+        # Then tensor represents currently populated memory cells.
+        # --
+        size = (len(tt), self.num_entity)
+        memories = torch.one_hot(size, tt.view(-1, 1)).unsqueeze(dim=1)  # lines: @NeuralLP:model.py 138-141
+
+        # create the database of facts from the matrix_db
+        database = dict()
+        for rel, facts in matrix_db.items():
+            indices = torch.LongTensor(facts[0])
+            values = torch.FloatTensor(facts[1])
+            size = torch.Size(facts[2])
+            database[rel] = torch.sparse.FloatTensor(indices.t(), values, size)
+
+        # Note: MatMul in Pytorch = torch.matmul(a, b) .. https://stackoverflow.com/questions/44524901/how-to-do-product-of-matrices-in-pytorch
+        for t in range(self.num_step):
+            # lines: @NeuralLP:model.py 149-155
+            a = torch.unsqueeze(rnn_outputs[t], dim=1)
+            b = torch.stack(rnn_outputs[0:t+1], dim=2)
+            attention_memories.append(self.softmax_mem(torch.squeeze(torch.matmul(a, b), dim=1)))
+
+            # memory_read: tensor of size (batch_size, num_entity) # lines: @NeuralLP:model.py 157-162
+            c = torch.unsqueeze(attention_memories[t], dim=1)
+            d = torch.autograd.Variable(memories.type(torch.FloatTensor))
+            memory_read = torch.squeeze(torch.matmul(c, d), dim=1)
+
+            # lines: @NeuralLP:model.py 164 - 191
+            if t < self.num_step - 1:
+                # database_results: (will be) a list of num_operator tensors,
+                # each of size (batch_size, num_entity).
+                database_results = []
+
+                memory_read = memory_read.t()
+
+                for r in range(int(self.num_operator/2)):
+                    for op_matrix, op_attn in zip(
+                                    [database[r],
+                                     database[r].t()],
+                                    [attention_operators[t][r],
+                                     attention_operators[t][r+int(self.num_operator/2)]]):
+                        op_matrix = torch.autograd.Variable(op_matrix.to_dense())  ## todo: Will this be a performance bottleneck ??
+                        product = torch.matmul(op_matrix, memory_read)
+                        database_results.append((product * op_attn).t())
+
+                added_database_results = torch.sum(torch.stack(database_results), dim=0)  ## todo: normalize later ... same as l1 norm ??
+
+                # Populate a new cell in memory by concatenating.
+                torch.cat([torch.autograd.Variable(memories.type(torch.FloatTensor)),torch.unsqueeze(added_database_results, dim=1)], 1)
+
+            else:
+                predictions = memory_read
+
+        return predictions
 
 
 @export
