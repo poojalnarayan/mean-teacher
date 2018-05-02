@@ -348,8 +348,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         prec1, prec10 = accuracy(class_logit.data, target_var.data, topk=(1, 10))
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec10[0], labeled_minibatch_size)
-        meters.update('error5', 100. - prec10[0], labeled_minibatch_size)
+        meters.update('top10', prec10[0], labeled_minibatch_size)
+        meters.update('error10', 100. - prec10[0], labeled_minibatch_size)
 
         if dataset is None: # todo: Currently not for the NeuralLP model
             ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
@@ -396,7 +396,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                     'Data {meters[data_time]:.3f}\t'
                     'Class {meters[class_loss]:.4f}\t'
                     'Prec@1 {meters[top1]:.3f}\t'
-                    'Prec@5 {meters[top5]:.3f}'.format(
+                    'Prec@10 {meters[top10]:.3f}'.format(
                         epoch, i, len(train_loader), meters=meters))
                 log.record(epoch + i / len(train_loader), {
                     'step': global_step,
@@ -463,11 +463,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
                 'Data {meters[data_time]:.3f}\t'
                 'Class {meters[class_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
+                'Prec@10 {meters[top10]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
 
-    LOG.info(' * Prec@1 {top1.avg:.3f}\tPrec@5 {top5.avg:.3f}'
-          .format(top1=meters['top1'], top5=meters['top5']))
+    LOG.info(' * Prec@1 {top1.avg:.3f}\tPrec@10 {top10.avg:.3f}'
+          .format(top1=meters['top1'], top10=meters['top10']))
     log.record(epoch, {
         'step': global_step,
         **meters.values(),
