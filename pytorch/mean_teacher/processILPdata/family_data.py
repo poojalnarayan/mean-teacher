@@ -19,13 +19,13 @@ class Data(object):
         self.facts, self.num_fact = self._parse_triplets(self.facts_file)
         self.matrix_db = self._db_to_matrix_db(self.facts)
 
-        if type == 'train':
-            self.train_file = os.path.join(folder, "train.txt")
-            self.train, self.num_train = self._parse_triplets(self.train_file)
-            self.matrix_db_train = self.matrix_db
-            extra_mdb = self._db_to_matrix_db(self.train)
-            self.augmented_mdb = self._combine_two_mdbs(self.matrix_db, extra_mdb)
-        elif type == 'valid':
+        self.train_file = os.path.join(folder, "train.txt")
+        self.train, self.num_train = self._parse_triplets(self.train_file)
+        self.matrix_db_train = self.matrix_db
+        extra_mdb = self._db_to_matrix_db(self.train)
+
+        self.augmented_mdb = self._combine_two_mdbs(self.matrix_db, extra_mdb)
+        if type == 'valid':
             self.valid_file = os.path.join(folder, "valid.txt")
             if os.path.isfile(self.valid_file):
                 self.valid, self.num_valid = self._parse_triplets(self.valid_file)
@@ -40,6 +40,8 @@ class Data(object):
             self.test, self.num_test = self._parse_triplets(self.test_file)
             self.matrix_db_test = self.matrix_db
             self.augmented_mdb_test = self.augmented_mdb
+        elif type == 'train':
+            pass  # NOTE:  do nothing here ... We  need to create the augmented_db in train .. but use in test .. so moving it out of the 'if' stmt
         else:
             assert False, "Invalid type of dataset {}".format(type)
 

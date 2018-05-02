@@ -14,7 +14,7 @@ setattr(torch, 'one_hot', torch_extras.one_hot)
 from .utils import export, parameter_count
 
 @export
-def neurallp():
+def neurallp(pretrained=False, **kwargs):
 
     # hyperparams here, currently hard-coded, todo: parameterize
     num_step = 3
@@ -29,6 +29,7 @@ def neurallp():
 ## todo: Implement this ...
 class NeuralLP(nn.Module):
     def __init__(self):
+        super().__init__()
         ## hyper-params
         self.num_step = 3
         self.num_layer = 1
@@ -56,11 +57,9 @@ class NeuralLP(nn.Module):
 
     def forward(self, triples, matrix_db):
 
-        ## NOTE: q = torch.autograd.Variable(torch.LongTensor( queries))
-
-        (qq, hh, tt) = triples
-        queries = [ [q] * (self.num_step - 1) + [self.num_query] for q in qq]
-        queries_var = torch.autograd.Variable(torch.LongTensor(queries))
+        (idx, qq, hh, tt) = triples
+        END = torch.autograd.Variable(torch.LongTensor([self.num_query]*len(qq)))
+        queries_var = torch.stack([qq]*(self.num_step-1) + [END], dim=1)
 
         ## input embedding --> rnn_inputs
         rnn_inputs = self.query_embedding(queries_var).permute(1, 0, 2)   # lines: @NeuralLP:model.py 88-94
@@ -93,7 +92,7 @@ class NeuralLP(nn.Module):
         # Then tensor represents currently populated memory cells.
         # --
         size = (len(tt), self.num_entity)
-        memories = torch.one_hot(size, tt.view(-1, 1)).unsqueeze(dim=1)  # lines: @NeuralLP:model.py 138-141
+        memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(dim=1)  # lines: @NeuralLP:model.py 138-141
 
         # create the database of facts from the matrix_db
         database = dict()
@@ -105,6 +104,10 @@ class NeuralLP(nn.Module):
 
         # Note: MatMul in Pytorch = torch.matmul(a, b) .. https://stackoverflow.com/questions/44524901/how-to-do-product-of-matrices-in-pytorch
         for t in range(self.num_step):
+            # print("---------------------------------")
+            # print("STEP : " + str(t))
+            # print("---------------------------------")
+
             # lines: @NeuralLP:model.py 149-155
             a = torch.unsqueeze(rnn_outputs[t], dim=1)
             b = torch.stack(rnn_outputs[0:t+1], dim=2)
@@ -112,8 +115,7 @@ class NeuralLP(nn.Module):
 
             # memory_read: tensor of size (batch_size, num_entity) # lines: @NeuralLP:model.py 157-162
             c = torch.unsqueeze(attention_memories[t], dim=1)
-            d = torch.autograd.Variable(memories.type(torch.FloatTensor))
-            memory_read = torch.squeeze(torch.matmul(c, d), dim=1)
+            memory_read = torch.squeeze(torch.matmul(c, memories), dim=1)
 
             # lines: @NeuralLP:model.py 164 - 191
             if t < self.num_step - 1:
@@ -133,15 +135,19 @@ class NeuralLP(nn.Module):
                         product = torch.matmul(op_matrix, memory_read)
                         database_results.append((product * op_attn).t())
 
-                added_database_results = torch.sum(torch.stack(database_results), dim=0)  ## todo: normalize later ... same as l1 norm ??
+                add_n = torch.sum(torch.stack(database_results), 0)
+                added_database_results = F.normalize(add_n, p=2, dim=1)  ## normalizing the database results --> computing the L2 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
 
                 # Populate a new cell in memory by concatenating.
-                torch.cat([torch.autograd.Variable(memories.type(torch.FloatTensor)),torch.unsqueeze(added_database_results, dim=1)], 1)
+                # torch.cat([torch.autograd.Variable(memories.type(torch.FloatTensor)),torch.unsqueeze(added_database_results, dim=1)], 1)
+                memories = torch.cat([memories,
+                           torch.unsqueeze(added_database_results, dim=1)], 1)
 
             else:
                 predictions = memory_read
 
-        return predictions
+        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob?
+        return predictions # torch.log(predictions)
 
 
 @export

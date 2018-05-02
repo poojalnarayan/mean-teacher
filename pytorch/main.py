@@ -15,6 +15,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
+import torch_extras
+setattr(torch, 'one_hot', torch_extras.one_hot)
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -39,7 +41,7 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
+    train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -50,7 +52,7 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
         model = model_factory(**model_params)
-        model = nn.DataParallel(model).cuda()
+        model = model.cpu()  # NOTE: removing data-parallelism in the model .. nn.DataParallel(model) #.cuda()
 
         if ema:
             for param in model.parameters():
@@ -59,7 +61,10 @@ def main(context):
         return model
 
     model = create_model()
-    ema_model = create_model(ema=True)
+    if args.dataset != 'family':
+        ema_model = create_model(ema=True)
+    else:
+        ema_model = None
 
     LOG.info(parameters_string(model))
 
@@ -85,39 +90,41 @@ def main(context):
 
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch)
+        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset=dataset)
         LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch)
+        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset=dataset)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
         # train for one epoch
-        train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        train(train_loader, model, ema_model, optimizer, epoch, training_log, dataset=dataset)
         LOG.info("--- training epoch in %s seconds ---" % (time.time() - start_time))
 
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1)
-            LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1)
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset=dataset)
+            if dataset is None: #todo: Currently not on the NeuralLP model
+                LOG.info("Evaluating the EMA model:")
+                ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset=dataset)
+                is_best = ema_prec1 > best_prec1
+                best_prec1 = max(ema_prec1, best_prec1)
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
-            is_best = ema_prec1 > best_prec1
-            best_prec1 = max(ema_prec1, best_prec1)
         else:
             is_best = False
 
-        if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0:
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'global_step': global_step,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'ema_state_dict': ema_model.state_dict(),
-                'best_prec1': best_prec1,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best, checkpoint_path, epoch + 1)
+        if dataset is None: # todo: checkpoint the NeuralLP models later
+            if args.checkpoint_epochs and (epoch + 1) % args.checkpoint_epochs == 0:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'global_step': global_step,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'ema_state_dict': ema_model.state_dict(),
+                    'best_prec1': best_prec1,
+                    'optimizer' : optimizer.state_dict(),
+                }, is_best, checkpoint_path, epoch + 1)
 
 
 def parse_dict_args(**kwargs):
@@ -163,6 +170,8 @@ def create_data_loaders(train_transformation,
             num_workers=2 * args.workers,  # Needs images twice as fast
             pin_memory=False,  # todo: gpu later
             drop_last=False)
+
+        # todo: Also return the matrix_db with each batch ... (after checking with the original implementation)
     else:
 
         traindir = os.path.join(datadir, args.train_subdir)
@@ -199,7 +208,10 @@ def create_data_loaders(train_transformation,
             pin_memory=True,
             drop_last=False)
 
-    return train_loader, eval_loader
+    if args.dataset == 'family':
+        return train_loader, eval_loader, dataset
+    else:
+        return train_loader, eval_loader, None
 
 
 def update_ema_variables(model, ema_model, alpha, global_step):
@@ -209,10 +221,23 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def train(train_loader, model, ema_model, optimizer, epoch, log):
+def filter_matrix_db(dataset, batch_input):
+
+    train_facts = dataset.family_data.train
+    batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
+    batch_ids = [i for i in batch_facts[0]]
+    extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
+
+    extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
+    augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
+    return augmented_mdb
+
+
+def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL) #.cuda() #todo: gpu
+    loss_criterion = nn.NLLLoss()  # todo: does it need any params ?? -- this is for the NeuralLP model
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
     elif args.consistency_type == 'kl':
@@ -225,142 +250,207 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     # switch to train mode
     model.train()
-    ema_model.train()
+    if dataset is None:
+        ema_model.train()
 
     end = time.time()
-    for i, ((input, ema_input), target) in enumerate(train_loader):
+
+    for i, data_minibatch in enumerate(train_loader):
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        input_var = torch.autograd.Variable(input)
-        ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        if dataset is None:
+            ((input, ema_input), target) = data_minibatch
+            input_var = torch.autograd.Variable(input)
+            ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
+            target_var = torch.autograd.Variable(target.cuda(async=True))
+            minibatch_size = len(target_var)
+            labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
+            assert labeled_minibatch_size > 0
+            meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        minibatch_size = len(target_var)
-        labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
-        assert labeled_minibatch_size > 0
-        meters.update('labeled_minibatch_size', labeled_minibatch_size)
+            ema_model_out = ema_model(ema_input_var)
+            model_out = model(input_var)
 
-        ema_model_out = ema_model(ema_input_var)
-        model_out = model(input_var)
+            if isinstance(model_out, Variable):
+                assert args.logit_distance_cost < 0
+                logit1 = model_out
+                ema_logit = ema_model_out
+            else:
+                assert len(model_out) == 2
+                assert len(ema_model_out) == 2
+                logit1, logit2 = model_out
+                ema_logit, _ = ema_model_out
 
-        if isinstance(model_out, Variable):
-            assert args.logit_distance_cost < 0
-            logit1 = model_out
-            ema_logit = ema_model_out
+                ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
+
+            if args.logit_distance_cost >= 0:
+                class_logit, cons_logit = logit1, logit2
+                res_loss = args.logit_distance_cost * residual_logit_criterion(class_logit, cons_logit) / minibatch_size
+                meters.update('res_loss', res_loss.data[0])
+            else:
+                class_logit, cons_logit = logit1, logit1
+                res_loss = 0
+
+            class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
+            ema_softmax = F.softmax(ema_logit, dim=1)
+
+            class_loss = class_criterion(class_logit, target_var) / minibatch_size
+            meters.update('class_loss', class_loss.data[0])
+
+            ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
+            meters.update('ema_class_loss', ema_class_loss.data[0])
+
+            if args.consistency:
+                consistency_weight = get_current_consistency_weight(epoch)
+                meters.update('cons_weight', consistency_weight)
+                consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
+                meters.update('cons_loss', consistency_loss.data[0])
+            else:
+                consistency_loss = 0
+                meters.update('cons_loss', 0)
+
+            loss = class_loss + consistency_loss + res_loss
+
         else:
-            assert len(model_out) == 2
-            assert len(ema_model_out) == 2
-            logit1, logit2 = model_out
-            ema_logit, _ = ema_model_out
 
-        ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
+            input_batch_ids = data_minibatch[0]
+            input = (data_minibatch[1], data_minibatch[2], data_minibatch[3])
 
-        if args.logit_distance_cost >= 0:
-            class_logit, cons_logit = logit1, logit2
-            res_loss = args.logit_distance_cost * residual_logit_criterion(class_logit, cons_logit) / minibatch_size
-            meters.update('res_loss', res_loss.data[0])
-        else:
-            class_logit, cons_logit = logit1, logit1
-            res_loss = 0
+            # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
+            # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
+            # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
+            input_var = [input_batch_ids] + [torch.autograd.Variable(i) for i in input]
 
-        class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
-        ema_softmax = F.softmax(ema_logit, dim=1)
+            matrix_db = filter_matrix_db(dataset, data_minibatch)
+            model_out = model(input_var, matrix_db)
 
-        class_loss = class_criterion(class_logit, target_var) / minibatch_size
-        meters.update('class_loss', class_loss.data[0])
+            target_var = input_var[2]  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
 
-        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
-        meters.update('ema_class_loss', ema_class_loss.data[0])
+            minibatch_size = len(target_var)
+            labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
+            assert labeled_minibatch_size > 0
+            meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        if args.consistency:
-            consistency_weight = get_current_consistency_weight(epoch)
-            meters.update('cons_weight', consistency_weight)
-            consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
-            meters.update('cons_loss', consistency_loss.data[0])
-        else:
-            consistency_loss = 0
-            meters.update('cons_loss', 0)
+            class_loss = loss_criterion(model_out, target_var)
+            meters.update('class_loss', class_loss.data[0])
 
-        loss = class_loss + consistency_loss + res_loss
+            # print ("LOSS is " + str(loss.data[0]))
+            loss = class_loss
+            class_logit = model_out
+
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
-        prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 5))
+        prec1, prec10 = accuracy(class_logit.data, target_var.data, topk=(1, 10))
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
+        meters.update('top5', prec10[0], labeled_minibatch_size)
+        meters.update('error5', 100. - prec10[0], labeled_minibatch_size)
 
-        ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
-        meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+        if dataset is None: # todo: Currently not for the NeuralLP model
+            ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
+            meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
+            meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
+            meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
+            meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         global_step += 1
-        update_ema_variables(model, ema_model, args.ema_decay, global_step)
+
+        if dataset is None: # todo: not currently done in the NeuralLP model
+            update_ema_variables(model, ema_model, args.ema_decay, global_step)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
-            LOG.info(
-                'Epoch: [{0}][{1}/{2}]\t'
-                'Time {meters[batch_time]:.3f}\t'
-                'Data {meters[data_time]:.3f}\t'
-                'Class {meters[class_loss]:.4f}\t'
-                'Cons {meters[cons_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
-                    epoch, i, len(train_loader), meters=meters))
-            log.record(epoch + i / len(train_loader), {
-                'step': global_step,
-                **meters.values(),
-                **meters.averages(),
-                **meters.sums()
-            })
+        if dataset is None:
+            if i % args.print_freq == 0:
+                LOG.info(
+                    'Epoch: [{0}][{1}/{2}]\t'
+                    'Time {meters[batch_time]:.3f}\t'
+                    'Data {meters[data_time]:.3f}\t'
+                    'Class {meters[class_loss]:.4f}\t'
+                    'Cons {meters[cons_loss]:.4f}\t'
+                    'Prec@1 {meters[top1]:.3f}\t'
+                    'Prec@5 {meters[top5]:.3f}'.format(
+                        epoch, i, len(train_loader), meters=meters))
+                log.record(epoch + i / len(train_loader), {
+                    'step': global_step,
+                    **meters.values(),
+                    **meters.averages(),
+                    **meters.sums()
+                })
+        else:
+            if i % args.print_freq == 0:
+                LOG.info(
+                    'Epoch: [{0}][{1}/{2}]\t'
+                    'Time {meters[batch_time]:.3f}\t'
+                    'Data {meters[data_time]:.3f}\t'
+                    'Class {meters[class_loss]:.4f}\t'
+                    'Prec@1 {meters[top1]:.3f}\t'
+                    'Prec@5 {meters[top5]:.3f}'.format(
+                        epoch, i, len(train_loader), meters=meters))
+                log.record(epoch + i / len(train_loader), {
+                    'step': global_step,
+                    **meters.values(),
+                    **meters.averages(),
+                    **meters.sums()
+                })
 
 
-def validate(eval_loader, model, log, global_step, epoch):
+def validate(eval_loader, model, log, global_step, epoch, dataset):
     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    loss_criterion = nn.NLLLoss()  # todo: does it need any params ?? -- this is for the NeuralLP model
     meters = AverageMeterSet()
 
     # switch to evaluate mode
     model.eval()
 
     end = time.time()
-    for i, (input, target) in enumerate(eval_loader):
+    for i, data_minibatch in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        input_var = torch.autograd.Variable(input, volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
+        if dataset is None:
+            (input, target) = data_minibatch
+            input_var = torch.autograd.Variable(input, volatile=True)
+            target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
+        else:
+            input_batch_ids = data_minibatch[0]
+            input = (data_minibatch[1], data_minibatch[2], data_minibatch[3])
+            input_var = [input_batch_ids] + [torch.autograd.Variable(i) for i in input]
+            target_var = input_var[2]
+
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        # compute output
-        output1, output2 = model(input_var)
-        softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
-        class_loss = class_criterion(output1, target_var) / minibatch_size
+        if dataset is None:
+            # compute output
+            output1, output2 = model(input_var)
+            softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
+            class_loss = class_criterion(output1, target_var) / minibatch_size
+        else:
+            matrix_db = filter_matrix_db(dataset, data_minibatch)
+            output1 = model(input_var, matrix_db)
+            class_loss = loss_criterion(output1, target_var)
 
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 5))
+        prec1, prec10 = accuracy(output1.data, target_var.data, topk=(1, 10))
         meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
+        meters.update('top10', prec10[0], labeled_minibatch_size)
+        meters.update('error10', 100.0 - prec10[0], labeled_minibatch_size)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)

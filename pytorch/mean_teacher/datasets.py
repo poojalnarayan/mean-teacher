@@ -1,14 +1,14 @@
 import torchvision.transforms as transforms
 
-# from . import data
-# from .utils import export
-# from torch.utils.data import Dataset
-# from .processILPdata.family_data import Data as FamilyData
-
-import data
-from utils import export
+from . import data
+from .utils import export
 from torch.utils.data import Dataset
-from processILPdata.family_data import Data as FamilyData
+from .processILPdata.family_data import Data as FamilyData
+
+# import data
+# from utils import export
+# from torch.utils.data import Dataset
+# from processILPdata.family_data import Data as FamilyData
 
 @export
 def family():
@@ -48,7 +48,7 @@ class ILP_dataset(Dataset):
 
         ## todo: need to augment with reverse... ??
         ## todo: Also need to pass the matrix_db per batch (filtered out by removing facts in the current mini-batch) check: @NuralLP:data.py - lines 336-339 .. not sure how ??
-        return query, head, tail
+        return idx, query, head, tail
 
     def __len__(self):
         # TODO: Can we clean this up ?
