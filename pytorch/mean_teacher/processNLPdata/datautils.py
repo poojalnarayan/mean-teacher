@@ -2,7 +2,7 @@
 
 import numpy as np
 from collections import defaultdict
-
+import re
 
 class Datautils:
 
@@ -42,64 +42,138 @@ class Datautils:
         return entities, contexts, labels
 
     @classmethod
-    def read_re_data(cls, filename):
+    def read_re_data(cls, filename, type, max_entity_len, max_inbetween_len):
         labels = []
         entities1 = []
         entities2 = []
-        sentences = []
-        chunks_left = []
         chunks_inbetween = []
-        chunks_right = []
-
-        max_entity_len = 0
-        max_sentence_len = 0
-        max_left_len = 0
-        max_right_len = 0
-        max_inbetween_len = 0
+        word_counts = dict()
 
         with open(filename) as f:
             for line in f:
                 vals = line.strip().split('\t')
 
-                sentence_str = vals[5].strip().replace(vals[2], "@ENTITY", 1)
-                sentence_str = sentence_str.replace(vals[3], "@ENTITY", 1)
-                left_str = sentence_str.partition("@ENTITY")[0]
-                inbetween_str = sentence_str.partition("@ENTITY")[2].partition("@ENTITY")[0]
-                right_str = sentence_str.partition("@ENTITY")[2].partition("@ENTITY")[2]
+                sentence_str = ' ' + vals[5].strip()
+                entity1 = vals[2].strip()
+                entity2 = vals[3].strip()
+                entities1_words = entity1.strip().split('_')
+                entities2_words = entity2.strip().split('_')
 
-                sentences_words = sentence_str.split(' ')[:-1]  # the last word is "###END###"
-                left_words = left_str.split(' ')
-                inbetween_words = inbetween_str.split(' ')
-                right_words = right_str.split(' ')[:-1]
+                entity1_idxs = [m.start() for m in re.finditer(' ' + entity1 + ' ', sentence_str)]
+                entity2_idxs = [m.start() for m in re.finditer(' ' + entity2 + ' ', sentence_str)]
 
-                if (len(sentences_words) <= 100) and (len(inbetween_words) <= 40):   # filter out noise
-                    labels.append(vals[4])
-                    entities1_words = vals[2].strip().split('_')
-                    entities2_words = vals[3].strip().split('_')
+                # this happens when not all words of entity are all connected by '_' in sentence
+                # e.g.: m.03h64	m.01ky9c	hong_kong	hong_kong_international_airport	/location/location/contains	turbo jet ferries depart from the hong_kong macao ferry terminal , sheung wan , the hong_kong china ferry terminal in kowloon and cross boundary passenger ferry terminal at hong_kong international airport . ###END###
+                if len(entity1_idxs) == 0:
+                    sentence_str_tab = sentence_str.replace(' ', "_")
+                    entity1_idxs = [m.start() for m in re.finditer('_' + entity1 + '_', sentence_str_tab)]
+                if len(entity2_idxs) == 0:
+                    sentence_str_tab = sentence_str.replace(' ', "_")
+                    entity2_idxs = [m.start() for m in re.finditer('_' + entity2 + '_', sentence_str_tab)]
 
-                    if len(entities1_words) > max_entity_len:
-                        max_entity_len = len(entities1_words)
-                    if len(entities2_words) > max_entity_len:
-                        max_entity_len = len(entities2_words)
+                # e.g.: m.04997fv	m.0bwdn	woods	tiger_woods	NA	quite simply , tiger_woods did n't play golf the way tiger_woods usually does , nowhere near the way he played in winning 10 majors . ###END###
+                if len(entity1_idxs) == 0:
+                    entity1_idxs = [m.start() for m in re.finditer(entity1, sentence_str)]
+                    entity1_idxs = np.array(entity1_idxs) - np.array([1] * len(entity1_idxs))
+                if len(entity2_idxs) == 0:
+                    entity2_idxs = [m.start() for m in re.finditer(entity2, sentence_str)]
+                    entity2_idxs = np.array(entity2_idxs) - np.array([1] * len(entity2_idxs))
 
-                    if len(sentences_words) > max_sentence_len:
-                        max_sentence_len = len(sentences_words)
-                    if len(left_words) > max_left_len:
-                        max_left_len = len(left_words)
-                    if len(inbetween_words) > max_inbetween_len:
-                        max_inbetween_len = len(inbetween_words)
-                    if len(right_words) > max_right_len:
-                        max_right_len = len(right_words)
+                if len(entity1_idxs) > 0 and len(entity2_idxs) > 0:
+                    d_abs = 2000  # initial the shortest distance between two entities as some big num, such as 2000
+                    entity1_idx = entity1_idxs[0]  # entity can appear more than once in sentence
+                    entity2_idx = entity2_idxs[0]
+                    for idx1 in entity1_idxs:
+                        for idx2 in entity2_idxs:
+                            if abs(idx1-idx2) < d_abs and idx1 != idx2:
+                                d_abs = abs(idx1-idx2)
+                                entity1_idx = idx1
+                                entity2_idx = idx2
 
-                    entities1.append(entities1_words)
-                    entities2.append(entities2_words)
-                    sentences.append(sentences_words)
-                    chunks_left.append(left_words)
-                    chunks_inbetween.append(inbetween_words)
-                    chunks_right.append(right_words)
+                    if entity1_idx < entity2_idx:
+                        sentence_str_1 = sentence_str[:entity1_idx] + ' @entity ' + sentence_str[entity1_idx+len(entity1)+2:entity2_idx]
+                        sentence_str_2 = ' @entity ' + sentence_str[entity2_idx+len(entity2)+2:]
+                        sentence_str = sentence_str_1 + ' ' + sentence_str_2
 
-        return entities1, entities2, sentences, labels, chunks_left, chunks_inbetween, chunks_right, max_entity_len, max_sentence_len, max_left_len, max_inbetween_len, max_right_len
+                    elif entity1_idx > entity2_idx:
+                        sentence_str_1 = sentence_str[:entity2_idx] + ' @entity ' + sentence_str[entity2_idx + len(entity2)+2:entity1_idx]
+                        sentence_str_2 = ' @entity ' + sentence_str[entity1_idx+len(entity1)+2:]
+                        sentence_str = sentence_str_1 + ' ' + sentence_str_2
 
+                    sentence_str = sentence_str.lower()
+                    sentence_str = sentence_str.replace('-lrb-', " ( ")
+                    sentence_str = sentence_str.replace('-rrb-', " ) ")
+                    sentence_str = ' '.join(sentence_str.split())
+                    inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
+
+                    # sentences_words = re.split( r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\.|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',sentence_str)[:-14]  # the last 14 character are "###END###"
+                    inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\.|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
+
+                    # i = 0
+                    # while i < len(sentences_words):
+                    #     word = sentences_words[i]
+                    #
+                    #     if len(word) == 0 or word is ' ':
+                    #         sentences_words.remove(word)
+                    #         i -= 1
+                    #     elif word[0] is not '@' and '@' in word:
+                    #         sentences_words[i] = '@email'
+                    #     elif word[0] is not '@' and not word.isalnum() and len(word) > 1 and '&' not in word:
+                    #         print(word)
+                    #
+                    #     i += 1
+
+                    i = 0
+                    while i < len(inbetween_words):
+                        word = inbetween_words[i]
+
+                        if len(word) == 0 or word is ' ':
+                            inbetween_words.remove(word)
+                            i -= 1
+                        elif word[0] is not '@' and '@' in word:
+                            inbetween_words[i] = '@email'
+                        elif word[0] is not '@' and not word.isalnum() and len(word) > 1 and '&' not in word:
+                            assert False, word
+
+                        i += 1
+
+                    if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
+
+                        labels.append(vals[4])
+
+                        #fan: should we swap entities1_words and entities2_words, if entity1_idx > entity2_idx?
+
+
+                        if len(entities1_words) > max_entity_len:
+                            entities1_words = entities1_words[:max_entity_len]
+                        if len(entities2_words) > max_entity_len:
+                            entities2_words = entities2_words[:max_entity_len]
+
+                        for word in inbetween_words:
+                            if word not in word_counts:
+                                word_counts[word] = 1
+                            else:
+                                word_counts[word] += 1
+
+                        for word in entities1_words:
+                            if word not in word_counts:
+                                word_counts[word] = 1
+                            else:
+                                word_counts[word] += 1
+
+                        for word in entities2_words:
+                            if word not in word_counts:
+                                word_counts[word] = 1
+                            else:
+                                word_counts[word] += 1
+
+                        entities1.append(entities1_words)
+                        entities2.append(entities2_words)
+                        chunks_inbetween.append(inbetween_words)
+                else:
+                    assert False, line
+
+        return entities1, entities2, labels, chunks_inbetween, word_counts
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...

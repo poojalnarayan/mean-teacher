@@ -430,29 +430,17 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
             input_entity1 = input[0]
             input_entity2 = input[1]
-            input_sentence = input[2]
-            input_left_chunk = input[3]
-            input_inbetween_chunk = input[4]
-            input_right_chunk = input[5]
+            input_inbetween_chunk = input[2]
             entity1_var = torch.autograd.Variable(input_entity1).cpu()
             entity2_var = torch.autograd.Variable(input_entity2).cpu()
-            sentence_var = torch.autograd.Variable(input_sentence).cpu()
-            left_chunk_var = torch.autograd.Variable(input_left_chunk).cpu()
             inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
-            right_chunk_var = torch.autograd.Variable(input_right_chunk).cpu()
 
             ema_input_entity1 = ema_input[0]
             ema_input_entity2 = ema_input[1]
-            ema_input_sentence = ema_input[2]
-            ema_input_left_chunk = ema_input[3]
-            ema_input_inbetween_chunk = ema_input[4]
-            ema_input_right_chunk = ema_input[5]
+            ema_input_inbetween_chunk = ema_input[2]
             ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
             ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
-            ema_sentence_var = torch.autograd.Variable(ema_input_sentence, volatile=True).cpu()
-            ema_left_chunk_var = torch.autograd.Variable(ema_input_left_chunk, volatile=True).cpu()
             ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
-            ema_right_chunk_var = torch.autograd.Variable(ema_input_right_chunk, volatile=True).cpu()
 
         else:
             ((input, ema_input), target) = datapoint
@@ -487,8 +475,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # elif args.dataset in ['riedel'] and args.arch == 'custom_embed':
 
         elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_sentence_var, ema_left_chunk_var, ema_inbetween_chunk_var, ema_right_chunk_var)
-            model_out = model(entity1_var, entity2_var, sentence_var, left_chunk_var, inbetween_chunk_var, right_chunk_var)
+            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         else:
             ema_model_out = ema_model(ema_input_var)
@@ -621,16 +609,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
             input_entity1 = input[0]
             input_entity2 = input[1]
-            input_sentence = input[2]
-            input_left_chunk = input[3]
-            input_inbetween_chunk = input[4]
-            input_right_chunk = input[5]
+            input_inbetween_chunk = input[2]
+
             entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
             entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
-            sentence_var = torch.autograd.Variable(input_sentence, volatile=True).cpu()
-            left_chunk_var = torch.autograd.Variable(input_left_chunk, volatile=True).cpu()
             inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
-            right_chunk_var = torch.autograd.Variable(input_right_chunk, volatile=True).cpu()
 
         else:
             (input, target) = datapoint
@@ -664,7 +647,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         # elif args.dataset in ['riedel']and args.arch == 'custom_embed':
 
         elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
-            output1 = model(entity1_var, entity2_var, sentence_var, left_chunk_var, inbetween_chunk_var, right_chunk_var)
+            output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         else:
             output1 = model(input_var) ##, output2 = model(input_var)

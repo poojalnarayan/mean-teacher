@@ -69,12 +69,25 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
     for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        entity = datapoint[0][0]
-        patterns = datapoint[0][1]
-        target = datapoint[1]
+        if args.dataset in ['conll', 'ontonotes']:
+            entity = datapoint[0][0]
+            patterns = datapoint[0][1]
+            target = datapoint[1]
 
-        entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
-        patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
+            entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
+            patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
+        
+        elif args.dataset in ['riedel']:
+            inputs = datapoint[0]
+            target = datapoint[1]
+
+            input_entity1 = inputs[0]
+            input_entity2 = inputs[1]
+            input_inbetween_chunk = inputs[2]
+
+            entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
+            entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
+            inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
 
         target_var = torch.autograd.Variable(target.cpu(), volatile=True)
 
@@ -86,6 +99,8 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
 
         if arch == "custom_embed":
             output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
+        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
+            output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
         else:
             output1 = model(entity_var, patterns_var)
 
@@ -147,17 +162,27 @@ def create_data_loaders(train_transformation,
                         datadir,
                         args):
 
-    evaldir = os.path.join(datadir, args.train_subdir)  # NOTE: test data is the same as train data. To load the word_vectors using the train_subdir
+    evaldir = os.path.join(datadir, args.eval_subdir)  # NOTE: test data is the same as train data. To load the word_vectors using the train_subdir
     print("evaldir : " + evaldir)
 
-    dataset_test = datasets.NECDataset(evaldir, args, eval_transformation)
+    if args.dataset in ['conll', 'ontonotes']:
+        dataset_test = datasets.NECDataset(evaldir, args, eval_transformation)
 
-    eval_loader = torch.utils.data.DataLoader(dataset_test,
-                                              batch_size=args.batch_size,
-                                              shuffle=False,
-                                              num_workers=2 * args.workers,
-                                              pin_memory=False,
-                                              drop_last=False)
+        eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=2 * args.workers,
+                                                  pin_memory=False,
+                                                  drop_last=False)
+    elif args.dataset in ['riedel']:
+        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test')
+
+        eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=False,
+                                                  num_workers=2 * args.workers,
+                                                  pin_memory=False,
+                                                  drop_last=False)
 
     return eval_loader, dataset_test
 
