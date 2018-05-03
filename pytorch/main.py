@@ -22,6 +22,7 @@ from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
+from mean_teacher.NeuralLPutils.utils import get_rules as NeuralILPRules
 
 LOG = logging.getLogger('main')
 
@@ -125,6 +126,24 @@ def main(context):
                     'best_prec1': best_prec1,
                     'optimizer' : optimizer.state_dict(),
                 }, is_best, checkpoint_path, epoch + 1)
+
+    if dataset is not None:
+        # todo: parameterize:
+        qq = np.array([i for i in range(0, dataset.family_data.num_operator)])
+        hh = [0] * len(qq)
+        tt = [0] * len(qq)
+        batch_ids = [-1 for _ in range(len(qq))]
+        mdb = {r: ([(0,0)], [0.], (dataset.family_data.num_entity, dataset.family_data.num_entity))
+                for r in range(int(dataset.family_data.num_operator / 2))}
+        input_var = [torch.autograd.Variable(torch.LongTensor(batch_ids)),
+                     torch.autograd.Variable(torch.LongTensor(qq)),
+                     torch.autograd.Variable(torch.LongTensor(hh)),
+                     torch.autograd.Variable(torch.LongTensor(tt))]
+
+        x = model(input_var, mdb, save_attention_vectors=True)
+        print("Dumping the Rules ...")
+        NeuralILPRules(model, dataset.family_data)
+        print("Done!!!!")
 
 
 def parse_dict_args(**kwargs):

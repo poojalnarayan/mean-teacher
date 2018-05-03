@@ -55,11 +55,15 @@ class NeuralLP(nn.Module):
         ### softmax over memories
         self.softmax_mem = nn.Softmax(dim=1)
 
-    def forward(self, triples, matrix_db):
+        self.queries_indexing_attn = None
+        self.attention_memories = None
+        self.attention_operators = None
+
+    def forward(self, triples, matrix_db, save_attention_vectors=False):
 
         (idx, qq, hh, tt) = triples
-        END = torch.autograd.Variable(torch.LongTensor([self.num_query]*len(qq)))
-        queries_var = torch.stack([qq]*(self.num_step-1) + [END], dim=1)
+        END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)))
+        queries_var = torch.stack([qq] * (self.num_step - 1) + [END], dim=1)
 
         ## input embedding --> rnn_inputs
         rnn_inputs = self.query_embedding(queries_var).permute(1, 0, 2)   # lines: @NeuralLP:model.py 88-94
@@ -147,6 +151,12 @@ class NeuralLP(nn.Module):
                 predictions = memory_read
 
         # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob?
+
+        if save_attention_vectors:
+            self.queries_indexing_attn = qq
+            self.attention_operators = attention_operators
+            self.attention_memories = attention_memories
+
         return predictions # torch.log(predictions)
 
 
