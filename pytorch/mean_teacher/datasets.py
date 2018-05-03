@@ -401,10 +401,10 @@ class REDataset(Dataset):
 
         if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:
             l = 0
-            refined_inbetween = []
+            refined_inbetween = list()
             for w in self.chunks_inbetween_words[idx]:
-                if (w in self.word_vocab.word_to_id) and l <= self.max_inbetween_len:
-                    refined_inbetween.append[w]
+                if w in self.word_vocab.word_to_id and l <= self.max_inbetween_len:
+                    refined_inbetween.append(w)
                     l += 1
             self.chunks_inbetween_words[idx] = refined_inbetween
 
