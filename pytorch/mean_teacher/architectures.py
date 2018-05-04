@@ -145,6 +145,8 @@ class NeuralLP(nn.Module):
                                     [attention_operators[t][r],
                                      attention_operators[t][r+int(self.num_operator/2)]]):
                         op_matrix = torch.autograd.Variable(op_matrix.to_dense())  ## todo: Will this be a performance bottleneck ??
+                        if torch.cuda.is_available():
+                            op_matrix = op_matrix.cuda()
                         product = torch.matmul(op_matrix, memory_read)
                         database_results.append((product * op_attn).t())
 
