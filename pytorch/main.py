@@ -143,6 +143,9 @@ def main(context):
                      torch.autograd.Variable(torch.LongTensor(qq), volatile=True),
                      torch.autograd.Variable(torch.LongTensor(tt), volatile=True)]
 
+        if torch.cuda.is_available():
+            input_var = [i.cuda() for i in input_var]
+
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         NeuralILPRules(model, dataset.family_data)
@@ -356,6 +359,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
             input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1]),
                                              torch.autograd.Variable(data_minibatch[3])]
+
+            if torch.cuda.is_available():
+                input_var = [i.cuda() for i in input_var]
 
             matrix_db = filter_matrix_db(dataset, data_minibatch)
             model_out = model(input_var, matrix_db)
