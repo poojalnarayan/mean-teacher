@@ -478,6 +478,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
                                              torch.autograd.Variable(data_minibatch[3], volatile=True)]
             if torch.cuda.is_available():
+                input_var[0] = input_var[0].cuda()
+                input_var[1] = input_var[1].cuda()
+                # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
                 target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
             else:
                 target_var = torch.autograd.Variable(data_minibatch[2].cpu())
