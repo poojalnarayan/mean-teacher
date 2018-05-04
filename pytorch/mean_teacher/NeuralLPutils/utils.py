@@ -2,7 +2,7 @@ import sys
 import pickle
 import time
 import numpy as np
-
+import torch.cuda
 
 def list_rules(attn_ops, attn_mems, the):
     """
