@@ -155,8 +155,13 @@ def get_attentions(model):
     all_queries = [q for q in range(0,num_operators)]  # functools.reduce(lambda x, y: list(x) + list(y), query_batches, [])
 
     for i in range(len(all_queries)):
-        attention_operators = model.attention_operators.data.numpy()
-        attention_memories = [mem.data.numpy() for mem in model.attention_memories]
+        if torch.cuda.is_available():
+            attention_operators = model.attention_operators.data.cpu().numpy()
+            attention_memories = [mem.data.cpu().numpy() for mem in model.attention_memories]
+        else:
+            attention_operators = model.attention_operators.data.numpy()
+            attention_memories = [mem.data.numpy() for mem in model.attention_memories]
+
         all_attention_operators[all_queries[i]] = [[attn[i]  # todo: is this right ? check NeuralLP:experiment.py: lines 227-234
                                                    for attn in attn_step]
                                                    for attn_step in attention_operators]
