@@ -73,10 +73,13 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay,
-                                nesterov=args.nesterov)
+    if dataset is None:
+        optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay,
+                                    nesterov=args.nesterov)
+    else:
+        optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr)
 
     # optionally resume from a checkpoint
     if args.resume:
