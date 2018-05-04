@@ -100,7 +100,12 @@ class NeuralLP(nn.Module):
         # Then tensor represents currently populated memory cells.
         # --
         size = (len(tt), self.num_entity)
-        memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(dim=1)  # lines: @NeuralLP:model.py 138-141
+        if torch.cuda.is_available():
+            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.cuda.FloatTensor).unsqueeze(
+                dim=1)  # lines: @NeuralLP:model.py 138-141
+        else:
+            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(
+                dim=1)  # lines: @NeuralLP:model.py 138-141
 
         # create the database of facts from the matrix_db
         database = dict()
