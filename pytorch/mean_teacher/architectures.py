@@ -61,7 +61,7 @@ class NeuralLP(nn.Module):
 
     def forward(self, triples, matrix_db, save_attention_vectors=False):
 
-        (idx, qq, hh, tt) = triples
+        (idx, qq, tt) = triples  # NOTE: Not passing the head variables .. as they are used in prediction ..
         END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)))
         queries_var = torch.stack([qq] * (self.num_step - 1) + [END], dim=1)
 
@@ -140,24 +140,22 @@ class NeuralLP(nn.Module):
                         database_results.append((product * op_attn).t())
 
                 add_n = torch.sum(torch.stack(database_results), 0)
-                added_database_results = F.normalize(add_n, p=2, dim=1)  ## normalizing the database results --> computing the L2 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
+                added_database_results = F.normalize(add_n, p=1, dim=1)  ## normalizing the database results --> computing the L2 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
 
                 # Populate a new cell in memory by concatenating.
-                # torch.cat([torch.autograd.Variable(memories.type(torch.FloatTensor)),torch.unsqueeze(added_database_results, dim=1)], 1)
                 memories = torch.cat([memories,
                            torch.unsqueeze(added_database_results, dim=1)], 1)
 
             else:
                 predictions = memory_read
 
-        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob?
-
         if save_attention_vectors:
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
 
-        return predictions # torch.log(predictions)
+        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob? .. ANS: Yes it does ... But is this right ?
+        return predictions  # torch.log(predictions)
 
 
 @export

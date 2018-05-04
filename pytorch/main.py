@@ -6,6 +6,7 @@ import time
 import math
 import logging
 
+import torch.cuda
 import numpy as np
 import torch
 import torch.nn as nn
@@ -53,7 +54,10 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
         model = model_factory(**model_params)
-        model = model.cpu()  # NOTE: removing data-parallelism in the model .. nn.DataParallel(model) #.cuda()
+        if torch.cuda.is_available():
+            model = model.cuda()
+        else:
+            model = model.cpu()  # NOTE: removing data-parallelism in the model .. nn.DataParallel(model) #.cuda()
 
         if ema:
             for param in model.parameters():
@@ -136,9 +140,8 @@ def main(context):
         mdb = {r: ([(0,0)], [0.], (dataset.family_data.num_entity, dataset.family_data.num_entity))
                 for r in range(int(dataset.family_data.num_operator / 2))}
         input_var = [torch.autograd.Variable(torch.LongTensor(batch_ids)),
-                     torch.autograd.Variable(torch.LongTensor(qq)),
-                     torch.autograd.Variable(torch.LongTensor(hh)),
-                     torch.autograd.Variable(torch.LongTensor(tt))]
+                     torch.autograd.Variable(torch.LongTensor(qq), volatile=True),
+                     torch.autograd.Variable(torch.LongTensor(tt), volatile=True)]
 
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
@@ -168,6 +171,12 @@ def create_data_loaders(train_transformation,
                         datadir,
                         args):
 
+    if torch.cuda.is_available():
+        pin_memory = True
+    else:
+        pin_memory = False
+
+
     if args.dataset == 'family':
         dataset = datasets.ILP_dataset(datadir, 'train')
         # TODO: For now not consider the teacher-student arch .. but just the supervised mode
@@ -178,7 +187,7 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=False)  # todo: gpu later
+                                                   pin_memory=pin_memory)
 
         dataset_test = datasets.ILP_dataset(datadir, 'test')
 
@@ -187,10 +196,9 @@ def create_data_loaders(train_transformation,
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2 * args.workers,  # Needs images twice as fast
-            pin_memory=False,  # todo: gpu later
+            pin_memory=pin_memory,
             drop_last=False)
 
-        # todo: Also return the matrix_db with each batch ... (after checking with the original implementation)
     else:
 
         traindir = os.path.join(datadir, args.train_subdir)
@@ -217,14 +225,14 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=True)
+                                                   pin_memory=pin_memory)
 
         eval_loader = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(evaldir, eval_transformation),
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2 * args.workers,  # Needs images twice as fast
-            pin_memory=True,
+            pin_memory=pin_memory,
             drop_last=False)
 
     if args.dataset == 'family':
@@ -255,8 +263,13 @@ def filter_matrix_db(dataset, batch_input):
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL) #.cuda() #todo: gpu
-    loss_criterion = nn.NLLLoss()  # todo: does it need any params ?? -- this is for the NeuralLP model
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+        loss_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+        loss_criterion = nn.NLLLoss().cpu()
+
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
     elif args.consistency_type == 'kl':
@@ -337,17 +350,20 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         else:
 
             input_batch_ids = data_minibatch[0]
-            input = (data_minibatch[1], data_minibatch[2], data_minibatch[3])
 
             # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
             # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
-            input_var = [input_batch_ids] + [torch.autograd.Variable(i) for i in input]
+            input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1]),
+                                             torch.autograd.Variable(data_minibatch[3])]
 
             matrix_db = filter_matrix_db(dataset, data_minibatch)
             model_out = model(input_var, matrix_db)
 
-            target_var = input_var[2]  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
+            if torch.cuda.is_available():
+                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+            else:
+                target_var = torch.autograd.Variable(data_minibatch[2].cpu())  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
 
             minibatch_size = len(target_var)
             labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -426,8 +442,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
 
 def validate(eval_loader, model, log, global_step, epoch, dataset):
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-    loss_criterion = nn.NLLLoss()  # todo: does it need any params ?? -- this is for the NeuralLP model
+
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+        loss_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+        loss_criterion = nn.NLLLoss().cpu()
+
     meters = AverageMeterSet()
 
     # switch to evaluate mode
@@ -443,10 +465,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
         else:
             input_batch_ids = data_minibatch[0]
-            input = (data_minibatch[1], data_minibatch[2], data_minibatch[3])
-            input_var = [input_batch_ids] + [torch.autograd.Variable(i) for i in input]
-            target_var = input_var[2]
-
+            input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
+                                             torch.autograd.Variable(data_minibatch[3], volatile=True)]
+            if torch.cuda.is_available():
+                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+            else:
+                target_var = torch.autograd.Variable(data_minibatch[2].cpu())
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
