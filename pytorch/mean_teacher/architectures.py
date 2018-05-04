@@ -101,7 +101,7 @@ class NeuralLP(nn.Module):
         # --
         size = (len(tt), self.num_entity)
         if torch.cuda.is_available():
-            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.cuda.FloatTensor).unsqueeze(
+            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
                 dim=1)  # lines: @NeuralLP:model.py 138-141
         else:
             memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(
