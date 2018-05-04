@@ -144,7 +144,9 @@ def main(context):
                      torch.autograd.Variable(torch.LongTensor(tt), volatile=True)]
 
         if torch.cuda.is_available():
-            input_var = [i.cuda() for i in input_var]
+            input_var[0] = input_var[0].cuda()
+            input_var[1] = input_var[1].cuda()
+            # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
 
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
@@ -361,7 +363,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                                              torch.autograd.Variable(data_minibatch[3])]
 
             if torch.cuda.is_available():
-                input_var = [i.cuda() for i in input_var]
+                input_var[0] = input_var[0].cuda()
+                input_var[1] = input_var[1].cuda()
+                # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
 
             matrix_db = filter_matrix_db(dataset, data_minibatch)
             model_out = model(input_var, matrix_db)
