@@ -10,6 +10,7 @@ from torch.autograd import Variable, Function
 import torch_extras  # Note: https://github.com/mrdrozdov-github/pytorch-extras
 import torch.sparse # Note: http://pytorch.org/docs/stable/sparse.html
 setattr(torch, 'one_hot', torch_extras.one_hot)
+import torch.cuda
 
 from .utils import export, parameter_count
 
@@ -62,7 +63,10 @@ class NeuralLP(nn.Module):
     def forward(self, triples, matrix_db, save_attention_vectors=False):
 
         (idx, qq, tt) = triples  # NOTE: Not passing the head variables .. as they are used in prediction ..
-        END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)))
+        if torch.cuda.is_available():
+            END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)).cuda())
+        else:
+            END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)))
         queries_var = torch.stack([qq] * (self.num_step - 1) + [END], dim=1)
 
         ## input embedding --> rnn_inputs
