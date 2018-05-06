@@ -37,7 +37,7 @@ class NeuralLP(nn.Module):
         self.num_layer = 1
         self.num_relation = 12
         self.query_embed_size = 128
-        self.rnn_state_size = 128  # todo: change this to 128
+        self.rnn_state_size = 128
         self.num_entity = 3007  # todo: = family_data.num_entity
 
         self.num_query = self.num_relation * 2
@@ -168,8 +168,11 @@ class NeuralLP(nn.Module):
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
+            print('----------------------')
+            for i, t in database.items():
+                print(str(i) + "\t" + str(torch.sum(t.to_dense())))
+            print('----------------------')
 
-        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob? .. ANS: Yes it does ... But is this right ?1
         if torch.cuda.is_available():
             thr_tensor = torch.autograd.Variable(torch.cuda.FloatTensor([THR]))
         else:
