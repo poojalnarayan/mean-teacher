@@ -13,6 +13,7 @@ setattr(torch, 'one_hot', torch_extras.one_hot)
 import torch.cuda
 
 from .utils import export, parameter_count
+THR = 1e-20
 
 @export
 def neurallp(pretrained=False, **kwargs):
@@ -107,6 +108,7 @@ class NeuralLP(nn.Module):
             memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(
                 dim=1)  # lines: @NeuralLP:model.py 138-141
 
+        # print("Init - memories size - " + str(memories.size()))
         # create the database of facts from the matrix_db
         database = dict()
         for rel, facts in matrix_db.items():
@@ -122,8 +124,8 @@ class NeuralLP(nn.Module):
             # print("---------------------------------")
 
             # lines: @NeuralLP:model.py 149-155
-            a = torch.unsqueeze(rnn_outputs[t], dim=1)
-            b = torch.stack(rnn_outputs[0:t+1], dim=2)
+            a = torch.unsqueeze(rnn_outputs[t], dim=1)  # todo: IMPT--> should this be [t+1]
+            b = torch.stack(rnn_outputs[0:t+1], dim=2)  # IMPT--> Should this not be 0:t-1 (according to Eq 11) ? ANS: No..
             attention_memories.append(self.softmax_mem(torch.squeeze(torch.matmul(a, b), dim=1)))
 
             # memory_read: tensor of size (batch_size, num_entity) # lines: @NeuralLP:model.py 157-162
@@ -151,22 +153,24 @@ class NeuralLP(nn.Module):
                         database_results.append((product * op_attn).t())
 
                 add_n = torch.sum(torch.stack(database_results), 0)
-                added_database_results = F.normalize(add_n, p=1, dim=1)  ## normalizing the database results --> computing the L2 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
+                added_database_results = F.normalize(add_n, p=1, dim=1)  ## normalizing the database results --> computing the L1 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
 
                 # Populate a new cell in memory by concatenating.
                 memories = torch.cat([memories,
                            torch.unsqueeze(added_database_results, dim=1)], 1)
+                # print("t = " + str(t) + " memories size - " + str(memories.size()))
 
             else:
                 predictions = memory_read
+                # print("t = " + str(t) + " predictions size - " + str(predictions.size()))
 
         if save_attention_vectors:
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
 
-        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob? .. ANS: Yes it does ... But is this right ?
-        return predictions  # torch.log(predictions)
+        # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob? .. ANS: Yes it does ... But is this right ?1
+        return torch.log(torch.max(predictions, torch.autograd.Variable(torch.FloatTensor([THR])))) #NOTE: adding the THR term
 
 
 @export
