@@ -170,7 +170,11 @@ class NeuralLP(nn.Module):
             self.attention_memories = attention_memories
 
         # NOTE: Take the log of the predictions #todo: not doing this .. will this fix the loss=nan prob? .. ANS: Yes it does ... But is this right ?1
-        return torch.log(torch.max(predictions, torch.autograd.Variable(torch.FloatTensor([THR])))) #NOTE: adding the THR term
+        if torch.cuda.is_available():
+            thr_tensor = torch.autograd.Variable(torch..cuda.FloatTensor([THR]))
+        else:
+            thr_tensor = torch.autograd.Variable(torch.FloatTensor([THR]))
+        return torch.log(torch.max(predictions, thr_tensor)) #NOTE: adding the THR term
 
 
 @export
