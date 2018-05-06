@@ -153,7 +153,8 @@ def main(context):
 
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
-        NeuralILPRules(model, dataset.family_data)
+        rule_thr = 0.01 #todo: parameterize
+        NeuralILPRules(model, dataset.family_data, rule_thr)
         print("Done!!!!")
 
 
