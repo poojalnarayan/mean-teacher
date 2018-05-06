@@ -26,7 +26,7 @@ def list_rules(attn_ops, attn_mems, the):
     paths = {t+1: [] for t in range(num_step)}
     paths[0] = [([], 1.)]
     for t in range(num_step):
-        print ("T = " + str(t))
+        # print ("T = " + str(t))
         for m, attn_mem in enumerate(attn_mems[t]):
             for p, w in paths[m]:
                 paths[t+1].append((p, w * attn_mem))
@@ -120,17 +120,6 @@ def get_rules(model, data, rule_thr=1e-20):
             f.write(line + "\n")
     msg = msg_with_time("\nRules listed and printed.", start)
     print(msg)
-
-
-def get_attentions_given_queries(self, sess, queries):
-    qq = queries
-    hh = [0] * len(queries)
-    tt = [0] * len(queries)
-    mdb = {r: ([(0,0)], [0.], (self.num_entity, self.num_entity))
-            for r in range(self.num_operator / 2)}
-    to_fetch = [self.attention_operators, self.attention_memories]
-    fetched = self._run_graph(sess, qq, hh, tt, mdb, to_fetch)
-    return fetched[0], fetched[1]
 
 
 def msg_with_time(msg, start):
