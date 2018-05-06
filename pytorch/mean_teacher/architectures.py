@@ -37,7 +37,7 @@ class NeuralLP(nn.Module):
         self.num_layer = 1
         self.num_relation = 12
         self.query_embed_size = 128
-        self.rnn_state_size = 64  # todo: change this to 128
+        self.rnn_state_size = 128  # todo: change this to 128
         self.num_entity = 3007  # todo: = family_data.num_entity
 
         self.num_query = self.num_relation * 2
