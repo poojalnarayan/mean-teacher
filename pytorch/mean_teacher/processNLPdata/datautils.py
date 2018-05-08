@@ -72,7 +72,9 @@ class Datautils:
                     entity2_idxs = [m.start() for m in re.finditer('_' + entity2 + '_', sentence_str_tab)]
 
                 if len(entity1_idxs) > 0 and len(entity2_idxs) > 0:
-                    d_abs = 2000  # initial the shortest distance between two entities as some big num, such as 2000
+                    # initial the shortest distance between two entities as some big num, such as 2000
+                    d_abs = 2000   #todo: replace with constant max of system
+
                     entity1_idx = entity1_idxs[0]  # entity can appear more than once in sentence
                     entity2_idx = entity2_idxs[0]
                     for idx1 in entity1_idxs:

@@ -321,6 +321,7 @@ def riedel():
 
 class REDataset(Dataset):
 
+    #todo: when use this var, instead of using self, use REDataset
     PAD = "@PADDING"
     OOV = "</s>"
     ENTITY = "@ENTITY"
@@ -328,30 +329,33 @@ class REDataset(Dataset):
     ENTITY_ID = -1
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
+
+    #todo: make them parameters
     max_entity_len = 8
     max_inbetween_len = 60
+    word_frequency = 300
 
     def __init__(self, dir, args, transform=None, type='train'):
 
         dataset_file = dir + "/" + type + ".txt"
-        w2vfile = dir + "/../../vectors.goldbergdeps.txt"
+        w2vfile = dir + "/../../vectors.goldbergdeps.txt"  #todo: make pretrain embedding file a parameter, replace with Glove?
 
         self.args = args
 
         if args.eval_subdir not in dir:
             self.entities1_words, self.entities2_words, self.labels_str,\
                 self.chunks_inbetween_words, self.word_counts \
-                = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
 
             self.word_vocab = Vocabulary()
             for word in chain.from_iterable(zip(*self.entities1_words)):
-                if word in self.word_counts and self.word_counts[word] >= 300:
+                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:   #todo: word_frequency can be a parameter
                     self.word_vocab.add(word)
             for word in chain.from_iterable(zip(*self.entities2_words)):
-                if word in self.word_counts and self.word_counts[word] >= 300:
+                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:
                     self.word_vocab.add(word)
             for word in chain.from_iterable(zip(*self.chunks_inbetween_words)):
-                if word in self.word_counts and self.word_counts[word] >= 300:
+                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:
                     self.word_vocab.add(word)
             self.word_vocab.add("@PADDING", 0)
 
@@ -420,6 +424,8 @@ class REDataset(Dataset):
         entity1_datum = torch.LongTensor(entity1_words_id_padded)
         entity2_datum = torch.LongTensor(entity2_words_id_padded)
 
+        # todo: make it a function to decide what to do with the words in-between (chunks_inbetween_words)
+        ##########
         if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:    # need to chunk
             l = 0
             refined_inbetween = list()
@@ -428,6 +434,7 @@ class REDataset(Dataset):
                     refined_inbetween.append(w)
                     l += 1
             self.chunks_inbetween_words[idx] = refined_inbetween
+        #############
 
         inbetween_words_id = [self.word_vocab.get_id(w) for w in self.chunks_inbetween_words[idx]]
 
@@ -440,14 +447,9 @@ class REDataset(Dataset):
             inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
 
             if len(inbetween_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
-
                 inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
                 inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
                 inbetween_datums = (torch.LongTensor(inbetween_words_padded_0), torch.LongTensor(inbetween_words_padded_1))
-
-            # else:  # todo: change this to an assert (if we are always using the student and teacher networks)
-            #     context_words_padded = self.pad_item(context_words_dropout)
-            #     context_datums = torch.LongTensor(context_words_padded)
 
         else:
 
@@ -494,9 +496,9 @@ class REDataset(Dataset):
         return self.lbl
 
     def pad_item(self, dataitem, type='entity'):
-        if (type is 'sentence'): # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
-            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
-        elif (type is 'entity'):  # Note: padding an entity (consisting of a seq of tokens)
+        # if (type is 'sentence'): # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
+        #     dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
+        if (type is 'entity'):  # Note: padding an entity (consisting of a seq of tokens)
             dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_entity_len - len(dataitem))
         # elif (type is 'left'):
             # dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_left_len - len(dataitem))

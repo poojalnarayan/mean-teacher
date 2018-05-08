@@ -78,7 +78,7 @@ def create_parser():
                         help='use pre-trained model')
     parser.add_argument('--wordemb-size', default=300, type=int,
                         help='size of the word-embeddings to be used in the simple_MLP_embed model (default: 300)')
-    parser.add_argument('--hidden-size', default=50, type=int,
+    parser.add_argument('--hidden-size', default=200, type=int,
                         help='size of the hidden layer to be used in the simple_MLP_embed model (default: 50)')
     parser.add_argument('--pretrained-wordemb', default=True, type=str2bool, metavar='BOOL',
                         help='Use pre-trained word embeddings to be loaded from disk, if True; else random initialization of word-emb (default: True)')

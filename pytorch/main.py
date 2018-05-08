@@ -272,7 +272,7 @@ def create_data_loaders(train_transformation,
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
         if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)  #todo: for supervised MT, labeled_idxs = range(), unlabeled_idxs=[]
 
         if args.exclude_unlabeled:
             sampler = SubsetRandomSampler(labeled_idxs)
@@ -477,8 +477,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
 
-        # Todo: Fan
-        # elif args.dataset in ['riedel'] and args.arch == 'custom_embed':
+        elif args.dataset in ['riedel'] and args.arch == 'lstm_RE':
+            ema_model_out, _, _, _ = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            model_out, _, _, _ = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
             ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
@@ -651,12 +652,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
-        # # Todo: Fan
-        # elif args.dataset in ['riedel']and args.arch == 'custom_embed':
-
+        elif args.dataset in ['riedel']and args.arch == 'lstm_RE':
+            output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
         elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
             output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
-
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
@@ -703,7 +702,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
     return meters['top1'].avg
 
-
+#todo: do we need to save custom_embeddings?  - mihai
 def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type):
 
     start_time = time.time()
@@ -810,7 +809,7 @@ def get_current_consistency_weight(epoch):
     # Consistency ramp-up from https://arxiv.org/abs/1610.02242
     return args.consistency * ramps.sigmoid_rampup(epoch, args.consistency_rampup)
 
-
+# todo: which metric to use?  -mihai
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
     maxk = max(topk)
