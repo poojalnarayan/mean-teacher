@@ -181,7 +181,7 @@ class FeedForwardMLPEmbed(nn.Module):
 ##### Simple architecture for relation extraction. the entity and sentence embeddings are computed by an average
 ##############################################
 @export
-def simple_MLP_embed_RE(pretrained=True, num_classes=56, word_vocab_embed=None, word_vocab_size=63110, wordemb_size=300, hidden_size=200, update_pretrained_wordemb=False):
+def simple_MLP_embed_RE(word_vocab_size, pretrained=True, num_classes=56, word_vocab_embed=None, wordemb_size=300, hidden_size=200, update_pretrained_wordemb=False):
 
     model = FeedForwardMLPEmbed_RE(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
@@ -193,19 +193,13 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         self.embedding_size = embedding_size
         self.entity1_embeddings = nn.Embedding(word_vocab_size, embedding_size)
         self.entity2_embeddings = nn.Embedding(word_vocab_size, embedding_size)
-        # self.sentence_embeddings = nn.Embedding(word_vocab_size, embedding_size)
-        # self.left_chunk_embeddings = nn.Embedding(word_vocab_size, embedding_size)
         self.inbetween_chunk_embeddings = nn.Embedding(word_vocab_size, embedding_size)
-        # self.right_chunk_embeddings = nn.Embedding(word_vocab_size, embedding_size)
 
         if word_vocab_embed is not None: # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
             print("Using a pre-initialized word-embedding vector .. loaded from disk")
             self.entity1_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.entity2_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            # self.sentence_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            # self.left_chunk_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.inbetween_chunk_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            # self.right_chunk_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:
                 # NOTE: do not update the emebddings
@@ -213,10 +207,7 @@ class FeedForwardMLPEmbed_RE(nn.Module):
                 print ("NOT UPDATING the word embeddings ....")
                 self.entity1_embeddings.weight.detach_()
                 self.entity2_embeddings.weight.detach_()
-                # self.sentence_embeddings.weight.detach_()
-                # self.left_chunk_embeddings.weight.detach_()
                 self.inbetween_chunk_embeddings.weight.detach_()
-                # self.right_chunk_embeddings.weight.detach_()
             else:
                 print("UPDATING the word embeddings ....")
 
@@ -231,10 +222,7 @@ class FeedForwardMLPEmbed_RE(nn.Module):
     def forward(self, entity1, entity2, inbetween_chunk):
         entity1_embed = torch.mean(self.entity1_embeddings(entity1), 1)             # Note: Average the word-embeddings
         entity2_embed = torch.mean(self.entity2_embeddings(entity2), 1)
-        # sentence_embed = torch.mean(self.sentence_embeddings(sentence), 1)
-        # left_chunk_embed = torch.mean(self.left_chunk_embeddings(left_chunk), 1)
         inbetween_chunk_embed = torch.mean(self.inbetween_chunk_embeddings(inbetween_chunk), 1)
-        # right_chunk_embed = torch.mean(self.right_chunk_embeddings(right_chunk), 1)
 
         concatenated = torch.cat([entity1_embed, entity2_embed, inbetween_chunk_embed], 1)
         res = self.layer1(concatenated)
@@ -246,6 +234,76 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         # print ("After softmax : " + str(res))
         return res
 
+
+##############################################
+##### More advanced architecture where the entity and words in-between embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
+##############################################
+#todo: fan
+@export
+def lstm_RE(word_vocab_size, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False):
+    lstm_hidden_size = 100
+    model = SeqModel_RE(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
+    return model
+
+class SeqModel_RE(nn.Module):
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb): #todo: add lstm parameters
+        super().__init__()
+        self.embedding_size = word_embedding_size
+        self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        self.between_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+
+        if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
+            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.between_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
+            if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
+                print("NOT UPDATING the word embeddings ....")
+                self.entity_word_embeddings.weight.detach_()
+                self.between_word_embeddings.weight.detach_()
+            else:
+                print("UPDATING the word embeddings ....")
+
+        # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
+        self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm_between = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+
+        # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
+        #  in this case `entity_lstm_out` and `pattern_lstm_out`
+        # Note: saving these representations, so that when they are computed during forward, we can use these variables
+        # to dump the custom entity and pattern embeddings
+        # self.entity_lstm_out = None
+        # self.pattern_lstm_out = None
+
+        # Note: Size of linear layer = [(lstm_hidden_size * 2) bi-LSTM ] * 2 --> concat of entity and context lstm out
+        self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
+        self.activation = nn.ReLU()  # non-linear activation
+        self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
+
+    # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
+    def forward(self, entity, between):
+        entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        between_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)
+        ###############################################
+        # bi-LSTM computation here
+
+        # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
+        self.lstm_entities.flatten_parameters()
+        self.lstm_between.flatten_parameters()
+
+        _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
+
+        _, (between_lstm_out, _) = self.lstm_between(between_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        between_lstm_out = torch.cat([between_lstm_out[0], between_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
+
+        # concatenate the entity_lstm and avgeraged pattern_lstm representations
+        entity_and_between_lstm_out = torch.cat([entity_lstm_out, between_lstm_out], dim=1)
+
+        res = self.layer1(entity_and_between_lstm_out)
+        res = self.activation(res)
+        res = self.layer2(res)
+        return res, entity_lstm_out, between_lstm_out
 
 @export
 def simple_MLP(pretrained=True, num_classes=10):

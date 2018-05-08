@@ -60,7 +60,7 @@ def main(context):
     num_classes = dataset_config.pop('num_classes')
 
     if args.dataset in ['conll', 'ontonotes', 'riedel']:
-        train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
+        train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
     else:
@@ -136,10 +136,16 @@ def main(context):
     cudnn.benchmark = True
 
     if args.evaluate:
-        LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir, "student")
-        LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
+        if args.dataset in ['conll', 'ontonotes']:
+            LOG.info("Evaluating the primary model:")
+            validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir, "student")
+            LOG.info("Evaluating the EMA model:")
+            validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
+        elif args.dataset in ['riedel']:
+            LOG.info("Evaluating the primary model:")
+            validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "student")
+            LOG.info("Evaluating the EMA model:")
+            validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "teacher")
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -151,9 +157,9 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset, context.result_dir, "student")
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "student")
             LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset, context.result_dir, "teacher")
+            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
             is_best = ema_prec1 > best_prec1
             best_prec1 = max(ema_prec1, best_prec1)
@@ -363,7 +369,7 @@ def create_data_loaders(train_transformation,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel']:
-        return train_loader, eval_loader, dataset
+        return train_loader, eval_loader, dataset, dataset_test
     else:
         return train_loader, eval_loader
 

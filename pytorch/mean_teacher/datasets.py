@@ -360,6 +360,12 @@ class REDataset(Dataset):
             vocab_file = dir + "/../vocabulary_train.txt"
             self.word_vocab.to_file(vocab_file)
 
+            categories = sorted(list({l for l in self.labels_str}))
+            label_category_file = dir + "/../label_category_train.txt"
+            with io.open(label_category_file, 'w', encoding='utf8') as f:
+                for lbl in categories:
+                    f.write(lbl + '\n')
+
         else:
             vocab_file = dir + "/../vocabulary_train.txt"
             self.word_vocab = Vocabulary.from_file(vocab_file)
@@ -367,10 +373,17 @@ class REDataset(Dataset):
             self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                 = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
+            categories = []
+            label_category_file = dir + "/../label_category_train.txt"
+            with io.open(label_category_file, encoding='utf8') as f:
+                for line in f:
+                    categories.append(line.strip())
+
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
                 self.word_vocab_embed = self.create_word_vocab_embed()
+
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -385,10 +398,13 @@ class REDataset(Dataset):
         REDataset.WORD_NOISE_TYPE = type_of_noise
         REDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
 
-        categories = sorted(list({l for l in self.labels_str}))
-        self.lbl = [categories.index(l) for l in self.labels_str]
-        # print(type)
-        # print(categories)
+        self.lbl = []
+        for l in self.labels_str:
+            if l in categories:
+                self.lbl.append(categories.index(l))
+            else:
+                self.lbl.append(len(categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
+        # self.lbl = [categories.index(l) for l in self.labels_str]
         self.transform = transform
 
     def __getitem__(self, idx):

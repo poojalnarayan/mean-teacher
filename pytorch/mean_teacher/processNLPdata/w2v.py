@@ -126,10 +126,11 @@ class Gigaword:
         if any(char.isdigit() for char in w):
             return "xnumx"
 
-        ## remove punctuations from a string: https://stackoverflow.com/questions/34293875/how-to-remove-punctuation-marks-from-a-string-in-python-3-x-using-translate
-        translator = str.maketrans('', '', string.punctuation)
+        # ## remove punctuations from a string: https://stackoverflow.com/questions/34293875/how-to-remove-punctuation-marks-from-a-string-in-python-3-x-using-translate
+        # translator = str.maketrans('', '', string.punctuation)
 
-        return w.translate(translator)
+        # return w.translate(translator)
+        return w
 
     @classmethod
     def norm(cls, embeddings):
