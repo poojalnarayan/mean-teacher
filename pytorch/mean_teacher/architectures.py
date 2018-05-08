@@ -240,7 +240,7 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 ##############################################
 #todo: fan
 @export
-def lstm_RE(word_vocab_size, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False):
+def lstm_RE(word_vocab_size, num_classes, wordemb_size=300, hidden_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
     lstm_hidden_size = 100
     model = SeqModel_RE(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model

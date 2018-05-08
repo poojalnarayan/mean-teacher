@@ -71,14 +71,6 @@ class Datautils:
                     sentence_str_tab = sentence_str.replace(' ', "_")
                     entity2_idxs = [m.start() for m in re.finditer('_' + entity2 + '_', sentence_str_tab)]
 
-                # e.g.: m.04997fv	m.0bwdn	woods	tiger_woods	NA	quite simply , tiger_woods did n't play golf the way tiger_woods usually does , nowhere near the way he played in winning 10 majors . ###END###
-                if len(entity1_idxs) == 0:
-                    entity1_idxs = [m.start() for m in re.finditer(entity1, sentence_str)]
-                    entity1_idxs = np.array(entity1_idxs) - np.array([1] * len(entity1_idxs))
-                if len(entity2_idxs) == 0:
-                    entity2_idxs = [m.start() for m in re.finditer(entity2, sentence_str)]
-                    entity2_idxs = np.array(entity2_idxs) - np.array([1] * len(entity2_idxs))
-
                 if len(entity1_idxs) > 0 and len(entity2_idxs) > 0:
                     d_abs = 2000  # initial the shortest distance between two entities as some big num, such as 2000
                     entity1_idx = entity1_idxs[0]  # entity can appear more than once in sentence
@@ -107,7 +99,7 @@ class Datautils:
                     inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
 
                     # sentences_words = re.split( r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\.|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',sentence_str)[:-14]  # the last 14 character are "###END###"
-                    inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\.|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
+                    inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
 
                     # i = 0
                     # while i < len(sentences_words):
@@ -132,8 +124,8 @@ class Datautils:
                             i -= 1
                         elif word[0] is not '@' and '@' in word:
                             inbetween_words[i] = '@email'
-                        elif word[0] is not '@' and not word.isalnum() and len(word) > 1 and '&' not in word:
-                            assert False, word
+                        elif word[:3] is 'www':
+                            inbetween_words[i] = '@web'
 
                         i += 1
 

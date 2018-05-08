@@ -564,8 +564,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             LOG.info(
                 'Epoch: [{0}][{1}/{2}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}'.format(
+                'Prec@1 {meters[top1]:.3f}\t'
+                'Prec@2 {meters[top5]:.3f}'.format(
                     epoch, i, len(train_loader), meters=meters))
+
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
                 **meters.values(),

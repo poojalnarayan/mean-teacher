@@ -405,6 +405,11 @@ class REDataset(Dataset):
             else:
                 self.lbl.append(len(categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
         # self.lbl = [categories.index(l) for l in self.labels_str]
+
+        # if type is 'test':
+        #     for i in range(10):
+        #         print(self.lbl[i])
+
         self.transform = transform
 
     def __getitem__(self, idx):
@@ -415,11 +420,11 @@ class REDataset(Dataset):
         entity1_datum = torch.LongTensor(entity1_words_id_padded)
         entity2_datum = torch.LongTensor(entity2_words_id_padded)
 
-        if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:
+        if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:    # need to chunk
             l = 0
             refined_inbetween = list()
             for w in self.chunks_inbetween_words[idx]:
-                if w in self.word_vocab.word_to_id and l <= self.max_inbetween_len:
+                if w in self.word_vocab.word_to_id and l <= self.max_inbetween_len:   #keep more useful words, i.e., words appears in vocabulary
                     refined_inbetween.append(w)
                     l += 1
             self.chunks_inbetween_words[idx] = refined_inbetween
