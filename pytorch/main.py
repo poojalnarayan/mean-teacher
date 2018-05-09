@@ -349,10 +349,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             ema_matrix_db = filter_matrix_db(dataset, ema_input_triple)
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
-            target_var = torch.autograd.Variable(input_triple[2])
-
-            if torch.cuda.is_available():
-                target_var = target_var.cuda()
+            target = torch.autograd.Variable(input_triple[2])
+            target_var = torch.autograd.Variable(target)
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -400,7 +398,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         loss = class_loss + consistency_loss + res_loss
 
         if torch.cuda.is_available():
-            target_var = torch.autograd.Variable(target.cuda(async=True))
+            target_var = target_var.cuda(async=True)
 
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
@@ -452,7 +450,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
     if dataset is None:
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL)
     else:
-        class_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+        class_criterion = nn.NLLLoss(size_average=False, ignore_index=NO_LABEL)
 
     if torch.cuda.is_available():
         class_criterion = class_criterion.cuda()
