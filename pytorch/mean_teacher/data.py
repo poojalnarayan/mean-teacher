@@ -3,6 +3,7 @@
 import itertools
 import logging
 import os.path
+import random
 
 from PIL import Image
 import numpy as np
@@ -70,6 +71,57 @@ class TransformTwice:
         out1 = self.transform(inp)
         out2 = self.transform(inp)
         return out1, out2
+
+
+def relabel_dataset_ilp(dataset, args):
+    unlabeled_idxs = []
+    labeled_ids = []
+
+    all_labels = list(enumerate(dataset.get_labels()))
+    random.shuffle(all_labels)  # randomizing the relabeling ...
+    num_classes = len(set([i for _, i in all_labels]))
+
+    if args.labels.isdigit():
+        # NOTE: if it contains whole numbers --> number of labeled datapoints
+        LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
+        num_labels = int(args.labels)
+    else:
+        # NOTE: if it contains a float (remember even xx.00) then it is a percentage ..
+        #       give a float number between 0 and 100 .. indicating percentage
+        LOG.info("[relabel dataset] Choosing " + args.labels + "% OF EXAMPLES randomly as supervision")
+        percent_labels = float(args.labels)
+        num_labels = int(percent_labels * len(all_labels) / 100.0)
+
+    if num_labels == len(all_labels):
+        for i in range(num_labels):
+            labeled_ids.append(i)
+
+    else:
+        num_labels_per_cat = int(num_labels / num_classes)
+
+        labels_hist = {}
+        for _, lbl in all_labels:
+            if lbl in labels_hist:
+                labels_hist[lbl] += 1
+            else:
+                labels_hist[lbl] = 1
+
+        num_labels_per_cat_dict = {}
+        for lbl, cnt in labels_hist.items():
+            num_labels_per_cat_dict[lbl] = min(labels_hist[lbl], num_labels_per_cat)
+
+        for idx, l in all_labels:
+            if num_labels_per_cat_dict[l] > 0:
+                labeled_ids.append(idx)
+                num_labels_per_cat_dict[l] -= 1
+            else:
+                unlabeled_idxs.append(idx)
+                dataset.relabel_datum(idx, NO_LABEL)
+
+    LOG.info("[relabel dataset] Number of LABELED examples : " + str(len(labeled_ids)))
+    LOG.info("[relabel dataset] Number of UNLABELED examples : " + str(len(unlabeled_idxs)))
+    LOG.info("[relabel dataset] TOTAL : " + str(len(labeled_ids)+len(unlabeled_idxs)))
+    return labeled_ids, unlabeled_idxs
 
 
 def relabel_dataset(dataset, labels):
@@ -141,3 +193,14 @@ def grouper(iterable, n):
     # grouper('ABCDEFG', 3) --> ABC DEF"
     args = [iter(iterable)] * n
     return zip(*args)
+
+
+class TransformTwiceILP:
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self, inp):
+        out1 = inp
+        out2 = inp
+        return out1, out2
+

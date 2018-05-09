@@ -66,10 +66,7 @@ def main(context):
         return model
 
     model = create_model()
-    if args.dataset != 'family':
-        ema_model = create_model(ema=True)
-    else:
-        ema_model = None
+    ema_model = create_model(ema=True)
 
     LOG.info(parameters_string(model))
 
@@ -185,14 +182,22 @@ def create_data_loaders(train_transformation,
     else:
         pin_memory = False
 
+    assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
     if args.dataset == 'family':
-        dataset = datasets.ILP_dataset(datadir, 'train')
-        # TODO: For now not consider the teacher-student arch .. but just the supervised mode
-        assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
-        train_dataset_size = dataset.__len__()
-        sampler = SubsetRandomSampler(list(range(0, train_dataset_size)))  # TODO: generate labeled indices .. for now using all the examples in train
-        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=False)
+        dataset = datasets.ILP_dataset(datadir, 'train', train_transformation)
+
+        if args.labels:
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_ilp(dataset, args)
+        if args.exclude_unlabeled or len(unlabeled_idxs) == 0:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
+
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
@@ -212,8 +217,6 @@ def create_data_loaders(train_transformation,
 
         traindir = os.path.join(datadir, args.train_subdir)
         evaldir = os.path.join(datadir, args.eval_subdir)
-
-        assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
         dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
 
@@ -272,12 +275,13 @@ def filter_matrix_db(dataset, batch_input):
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
-    if torch.cuda.is_available():
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-        loss_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+    if dataset is None:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL)
     else:
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
-        loss_criterion = nn.NLLLoss().cpu()
+        class_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+
+    if torch.cuda.is_available():
+        class_criterion = class_criterion.cuda()
 
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
@@ -291,8 +295,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
     # switch to train mode
     model.train()
-    if dataset is None:
-        ema_model.train()
+    ema_model.train()
 
     end = time.time()
 
@@ -308,88 +311,93 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             input_var = torch.autograd.Variable(input)
             ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
             target_var = torch.autograd.Variable(target.cuda(async=True))
-            minibatch_size = len(target_var)
-            labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
-            assert labeled_minibatch_size > 0
-            meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
 
-            if isinstance(model_out, Variable):
-                assert args.logit_distance_cost < 0
-                logit1 = model_out
-                ema_logit = ema_model_out
-            else:
-                assert len(model_out) == 2
-                assert len(ema_model_out) == 2
-                logit1, logit2 = model_out
-                ema_logit, _ = ema_model_out
-
-                ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
-
-            if args.logit_distance_cost >= 0:
-                class_logit, cons_logit = logit1, logit2
-                res_loss = args.logit_distance_cost * residual_logit_criterion(class_logit, cons_logit) / minibatch_size
-                meters.update('res_loss', res_loss.data[0])
-            else:
-                class_logit, cons_logit = logit1, logit1
-                res_loss = 0
-
-            class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
-            ema_softmax = F.softmax(ema_logit, dim=1)
-
-            class_loss = class_criterion(class_logit, target_var) / minibatch_size
-            meters.update('class_loss', class_loss.data[0])
-
-            ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
-            meters.update('ema_class_loss', ema_class_loss.data[0])
-
-            if args.consistency:
-                consistency_weight = get_current_consistency_weight(epoch)
-                meters.update('cons_weight', consistency_weight)
-                consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
-                meters.update('cons_loss', consistency_loss.data[0])
-            else:
-                consistency_loss = 0
-                meters.update('cons_loss', 0)
-
-            loss = class_loss + consistency_loss + res_loss
-
         else:
+            # print("---------------")
+            # print(len(data_minibatch))
+            # print('-----')
+            # print(data_minibatch)
+            # print("---------------")
 
-            input_batch_ids = data_minibatch[0]
+            (input_triple, ema_input_triple) = data_minibatch
+            input_batch_ids = input_triple[0]
+            ema_input_batch_ids = ema_input_triple[0]
 
             # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
             # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
-            input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1]),
-                                             torch.autograd.Variable(data_minibatch[3])]
+            input_var = [input_batch_ids] + [torch.autograd.Variable(input_triple[1]),
+                                             torch.autograd.Variable(input_triple[3])]
+
+            ema_input_var = [ema_input_batch_ids] + [torch.autograd.Variable(ema_input_triple[1]),
+                                                     torch.autograd.Variable(ema_input_triple[3])]
 
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
                 input_var[1] = input_var[1].cuda()
+
+                ema_input_var[0] = ema_input_var[0].cuda()
+                ema_input_var[1] = ema_input_var[1].cuda()
                 # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
 
-            matrix_db = filter_matrix_db(dataset, data_minibatch)
+            matrix_db = filter_matrix_db(dataset, input_triple)
             model_out = model(input_var, matrix_db)
 
-            if torch.cuda.is_available():
-                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
-            else:
-                target_var = torch.autograd.Variable(data_minibatch[2].cpu())  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
+            ema_matrix_db = filter_matrix_db(dataset, ema_input_triple)
+            ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
-            minibatch_size = len(target_var)
-            labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
-            assert labeled_minibatch_size > 0
-            meters.update('labeled_minibatch_size', labeled_minibatch_size)
+            target_var = torch.autograd.Variable(input_triple[2])
 
-            class_loss = loss_criterion(model_out, target_var)
-            meters.update('class_loss', class_loss.data[0])
+        minibatch_size = len(target_var)
+        labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
+        assert labeled_minibatch_size > 0
+        meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-            # print ("LOSS is " + str(loss.data[0]))
-            loss = class_loss
-            class_logit = model_out
+        if isinstance(model_out, Variable):
+            assert args.logit_distance_cost < 0
+            logit1 = model_out
+            ema_logit = ema_model_out
+        else:
+            assert len(model_out) == 2
+            assert len(ema_model_out) == 2
+            logit1, logit2 = model_out
+            ema_logit, _ = ema_model_out
+
+            ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
+
+        if args.logit_distance_cost >= 0:
+            class_logit, cons_logit = logit1, logit2
+            res_loss = args.logit_distance_cost * residual_logit_criterion(class_logit, cons_logit) / minibatch_size
+            meters.update('res_loss', res_loss.data[0])
+        else:
+            class_logit, cons_logit = logit1, logit1
+            res_loss = 0
+
+        class_softmax, cons_softmax = F.softmax(class_logit, dim=1), F.softmax(cons_logit, dim=1)
+        ema_softmax = F.softmax(ema_logit, dim=1)
+
+        class_loss = class_criterion(class_logit, target_var) / minibatch_size
+        meters.update('class_loss', class_loss.data[0])
+
+        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
+        meters.update('ema_class_loss', ema_class_loss.data[0])
+
+        if args.consistency:
+            consistency_weight = get_current_consistency_weight(epoch)
+            meters.update('cons_weight', consistency_weight)
+            consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
+            meters.update('cons_loss', consistency_loss.data[0])
+        else:
+            consistency_loss = 0
+            meters.update('cons_loss', 0)
+
+        loss = class_loss + consistency_loss + res_loss
+
+        if torch.cuda.is_available():
+            target_var = torch.autograd.Variable(target.cuda(async=True))
 
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
@@ -400,12 +408,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         meters.update('top10', prec10[0], labeled_minibatch_size)
         meters.update('error10', 100. - prec10[0], labeled_minibatch_size)
 
-        if dataset is None: # todo: Currently not for the NeuralLP model
-            ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
-            meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
-            meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-            meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-            meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+        ema_prec1, ema_prec10 = accuracy(ema_logit.data, target_var.data, topk=(1, 10))
+        meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
+        meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
+        meters.update('ema_top10', ema_prec10[0], labeled_minibatch_size)
+        meters.update('ema_error10', 100. - ema_prec10[0], labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -413,56 +420,40 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         optimizer.step()
         global_step += 1
 
-        if dataset is None: # todo: not currently done in the NeuralLP model
-            update_ema_variables(model, ema_model, args.ema_decay, global_step)
+
+        update_ema_variables(model, ema_model, args.ema_decay, global_step)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
         end = time.time()
 
-        if dataset is None:
-            if i % args.print_freq == 0:
-                LOG.info(
-                    'Epoch: [{0}][{1}/{2}]\t'
-                    'Time {meters[batch_time]:.3f}\t'
-                    'Data {meters[data_time]:.3f}\t'
-                    'Class {meters[class_loss]:.4f}\t'
-                    'Cons {meters[cons_loss]:.4f}\t'
-                    'Prec@1 {meters[top1]:.3f}\t'
-                    'Prec@5 {meters[top5]:.3f}'.format(
-                        epoch, i, len(train_loader), meters=meters))
-                log.record(epoch + i / len(train_loader), {
-                    'step': global_step,
-                    **meters.values(),
-                    **meters.averages(),
-                    **meters.sums()
-                })
-        else:
-            if i % args.print_freq == 0:
-                LOG.info(
-                    'Epoch: [{0}][{1}/{2}]\t'
-                    'Time {meters[batch_time]:.3f}\t'
-                    'Data {meters[data_time]:.3f}\t'
-                    'Class {meters[class_loss]:.4f}\t'
-                    'Prec@1 {meters[top1]:.3f}\t'
-                    'Prec@10 {meters[top10]:.3f}'.format(
-                        epoch, i, len(train_loader), meters=meters))
-                log.record(epoch + i / len(train_loader), {
-                    'step': global_step,
-                    **meters.values(),
-                    **meters.averages(),
-                    **meters.sums()
-                })
-
+        if i % args.print_freq == 0:
+            LOG.info(
+                'Epoch: [{0}][{1}/{2}]\t'
+                'Time {meters[batch_time]:.3f}\t'
+                'Data {meters[data_time]:.3f}\t'
+                'Class {meters[class_loss]:.4f}\t'
+                'Cons {meters[cons_loss]:.4f}\t'
+                'Prec@1 {meters[top1]:.3f}\t'
+                'Prec@5 {meters[top10]:.3f}'.format(
+                    epoch, i, len(train_loader), meters=meters))
+            log.record(epoch + i / len(train_loader), {
+                'step': global_step,
+                **meters.values(),
+                **meters.averages(),
+                **meters.sums()
+            })
 
 def validate(eval_loader, model, log, global_step, epoch, dataset):
 
-    if torch.cuda.is_available():
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-        loss_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+    if dataset is None:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL)
     else:
-        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
-        loss_criterion = nn.NLLLoss().cpu()
+        class_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+
+    if torch.cuda.is_available():
+        class_criterion = class_criterion.cuda()
+
 
     meters = AverageMeterSet()
 

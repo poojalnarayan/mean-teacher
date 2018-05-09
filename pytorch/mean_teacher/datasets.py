@@ -14,14 +14,17 @@ from .processILPdata.family_data import Data as FamilyData
 def family():
 
     return {
-        'train_transformation': None,
+        'train_transformation': data.TransformTwiceILP(None),
         'eval_transformation': None,
         'datadir': 'data-local/neuralilp/family/',
         'num_classes': 1000 #todo: what should be filled here??
     }
 
 class ILP_dataset(Dataset):
-    def __init__(self, datadir, dataset_type):
+
+    WORD_NOISE_TYPE = 'swap'
+
+    def __init__(self, datadir, dataset_type, transform=None):
         ## TODO: parameterize, currently hard-coded
         # datadir = 'data-local/neuralilp/family/'
         # NOTE: removing these params
@@ -35,6 +38,8 @@ class ILP_dataset(Dataset):
         self.dataset_type = dataset_type
         self.family_data = FamilyData(datadir, dataset_type)
 
+        self.transform = transform
+
     def __getitem__(self, idx):
         # TODO: Can we clean this up ?
         if self.dataset_type == 'train':
@@ -46,9 +51,10 @@ class ILP_dataset(Dataset):
         else:
             assert False, "Wrong dataset type .. " + self.dataset_type
 
-        ## todo: need to augment with reverse... ??
-        ## todo: Also need to pass the matrix_db per batch (filtered out by removing facts in the current mini-batch) check: @NuralLP:data.py - lines 336-339 .. not sure how ??
-        return idx, query, head, tail
+        if self.transform is not None:
+            return self.transform((idx, query, head, tail))
+        else:
+            return idx, query, head, tail
 
     def __len__(self):
         # TODO: Can we clean this up ?
@@ -60,6 +66,22 @@ class ILP_dataset(Dataset):
             return len(self.family_data.valid)
         else:
             assert False, "Wrong dataset type .. " + self.dataset_type
+
+    def get_labels(self):
+        if self.dataset_type == 'train':
+            return [datum[1] for datum in self.family_data.train]
+        elif self.dataset_type == 'test':
+            return [datum[1] for datum in self.family_data.test]
+        elif self.dataset_type == 'valid':
+            return [datum[1] for datum in self.family_data.valid]
+        else:
+            assert False, "Wrong dataset type .. " + self.dataset_type
+
+    def relabel_datum(self, idx, label):
+        if self.dataset_type == 'train':
+            self.family_data.train[idx] = (self.family_data.train[idx][0], label, self.family_data.train[idx][2])
+        else:
+            assert False, "Cannot relabel dataset of type .. " + self.dataset_type
 
 @export
 def imagenet():
