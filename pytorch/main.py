@@ -341,7 +341,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
                 ema_input_var[0] = ema_input_var[0].cuda()
                 ema_input_var[1] = ema_input_var[1].cuda()
-                # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
+
 
             matrix_db = filter_matrix_db(dataset, input_triple)
             model_out = model(input_var, matrix_db)
@@ -350,6 +350,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
             target_var = torch.autograd.Variable(input_triple[2])
+
+            if torch.cuda.is_available():
+                target_var = target_var.cuda()
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
