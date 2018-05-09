@@ -85,7 +85,7 @@ def create_parser():
     parser.add_argument('--update-pretrained-wordemb', default=False, type=str2bool, metavar='BOOL',
                         help='Update the pre-trained word embeddings during training, if True; else keep them fixed (default: False)')
     parser.add_argument('--word-noise', default='drop:1', type=str,
-                        help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
+                        help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace|no-noise):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
     parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
     return parser

@@ -77,6 +77,8 @@ def conll():
 
     if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
         addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
     else:
         assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
 
