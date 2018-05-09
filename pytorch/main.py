@@ -357,6 +357,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
+        if torch.cuda.is_available():
+            target_var = target_var.cuda(async=True)
+
         if isinstance(model_out, Variable):
             assert args.logit_distance_cost < 0
             logit1 = model_out
@@ -396,9 +399,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             meters.update('cons_loss', 0)
 
         loss = class_loss + consistency_loss + res_loss
-
-        if torch.cuda.is_available():
-            target_var = target_var.cuda(async=True)
 
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
