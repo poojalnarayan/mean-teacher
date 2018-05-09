@@ -278,7 +278,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     if dataset is None:
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL)
     else:
-        class_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+        class_criterion = nn.NLLLoss(size_average=False, ignore_index=NO_LABEL)  # todo: does it need any params ?? -- this is for the NeuralLP model
 
     if torch.cuda.is_available():
         class_criterion = class_criterion.cuda()
