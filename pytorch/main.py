@@ -349,7 +349,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             ema_matrix_db = filter_matrix_db(dataset, ema_input_triple)
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
-            target = torch.autograd.Variable(input_triple[2])
+            target = input_triple[2]
             target_var = torch.autograd.Variable(target)
 
         minibatch_size = len(target_var)
