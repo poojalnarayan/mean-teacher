@@ -364,10 +364,10 @@ class REDataset(Dataset):
             vocab_file = dir + "/../vocabulary_train.txt"
             self.word_vocab.to_file(vocab_file)
 
-            categories = sorted(list({l for l in self.labels_str}))
+            self.categories = sorted(list({l for l in self.labels_str}))
             label_category_file = dir + "/../label_category_train.txt"
             with io.open(label_category_file, 'w', encoding='utf8') as f:
-                for lbl in categories:
+                for lbl in self.categories:
                     f.write(lbl + '\n')
 
         else:
@@ -377,11 +377,11 @@ class REDataset(Dataset):
             self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                 = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
-            categories = []
+            self.categories = []
             label_category_file = dir + "/../label_category_train.txt"
             with io.open(label_category_file, encoding='utf8') as f:
                 for line in f:
-                    categories.append(line.strip())
+                    self.categories.append(line.strip())
 
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
@@ -404,10 +404,10 @@ class REDataset(Dataset):
 
         self.lbl = []
         for l in self.labels_str:
-            if l in categories:
-                self.lbl.append(categories.index(l))
+            if l in self.categories:
+                self.lbl.append(self.categories.index(l))
             else:
-                self.lbl.append(len(categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
+                self.lbl.append(len(self.categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
         # self.lbl = [categories.index(l) for l in self.labels_str]
 
         # if type is 'test':
@@ -491,6 +491,14 @@ class REDataset(Dataset):
 
     def get_num_classes(self):
         return len(list({l for l in self.lbl}))
+
+    def get_num_per_classes(self):
+        num_per_classes = []
+        for c in range(len(self.categories)):
+            c_count = self.lbl.count(c)
+            num_per_classes.append(c_count)
+
+        return num_per_classes
 
     def get_labels(self):
         return self.lbl

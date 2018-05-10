@@ -140,6 +140,44 @@ class TransformTwice:
         out2 = self.transform(inp)
         return out1, out2
 
+#randomly choose propotional labeled samples per class
+def relabel_dataset_RE(dataset, args):
+    unlabeled_idxs = []
+    labeled_ids = []
+    all_labels = list(enumerate(dataset.get_labels()))   # notice enumerate also keep the indexes
+    random.shuffle(all_labels)  # randomizing the relabeling
+    num_classes = dataset.get_num_classes()
+    num_per_classes = dataset.get_num_per_classes()
+    num_labels_per_class = []
+
+    if args.labels.isdigit():   #integer --> number of labeled datapoints
+        LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
+        num_labels = int(args.labels)
+        for i in range(num_classes):
+            num_c =  num_per_classes[i]
+            num_labels_c = int(num_labels * num_c / len(all_labels))
+            num_labels_per_class.append(num_labels_c)
+
+    else:    #float number between 0 and 100 --> percentage
+        LOG.info("[relabel dataset] Choosing " + args.labels + "% OF EXAMPLES randomly as supervision")
+        percent_labels = float(args.labels)
+        for i in range(num_classes):
+            num_c = num_per_classes[i]
+            num_labels_c = int(num_c * percent_labels / 100.0)
+            num_labels_per_class.append(num_labels_c)
+
+    for idx, l in all_labels:
+        if num_labels_per_class[l] > 0:
+            labeled_ids.append(idx)
+            num_labels_per_class[l] -= 1
+        else:
+            unlabeled_idxs.append(idx)
+            dataset.lbl[idx] = NO_LABEL
+
+    LOG.info("[relabel dataset] Number of LABELED examples : " + str(len(labeled_ids)))
+    LOG.info("[relabel dataset] Number of UNLABELED examples : " + str(len(unlabeled_idxs)))
+    LOG.info("[relabel dataset] TOTAL : " + str(len(labeled_ids)+len(unlabeled_idxs)))
+    return labeled_ids, unlabeled_idxs
 
 def relabel_dataset_nlp(dataset, args):
     unlabeled_idxs = []

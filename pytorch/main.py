@@ -13,7 +13,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
-# import torch.cpu
+import torch.cuda
+
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -83,17 +84,11 @@ def main(context):
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
 
         model = model_factory(**model_params)
-        # if torch.cpu.is_available():
-        ######### NOTE: RNN with data parallel seems to have some issues with sharding the minibatches across GPUs and collecting them having differnt dims
-        ######### 1. https://discuss.pytorch.org/t/dataparallel-lstm-gru-wrong-hidden-batch-size-8-gpus/6701/4
-        ######### 2. https://discuss.pytorch.org/t/multi-layer-rnn-with-dataparallel/4450/2
-        ######### 3. https://stackoverflow.com/questions/44595338/how-to-parallelize-rnn-function-in-pytorch-with-dataparallel
-        ######### Following 3. -> most simple at the moment and seems to be working without exceptions
-        #model = nn.DataParallel(model, dim=1).cpu()
         LOG.info("--------------------IMPORTANT: REMOVING nn.DataParallel for the moment --------------------")
-        model = model.cpu()  # Note: Disabling data parallelism for now
-        # else:
-        #     model = nn.DataParallel(model).cpu()
+        if torch.cuda.is_available():
+            model = model.cuda()    # Note: Disabling data parallelism for now
+        else:
+            model = model.cpu()
 
         if ema:
             for param in model.parameters():
@@ -210,10 +205,10 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    # if torch.cpu.is_available():
-    #     pin_memory = True
-    # else:
-    #     pin_memory = False
+    if torch.cuda.is_available():
+        pin_memory = True
+    else:
+        pin_memory = False
 
     if args.dataset in ['conll', 'ontonotes']:
 
@@ -236,9 +231,10 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
-                                                  batch_sampler=batch_sampler,
-                                                  num_workers=args.workers,
-                                                  pin_memory=False)
+                                                   pin_memory,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers
+                                                  )
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
@@ -257,10 +253,10 @@ def create_data_loaders(train_transformation,
         dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  pin_memory,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=False,
                                                   drop_last=False)
 
     elif args.dataset in ['riedel']:
@@ -272,9 +268,8 @@ def create_data_loaders(train_transformation,
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
         if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)  #todo: for supervised MT, labeled_idxs = range(), unlabeled_idxs=[]
-
-        if args.exclude_unlabeled:
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_RE(dataset, args)
+        if args.exclude_unlabeled or len(unlabeled_idxs) == 0:
             sampler = SubsetRandomSampler(labeled_idxs)
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
         elif args.labeled_batch_size:
@@ -284,9 +279,10 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
-                                                  batch_sampler=batch_sampler,
-                                                  num_workers=args.workers,
-                                                  pin_memory=False)
+                                                   pin_memory=pin_memory,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers
+                                                   )
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
@@ -294,10 +290,10 @@ def create_data_loaders(train_transformation,
         dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test')
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  pin_memory=pin_memory,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=False,
                                                   drop_last=False)
 
 
@@ -321,9 +317,10 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
+                                                   pin_memory,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=False)
+                                                   )
                                                    # drop_last=False)
                                                    # batch_size=args.batch_size)
                                                    # shuffle=True)
@@ -331,10 +328,10 @@ def create_data_loaders(train_transformation,
         dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
+                                                  pin_memory,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
-                                                  pin_memory=False,
                                                   drop_last=False)
 
     else:
@@ -356,16 +353,17 @@ def create_data_loaders(train_transformation,
             assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
         train_loader = torch.utils.data.DataLoader(dataset,
+                                                   pin_memory,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
-                                                   pin_memory=False)
+                                                   )
 
         eval_loader = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(evaldir, eval_transformation),
+            pin_memory,
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2 * args.workers,  # Needs images twice as fast
-            pin_memory=False,
             drop_last=False)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel']:
@@ -384,10 +382,10 @@ def update_ema_variables(model, ema_model, alpha, global_step):
 def train(train_loader, model, ema_model, optimizer, epoch, log):
     global global_step
 
-    # if torch.cpu.is_available():
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
-    # else:
-    #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
@@ -421,13 +419,21 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
             input_patterns = input[1]
-            entity_var = torch.autograd.Variable(input_entity).cpu()
-            patterns_var = torch.autograd.Variable(input_patterns).cpu()
 
             ema_input_entity = ema_input[0]
             ema_input_patterns = ema_input[1]
-            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
-            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
+
+            if torch.cuda.is_available():
+                entity_var = torch.autograd.Variable(input_entity).cuda()
+                patterns_var = torch.autograd.Variable(input_patterns).cuda()
+                ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
+                ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
+
+            else:
+                entity_var = torch.autograd.Variable(input_entity).cpu()
+                patterns_var = torch.autograd.Variable(input_patterns).cpu()
+                ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
+                ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel']:
             input = datapoint[0]
@@ -437,26 +443,42 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             input_entity1 = input[0]
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]
-            entity1_var = torch.autograd.Variable(input_entity1).cpu()
-            entity2_var = torch.autograd.Variable(input_entity2).cpu()
-            inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
-
             ema_input_entity1 = ema_input[0]
             ema_input_entity2 = ema_input[1]
             ema_input_inbetween_chunk = ema_input[2]
-            ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
-            ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
-            ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
+
+            if torch.cuda.is_available():
+                entity1_var = torch.autograd.Variable(input_entity1).cuda()
+                entity2_var = torch.autograd.Variable(input_entity2).cuda()
+                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
+
+                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
+                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
+                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
+
+            else:
+                entity1_var = torch.autograd.Variable(input_entity1).cpu()
+                entity2_var = torch.autograd.Variable(input_entity2).cpu()
+                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
+
+                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
+                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
+                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
 
         else:
             ((input, ema_input), target) = datapoint
-            input_var = torch.autograd.Variable(input).cpu()
-            ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cpu() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        # if torch.cpu.is_available():
-        target_var = torch.autograd.Variable(target.cpu())
-        # else:
-        #     target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
+            if torch.cuda.is_available():
+                input_var = torch.autograd.Variable(input).cuda()
+                ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+            else:
+                input_var = torch.autograd.Variable(input).cpu()
+                ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cpu()
+
+        if torch.cuda.is_available():
+            target_var = torch.autograd.Variable(target.cuda())
+        else:
+            target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -578,10 +600,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
-    # if torch.cpu.is_available():
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
-    # else:
-    #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
+    if torch.cuda.is_available():
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    else:
+        class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
     meters = AverageMeterSet()
 
@@ -609,8 +631,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             patterns = datapoint[0][1]
             target = datapoint[1]
 
-            entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
-            patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
+            if torch.cuda.is_available():
+                entity_var = torch.autograd.Variable(entity, volatile=True).cuda()
+                patterns_var = torch.autograd.Variable(patterns, volatile=True).cuda()
+            else:
+                entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
+                patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel']:
             input = datapoint[0]
@@ -620,18 +646,26 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]
 
-            entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
-            entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
-            inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
+            if torch.cuda.is_available():
+                entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cuda()
+                entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cuda()
+                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cuda()
+            else:
+                entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
+                entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
+                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
 
         else:
             (input, target) = datapoint
-            input_var = torch.autograd.Variable(input, volatile=True).cpu() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+            if torch.cuda.is_available():
+                input_var = torch.autograd.Variable(input, volatile=True).cuda()
+            else:
+                input_var = torch.autograd.Variable(input, volatile=True).cpu() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
-        # if torch.cpu.is_available():
-        target_var = torch.autograd.Variable(target.cpu(), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
-        # else:
-        #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
+        if torch.cuda.is_available():
+            target_var = torch.autograd.Variable(target.cuda(), volatile=True)
+        else:
+            target_var = torch.autograd.Variable(target.cpu(), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
@@ -712,8 +746,12 @@ def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, mod
     # dataset_id_list = list()
 
     for min_batch_id, datapoint in enumerate(custom_embeddings_minibatch):
-        mention_embeddings_batch = datapoint[0].cpu().data.numpy()
-        patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).cpu().data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
+        if torch.cuda.is_available():
+            mention_embeddings_batch = datapoint[0].cuda().data.numpy()
+            patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).cuda().data.numpy()
+        else:
+            mention_embeddings_batch = datapoint[0].cpu().data.numpy()
+            patterns_embeddings_batch = datapoint[1].permute(1, 0, 2).cpu().data.numpy()  # Note the permute .. to get the min-batches in the 1st dim
         # min_batch_sz = datapoint[2]
 
         # compute the custom entity embeddings
@@ -809,7 +847,6 @@ def get_current_consistency_weight(epoch):
     # Consistency ramp-up from https://arxiv.org/abs/1610.02242
     return args.consistency * ramps.sigmoid_rampup(epoch, args.consistency_rampup)
 
-# todo: which metric to use?  -mihai
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
     maxk = max(topk)
@@ -824,7 +861,6 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / labeled_minibatch_size))
     return res
-
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
