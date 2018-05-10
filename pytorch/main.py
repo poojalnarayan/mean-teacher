@@ -461,6 +461,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('top5', prec5[0], labeled_minibatch_size)
         meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
 
+        # NA_label = 0 #todo: Fill in the correct label for NA
+        # prec, rec = prec_rec(class_logit.data, target_var.data, NA_label, topk=(1,))
+        # meters.update('prec', prec, labeled_minibatch_size)
+        # meters.update('rec', rec, labeled_minibatch_size)
+
         ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
         meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
         meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
@@ -733,6 +738,22 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / labeled_minibatch_size))
     return res
 
+
+def prec_rec(output, target, NA_label, topk=(1,)):
+
+    maxk = max(topk)
+    assert maxk == 1, "Right now only computing P/R/F for topk=1"
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+
+    tp = pred.index(pred.eq(target.view(1,-1).expand_as(pred))).ne(NA_label).sum() # number of cases where pred matches with target and that is not NA label
+    tp_fp = pred.ne(NA_label).sum() # number of non NA labels in pred
+    tp_fn = target.ne(NA_label).sum() # number of non NA labels in target
+
+    prec = float(tp) / tp_fp
+    rec = float(tp) / tp_fn
+
+    return prec, rec
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
