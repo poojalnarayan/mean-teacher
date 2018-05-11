@@ -240,7 +240,7 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 ##############################################
 #todo: fan
 @export
-def lstm_RE(word_vocab_size, num_classes, wordemb_size=300, hidden_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
+def lstm_RE(word_vocab_size, num_classes, pretrained=True, wordemb_size=300, hidden_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
     lstm_hidden_size = 100
     model = SeqModel_RE(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
@@ -278,9 +278,9 @@ class SeqModel_RE(nn.Module):
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, entity1, entity2, inbetween_chunk):
-        entity1_word_embed = self.entity_word_embeddings(entity1).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        entity2_word_embed = self.entity_word_embeddings(entity2).permute(1, 0, 2)
-        between_word_embed = self.entity_word_embeddings(inbetween_chunk).permute(1, 0, 2)
+        entity1_word_embed = self.entity1_word_embeddings(entity1).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        entity2_word_embed = self.entity2word_embeddings(entity2).permute(1, 0, 2)
+        between_word_embed = self.between_word_embeddings(inbetween_chunk).permute(1, 0, 2)
         ###############################################
         # bi-LSTM computation here
 
