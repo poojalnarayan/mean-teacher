@@ -81,6 +81,7 @@ def main(context):
             model_params['wordemb_size'] = args.wordemb_size
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
+            model_params['use_dropout'] = args.use_dropout
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():

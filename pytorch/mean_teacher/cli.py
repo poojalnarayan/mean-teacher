@@ -90,6 +90,8 @@ def create_parser():
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
     parser.add_argument('--run-name', default='', type=str, metavar='PATH',
                         help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--use-dropout', default=False, type=str2bool, metavar='BOOL',
+                        help='Use dropout in the final layer of the model (p=0.2) (default: False)')
     return parser
 
 

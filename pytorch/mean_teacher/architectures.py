@@ -29,16 +29,16 @@ from .utils import export, parameter_count
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False):
+def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False):
 
     lstm_hidden_size = 100
-    model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
+    model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)
     return model
 
 
 # todo: Is padding the way done here ok ?
 class SeqModelCustomEmbed(nn.Module):
-    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb): #todo: add lstm parameters
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb, use_dropout):
         super().__init__()
         self.embedding_size = word_embedding_size
         self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
@@ -71,6 +71,9 @@ class SeqModelCustomEmbed(nn.Module):
         self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
         self.activation = nn.ReLU()  # non-linear activation
         self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
+
+        self.use_dropout = use_dropout
+        self.dropout_layer = nn.Dropout(p=0.2)
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, entity, pattern):
@@ -117,22 +120,26 @@ class SeqModelCustomEmbed(nn.Module):
         res = self.layer1(entity_and_pattern_lstm_out)
         res = self.activation(res)
         res = self.layer2(res)
+
+        if self.use_dropout:
+            res = self.dropout_layer(res)
+
         return res, entity_lstm_out, pattern_lstm_out
 
 ##############################################
 ##### Simple architecture where the entity and pattern embeddings are computed by an average
 ##############################################
 @export
-def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False):
+def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False, use_dropout=False):
 
     # Note: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
 
-    model = FeedForwardMLPEmbed(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
+    model = FeedForwardMLPEmbed(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)
     return model
 
 
 class FeedForwardMLPEmbed(nn.Module):
-    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed, update_pretrained_wordemb):
+    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed, update_pretrained_wordemb, use_dropout):
         super().__init__()
         self.embedding_size = embedding_size
         self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size)
@@ -161,6 +168,9 @@ class FeedForwardMLPEmbed(nn.Module):
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
         # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
+        self.use_dropout = use_dropout
+        self.dropout_layer = nn.Dropout(p=0.2)
+
     def forward(self, entity, pattern):
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
         pattern_flattened = pattern.view(pattern.size()[0], -1)                  # Note: Flatten the list of list of words into a list of words
@@ -175,6 +185,10 @@ class FeedForwardMLPEmbed(nn.Module):
         # print (res.shape)
         # res = self.softmax(res) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
         # print ("After softmax : " + str(res))
+
+        if self.use_dropout:
+            res = self.dropout_layer(res)
+
         return res
 
 @export
