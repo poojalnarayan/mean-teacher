@@ -54,7 +54,7 @@ class Datautils:
                 vals = line.strip().split('\t')
 
                 sentence_str = ' ' + vals[5].strip()
-                sentence_str = sentence_str.replace(' .  ###END###', ".  ###END###")
+                sentence_str = sentence_str.replace(".  ###END###", ' .  ###END###')
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
                 entities1_words = entity1.strip().split('_')
