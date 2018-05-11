@@ -117,12 +117,18 @@ class SeqModelCustomEmbed(nn.Module):
 
         ###############################################
 
+        if self.use_dropout:  # dropout after the lstm layer
+            entity_and_pattern_lstm_out = self.dropout_layer(entity_and_pattern_lstm_out)
+
         res = self.layer1(entity_and_pattern_lstm_out)
+
+        if self.use_dropout:  # dropout in the hidden layer
+            res = self.dropout_layer(res)
+
         res = self.activation(res)
         res = self.layer2(res)
 
-        if self.use_dropout:
-            res = self.dropout_layer(res)
+        # NOTE: no dropout in the output layer
 
         return res, entity_lstm_out, pattern_lstm_out
 
