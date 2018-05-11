@@ -279,7 +279,7 @@ class SeqModel_RE(nn.Module):
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, entity1, entity2, inbetween_chunk):
         entity1_word_embed = self.entity1_word_embeddings(entity1).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        entity2_word_embed = self.entity2word_embeddings(entity2).permute(1, 0, 2)
+        entity2_word_embed = self.entity2_word_embeddings(entity2).permute(1, 0, 2)
         between_word_embed = self.between_word_embeddings(inbetween_chunk).permute(1, 0, 2)
         ###############################################
         # bi-LSTM computation here
