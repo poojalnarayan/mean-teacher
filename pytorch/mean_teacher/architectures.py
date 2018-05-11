@@ -304,7 +304,7 @@ class SeqModel_RE(nn.Module):
         res = self.layer1(entity_and_between_lstm_out)
         res = self.activation(res)
         res = self.layer2(res)
-        return res, entity1_lstm_out, entity2_lstm_out, between_lstm_out
+        return res
 
 @export
 def simple_MLP(pretrained=True, num_classes=10):

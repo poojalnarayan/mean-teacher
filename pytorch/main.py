@@ -39,7 +39,7 @@ LOG = logging.getLogger('main')
 args = None
 best_prec1 = 0
 global_step = 0
-
+NA_label = -1
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
@@ -200,6 +200,7 @@ def create_data_loaders(train_transformation,
                         datadir,
                         args):
 
+    global NA_label
     traindir = os.path.join(datadir, args.train_subdir)
     evaldir = os.path.join(datadir, args.eval_subdir)
 
@@ -297,7 +298,7 @@ def create_data_loaders(train_transformation,
                                                   drop_last=False)
 
 
-
+        NA_label = dataset.categories.index('NA')
 
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
@@ -381,6 +382,7 @@ def update_ema_variables(model, ema_model, alpha, global_step):
 
 def train(train_loader, model, ema_model, optimizer, epoch, log):
     global global_step
+    global NA_label
 
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
@@ -500,19 +502,19 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             model_out = model(entity_var, patterns_var)
 
         elif args.dataset in ['riedel'] and args.arch == 'lstm_RE':
-            ema_model_out, _, _, _ = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
-            model_out, _, _, _ = model(entity1_var, entity2_var, inbetween_chunk_var)
+            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
             ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
-
+            # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
 
         ## DONE: AJAY - WHAT IS THIS CODE BLK ACHIEVING ? Ans: THIS IS RELATED TO --logit-distance-cost .. (fc1 and fc2 in model) ...
-        if isinstance(model_out, Variable):
+        if isinstance(model_out, Variable):       # this is default
             assert args.logit_distance_cost < 0
             logit1 = model_out
             ema_logit = ema_model_out
@@ -528,17 +530,18 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             class_logit, cons_logit = logit1, logit2
             res_loss = args.logit_distance_cost * residual_logit_criterion(class_logit, cons_logit) / minibatch_size
             meters.update('res_loss', res_loss.data[0])
-        else:
-            class_logit, cons_logit = logit1, logit1
+        else:                                 # this is the default
+            class_logit, cons_logit = logit1, logit1    # class_logit.data.size(): torch.Size([256, 56])
             res_loss = 0
+
 
         class_loss = class_criterion(class_logit, target_var) / minibatch_size  ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
         meters.update('class_loss', class_loss.data[0])
 
         ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
-        meters.update('ema_class_loss', ema_class_loss.data[0])
+        meters.update('ema_class_loss', ema_class_loss.data[0])    # Do we need this?
 
-        if args.consistency:
+        if args.consistency:     # if pass --consistency in running script
             consistency_weight = get_current_consistency_weight(epoch)
             meters.update('cons_weight', consistency_weight)
             consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
@@ -551,17 +554,28 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
-        prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
-        meters.update('top1', prec1[0], labeled_minibatch_size)
-        meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
+        if args.dataset in ['riedel']:
+            prec, rec, num_labeled_notNA = prec_rec(class_logit.data, target_var.data, NA_label, topk=(1,))
+            meters.update('prec', prec, num_labeled_notNA)
+            meters.update('rec', rec, num_labeled_notNA)
 
-        ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
-        meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+            ema_prec, ema_rec, num_labeled_notNA = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
+            meters.update('ema_prec', ema_prec, num_labeled_notNA)
+            meters.update('ema_rec', ema_rec, num_labeled_notNA)
+
+        else:
+            prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            meters.update('top1', prec1[0], labeled_minibatch_size)
+            meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
+            meters.update('top5', prec5[0], labeled_minibatch_size)
+            meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
+
+            ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
+            meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
+            meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
+            meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -575,21 +589,21 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         end = time.time()
 
         if i % args.print_freq == 0:
-            # LOG.info(
-            #     'Epoch: [{0}][{1}/{2}]\t'
-            #     'Time {meters[batch_time]:.3f}\t'
-            #     'Data {meters[data_time]:.3f}\t'
-            #     'Class {meters[class_loss]:.4f}\t'
-            #     'Cons {meters[cons_loss]:.4f}\t'
-            #     'Prec@1 {meters[top1]:.3f}\t'
-            #     'Prec@5 {meters[top5]:.3f}'.format(
-            #         epoch, i, len(train_loader), meters=meters))
-            LOG.info(
-                'Epoch: [{0}][{1}/{2}]\t'
-                'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@2 {meters[top5]:.3f}'.format(
-                    epoch, i, len(train_loader), meters=meters))
+            if args.dataset in ['riedel']:
+                LOG.info(
+                    'Epoch: [{0}][{1}/{2}]\t'
+                    'ClassLoss {meters[class_loss]:.4f}\t'
+                    'Precision {meters[prec]:.3f}\t'
+                    'Recall {meters[rec]:.3f}'.format(
+                        epoch, i, len(train_loader), meters=meters))
+
+            else:
+                LOG.info(
+                    'Epoch: [{0}][{1}/{2}]\t'
+                    'ClassLoss {meters[class_loss]:.4f}\t'
+                    'Prec@1 {meters[top1]:.3f}\t'
+                    'Prec@2 {meters[top5]:.3f}'.format(
+                        epoch, i, len(train_loader), meters=meters))
 
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
@@ -600,6 +614,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
+    global NA_label
+
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
     else:
@@ -695,36 +711,47 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
-        # measure accuracy and record loss
-        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
-        meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
-        meters.update('top1', prec1[0], labeled_minibatch_size)
-        meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
+        if args.dataset in ['riedel']:
+            prec, rec, num_labeled_notNA = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
+            meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)    # why different from train？
+            meters.update('prec', prec, num_labeled_notNA)
+            meters.update('rec', rec, num_labeled_notNA)
+
+        else:
+            # measure accuracy and record loss
+            prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
+            meters.update('top1', prec1[0], labeled_minibatch_size)
+            meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
+            meters.update('top5', prec5[0], labeled_minibatch_size)
+            meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
         end = time.time()
 
         if i % args.print_freq == 0:
-            # LOG.info(
-            #     'Test: [{0}/{1}]\t'
-            #     'Time {meters[batch_time]:.3f}\t'
-            #     'Data {meters[data_time]:.3f}\t'
-            #     'Class {meters[class_loss]:.4f}\t'
-            #     'Prec@1 {meters[top1]:.3f}\t'
-            #     'Prec@5 {meters[top5]:.3f}'.format(
-            #         i, len(eval_loader), meters=meters))
+            if args.dataset in ['riedel']:
+                LOG.info(
+                    'Test: [{0}/{1}]\t'
+                    'ClassLoss {meters[class_loss]:.4f}\t'
+                    'Precision {meters[prec]:.3f}\t'
+                    'Recall {meters[rec]:.3f}'.format(
+                        i, len(eval_loader), meters=meters))
+            else:
+                LOG.info(
+                    'Test: [{0}/{1}]\t'
+                    'ClassLoss {meters[class_loss]:.4f}\t'
+                    'Prec@1 {meters[top1]:.3f}'.format(
+                        i, len(eval_loader), meters=meters))
 
-            LOG.info(
-                'Test: [{0}/{1}]\t'
-                'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}'.format(
-                    i, len(eval_loader), meters=meters))
+    if args.dataset in ['riedel']:
+        LOG.info(' * Precision {prec.avg:.3f}\tRecall {rec.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
+                 .format(prec=meters['prec'], rec=meters['rec'], class_loss=meters['class_loss']))
+    else:
+        LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
+              .format(top1=meters['top1'], class_loss=meters['class_loss']))
 
-    LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
-          .format(top1=meters['top1'], class_loss=meters['class_loss']))
     log.record(epoch, {
         'step': global_step,
         **meters.values(),
@@ -734,7 +761,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
     if save_custom_embed_condition:
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
-    return meters['top1'].avg
+
+    if args.dataset in ['riedel']:
+        return meters['prec'].avg
+    else:
+        return meters['top1'].avg
 
 #todo: do we need to save custom_embeddings?  - mihai
 def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type):
@@ -852,15 +883,45 @@ def accuracy(output, target, topk=(1,)):
     maxk = max(topk)
     labeled_minibatch_size = max(target.ne(NO_LABEL).sum(), 1e-8)
 
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
+    _, pred = output.topk(maxk, 1, True, True)   # pred: torch.LongTensor of size 256x2, which 2 labels (labels' id) have highest score
+    pred = pred.t()    # 2 * 256
     correct = pred.eq(target.view(1, -1).expand_as(pred))
+    # target.size(): torch.Size([256])
+    # target.view(1, -1): 1 * 256
+    # expand_as(pred): copy the first row to be the second row to get 2*256
+    # correct: 2*256
 
     res = []
     for k in topk:
         correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / labeled_minibatch_size))
     return res
+
+
+def prec_rec(output, target, NA_label, topk=(1,)):
+    maxk = max(topk)
+    assert maxk == 1, "Right now only computing P/R/F for topk=1"
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+
+    # index() takes same size of pred with idx value 0 and 1, and only return pred[idx] where idx is 1
+    tp = pred.index(pred.eq(target.view(1, -1).expand_as(pred))).ne(
+        NA_label).sum()  # number of cases where pred matches with target and that is not NA label
+    tp_fp = pred.ne(NA_label).sum()  # number of non NA labels in pred
+    tp_fn = target.ne(NA_label).sum()  # number of non NA labels in target
+
+    if tp_fp > 0:
+        prec = float(tp) / tp_fp
+    else:
+        prec = 0.0
+
+    if tp_fn > 0:
+        rec = float(tp) / tp_fn
+    else:
+        rec = 0.0
+
+    return prec, rec, tp_fn
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

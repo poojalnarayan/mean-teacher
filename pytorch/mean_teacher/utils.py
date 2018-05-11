@@ -78,7 +78,10 @@ class AverageMeter:
         self.val = val
         self.sum += val * n
         self.count += n
-        self.avg = self.sum / self.count
+        if self.count == 0:
+            self.avg = 0
+        else:
+            self.avg = self.sum / self.count
 
     def __format__(self, format):
         return "{self.val:{format}} ({self.avg:{format}})".format(self=self, format=format)
