@@ -60,7 +60,7 @@ def main(context):
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
 
-    if args.dataset in ['conll', 'ontonotes', 'riedel']:
+    if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
         train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
@@ -76,7 +76,7 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
 
-        if args.dataset in ['conll', 'ontonotes', 'riedel']:
+        if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
             model_params['wordemb_size'] = args.wordemb_size
@@ -101,7 +101,7 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    if args.dataset in ['conll', 'ontonotes', 'riedel'] and args.update_pretrained_wordemb is False:
+    if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -136,7 +136,7 @@ def main(context):
             validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir, "student")
             LOG.info("Evaluating the EMA model:")
             validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
-        elif args.dataset in ['riedel']:
+        elif args.dataset in ['riedel', 'gids']:
             LOG.info("Evaluating the primary model:")
             validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "student")
             LOG.info("Evaluating the EMA model:")
@@ -260,7 +260,7 @@ def create_data_loaders(train_transformation,
                                                   num_workers=2 * args.workers,
                                                   drop_last=False)
 
-    elif args.dataset in ['riedel']:
+    elif args.dataset in ['riedel', 'gids']:
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
@@ -302,7 +302,7 @@ def create_data_loaders(train_transformation,
 
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
-    elif args.dataset in ['riedel10', 'gids']:
+    elif args.dataset in ['riedel10']:
 
         dataset = datasets.RiedelDataset(traindir, train_transformation)
 
@@ -367,7 +367,7 @@ def create_data_loaders(train_transformation,
             num_workers=2 * args.workers,  # Needs images twice as fast
             drop_last=False)
 
-    if args.dataset in ['conll', 'ontonotes', 'riedel']:
+    if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
         return train_loader, eval_loader, dataset, dataset_test
     else:
         return train_loader, eval_loader
@@ -437,7 +437,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                 ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
                 ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
-        elif args.dataset in ['riedel']:
+        elif args.dataset in ['riedel', 'gids']:
             input = datapoint[0]
             ema_input = datapoint[1]
             target = datapoint[2]
@@ -501,11 +501,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
 
-        elif args.dataset in ['riedel'] and args.arch == 'lstm_RE':
+        elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
             ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
 
-        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
+        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
             ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
             # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
@@ -554,7 +554,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
-        if args.dataset in ['riedel']:
+        if args.dataset in ['riedel', 'gids']:
             prec, rec, num_labeled_notNA = prec_rec(class_logit.data, target_var.data, NA_label, topk=(1,))
             meters.update('prec', prec, num_labeled_notNA)
             meters.update('rec', rec, num_labeled_notNA)
@@ -589,7 +589,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.dataset in ['riedel']:
+            if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Epoch: [{0}][{1}/{2}]\t'
                     'ClassLoss {meters[class_loss]:.4f}\t'
@@ -654,7 +654,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 entity_var = torch.autograd.Variable(entity, volatile=True).cpu()
                 patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
 
-        elif args.dataset in ['riedel']:
+        elif args.dataset in ['riedel', 'gids']:
             input = datapoint[0]
             target = datapoint[1]
 
@@ -702,16 +702,16 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
-        elif args.dataset in ['riedel']and args.arch == 'lstm_RE':
+        elif args.dataset in ['riedel', 'gids']and args.arch == 'lstm_RE':
             output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
-        elif args.dataset in ['riedel'] and args.arch == 'simple_MLP_embed_RE':
+        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
             output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
-        if args.dataset in ['riedel']:
+        if args.dataset in ['riedel', 'gids']:
             prec, rec, num_labeled_notNA = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
             meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)    # why different from train？
             meters.update('prec', prec, num_labeled_notNA)
@@ -731,7 +731,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.dataset in ['riedel']:
+            if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Test: [{0}/{1}]\t'
                     'ClassLoss {meters[class_loss]:.4f}\t'
@@ -745,7 +745,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                     'Prec@1 {meters[top1]:.3f}'.format(
                         i, len(eval_loader), meters=meters))
 
-    if args.dataset in ['riedel']:
+    if args.dataset in ['riedel', 'gids']:
         LOG.info(' * Precision {prec.avg:.3f}\tRecall {rec.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
                  .format(prec=meters['prec'], rec=meters['rec'], class_loss=meters['class_loss']))
     else:
@@ -762,7 +762,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     if save_custom_embed_condition:
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
 
-    if args.dataset in ['riedel']:
+    if args.dataset in ['riedel', 'gids']:
         return meters['prec'].avg
     else:
         return meters['top1'].avg
