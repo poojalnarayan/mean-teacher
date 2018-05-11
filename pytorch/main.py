@@ -926,4 +926,9 @@ def prec_rec(output, target, NA_label, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
-    main(RunContext(__file__, 0))
+    print('----------------')
+    print("Running mean teacher experiment with args:")
+    print('----------------')
+    print(args)
+    print('----------------')
+    main(RunContext(__file__, 0, args.run_name))
