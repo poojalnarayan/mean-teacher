@@ -542,15 +542,15 @@ def riedel10():
         'num_classes': 56
     }
 
-@export
-def gids():
-
-    return {
-        'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
-        'eval_transformation': None,
-        'datadir': 'data-local/gids',
-        'num_classes': 5
-    }
+# @export
+# def gids():
+#
+#     return {
+#         'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
+#         'eval_transformation': None,
+#         'datadir': 'data-local/gids',
+#         'num_classes': 5
+#     }
 
 class RiedelDataset(Dataset):
     def __init__(self, dir, transform=None):
