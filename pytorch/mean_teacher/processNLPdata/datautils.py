@@ -54,7 +54,6 @@ class Datautils:
                 vals = line.strip().split('\t')
 
                 sentence_str = ' ' + vals[5].strip()
-                sentence_str = sentence_str.replace('. ', ' . ')
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
                 entities1_words = entity1.strip().split('_')
@@ -76,6 +75,14 @@ class Datautils:
 
                 entity1_idxs = [m.start() for m in re.finditer(' ' + entity1_pattern + ' ', sentence_str)]
                 entity2_idxs = [m.start() for m in re.finditer(' ' + entity2_pattern + ' ', sentence_str)]
+
+                if len(entity1_idxs) == 0:
+                    sentence_space = sentence_str.replace('. ', ' . ')
+                    entity1_idxs = [m.start() for m in re.finditer(' ' + entity1_pattern + ' ', sentence_space)]
+
+                if len(entity2_idxs) == 0:
+                    sentence_space = sentence_str.replace('. ', ' . ')
+                    entity2_idxs = [m.start() for m in re.finditer(' ' + entity2_pattern + ' ', sentence_space)]
 
                 # this happens when not all words of entity are all connected by '_' in sentence
                 # e.g.: m.03h64	m.01ky9c	hong_kong	hong_kong_international_airport	/location/location/contains	turbo jet ferries depart from the hong_kong macao ferry terminal , sheung wan , the hong_kong china ferry terminal in kowloon and cross boundary passenger ferry terminal at hong_kong international airport . ###END###
