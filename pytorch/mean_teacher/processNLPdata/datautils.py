@@ -65,6 +65,7 @@ class Datautils:
                 entity1_pattern = entity1_pattern.replace(']', "\]")
                 entity1_pattern = entity1_pattern.replace('{', "\{")
                 entity1_pattern = entity1_pattern.replace('}', "\}")
+                entity1_pattern = entity1_pattern.replace('"', '\\"')
 
                 entity2_pattern = entity2.replace('(', "\(")
                 entity2_pattern = entity2_pattern.replace(')', "\)")
@@ -72,17 +73,16 @@ class Datautils:
                 entity2_pattern = entity2_pattern.replace(']', "\]")
                 entity2_pattern = entity2_pattern.replace('{', "\{")
                 entity2_pattern = entity2_pattern.replace('}', "\}")
+                entity2_pattern = entity2_pattern.replace('"', '\\"')
 
                 entity1_idxs = [m.start() for m in re.finditer(' ' + entity1_pattern + ' ', sentence_str)]
                 entity2_idxs = [m.start() for m in re.finditer(' ' + entity2_pattern + ' ', sentence_str)]
 
                 if len(entity1_idxs) == 0:
-                    sentence_space = sentence_str.replace('. ', ' . ')
-                    entity1_idxs = [m.start() for m in re.finditer(' ' + entity1_pattern + ' ', sentence_space)]
+                    entity1_idxs = [m.start() for m in re.finditer(entity1_pattern, sentence_str)]
 
                 if len(entity2_idxs) == 0:
-                    sentence_space = sentence_str.replace('. ', ' . ')
-                    entity2_idxs = [m.start() for m in re.finditer(' ' + entity2_pattern + ' ', sentence_space)]
+                    entity2_idxs = [m.start() for m in re.finditer(entity2_pattern, sentence_str)]
 
                 # this happens when not all words of entity are all connected by '_' in sentence
                 # e.g.: m.03h64	m.01ky9c	hong_kong	hong_kong_international_airport	/location/location/contains	turbo jet ferries depart from the hong_kong macao ferry terminal , sheung wan , the hong_kong china ferry terminal in kowloon and cross boundary passenger ferry terminal at hong_kong international airport . ###END###
