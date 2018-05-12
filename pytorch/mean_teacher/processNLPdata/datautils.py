@@ -60,17 +60,31 @@ class Datautils:
                 entities1_words = entity1.strip().split('_')
                 entities2_words = entity2.strip().split('_')
 
-                entity1_idxs = [m.start() for m in re.finditer(' ' + entity1 + ' ', sentence_str)]
-                entity2_idxs = [m.start() for m in re.finditer(' ' + entity2 + ' ', sentence_str)]
+                entity1_pattern = entity1.replace('(', "\(")
+                entity1_pattern = entity1_pattern.replace(')', "\)")
+                entity1_pattern = entity1_pattern.replace('[', "\[")
+                entity1_pattern = entity1_pattern.replace(']', "\]")
+                entity1_pattern = entity1_pattern.replace('{', "\{")
+                entity1_pattern = entity1_pattern.replace('}', "\}")
+
+                entity2_pattern = entity2.replace('(', "\(")
+                entity2_pattern = entity2_pattern.replace(')', "\)")
+                entity2_pattern = entity2_pattern.replace('[', "\[")
+                entity2_pattern = entity2_pattern.replace(']', "\]")
+                entity2_pattern = entity2_pattern.replace('{', "\{")
+                entity2_pattern = entity2_pattern.replace('}', "\}")
+
+                entity1_idxs = [m.start() for m in re.finditer(' ' + entity1_pattern + ' ', sentence_str)]
+                entity2_idxs = [m.start() for m in re.finditer(' ' + entity2_pattern + ' ', sentence_str)]
 
                 # this happens when not all words of entity are all connected by '_' in sentence
                 # e.g.: m.03h64	m.01ky9c	hong_kong	hong_kong_international_airport	/location/location/contains	turbo jet ferries depart from the hong_kong macao ferry terminal , sheung wan , the hong_kong china ferry terminal in kowloon and cross boundary passenger ferry terminal at hong_kong international airport . ###END###
                 if len(entity1_idxs) == 0:
                     sentence_str_tab = sentence_str.replace(' ', "_")
-                    entity1_idxs = [m.start() for m in re.finditer('_' + entity1 + '_', sentence_str_tab)]
+                    entity1_idxs = [m.start() for m in re.finditer('_' + entity1_pattern + '_', sentence_str_tab)]
                 if len(entity2_idxs) == 0:
                     sentence_str_tab = sentence_str.replace(' ', "_")
-                    entity2_idxs = [m.start() for m in re.finditer('_' + entity2 + '_', sentence_str_tab)]
+                    entity2_idxs = [m.start() for m in re.finditer('_' + entity2_pattern + '_', sentence_str_tab)]
 
                 if len(entity1_idxs) > 0 and len(entity2_idxs) > 0:
                     # initial the shortest distance between two entities as some big num, such as 2000
