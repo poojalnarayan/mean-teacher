@@ -55,7 +55,7 @@ def main(context):
     checkpoint_path = context.transient_dir
     training_log = context.create_train_log("training")
     validation_log = context.create_train_log("validation")
-    ema_validation_log = context.create_train_log("ema_validation")
+    # ema_validation_log = context.create_train_log("ema_validation")
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
@@ -97,7 +97,7 @@ def main(context):
         return model
 
     model = create_model()
-    ema_model = create_model(ema=True)
+    # ema_model = create_model(ema=True)
 
     LOG.info(parameters_string(model))
 
@@ -124,7 +124,7 @@ def main(context):
         global_step = checkpoint['global_step']
         best_prec1 = checkpoint['best_prec1']
         model.load_state_dict(checkpoint['state_dict'])
-        ema_model.load_state_dict(checkpoint['ema_state_dict'])
+        # ema_model.load_state_dict(checkpoint['ema_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         LOG.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
 
@@ -134,30 +134,31 @@ def main(context):
         if args.dataset in ['conll', 'ontonotes']:
             LOG.info("Evaluating the primary model:")
             validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset, context.result_dir, "student")
-            LOG.info("Evaluating the EMA model:")
-            validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
+            # LOG.info("Evaluating the EMA model:")
+            # validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset, context.result_dir, "teacher")
         elif args.dataset in ['riedel', 'gids']:
             LOG.info("Evaluating the primary model:")
             validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "student")
-            LOG.info("Evaluating the EMA model:")
-            validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "teacher")
+            # LOG.info("Evaluating the EMA model:")
+            # validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "teacher")
         return
 
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
         # train for one epoch
-        train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        # train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        train(train_loader, model, optimizer, epoch, training_log)
         LOG.info("--- training epoch in %s seconds ---" % (time.time() - start_time))
 
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
             prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "student")
-            LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
+            # LOG.info("Evaluating the EMA model:")
+            # ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
-            is_best = ema_prec1 > best_prec1
-            best_prec1 = max(ema_prec1, best_prec1)
+            is_best = prec1 > best_prec1
+            best_prec1 = max(prec1, best_prec1)
         else:
             is_best = False
 
@@ -167,7 +168,7 @@ def main(context):
                 'global_step': global_step,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
-                'ema_state_dict': ema_model.state_dict(),
+                # 'ema_state_dict': ema_model.state_dict(),
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
                 'dataset' : args.dataset,
@@ -380,7 +381,8 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def train(train_loader, model, ema_model, optimizer, epoch, log):
+# def train(train_loader, model, ema_model, optimizer, epoch, log):
+def train(train_loader, model, optimizer, epoch, log):
     global global_step
     global NA_label
 
@@ -401,7 +403,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     # switch to train mode
     model.train() ### From the documentation (nn.module,py) : i) Sets the module in training mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
-    ema_model.train()
+    # ema_model.train()
 
     end = time.time()
     for i, datapoint in enumerate(train_loader):
@@ -415,67 +417,68 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if args.dataset in ['conll', 'ontonotes']:
 
             input = datapoint[0]
-            ema_input = datapoint[1]
-            target = datapoint[2]
+            # ema_input = datapoint[1]
+            target = datapoint[1]
 
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
             input_patterns = input[1]
 
-            ema_input_entity = ema_input[0]
-            ema_input_patterns = ema_input[1]
+            # ema_input_entity = ema_input[0]
+            # ema_input_patterns = ema_input[1]
 
             if torch.cuda.is_available():
                 entity_var = torch.autograd.Variable(input_entity).cuda()
                 patterns_var = torch.autograd.Variable(input_patterns).cuda()
-                ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
-                ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
+                # ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
+                # ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
 
             else:
                 entity_var = torch.autograd.Variable(input_entity).cpu()
                 patterns_var = torch.autograd.Variable(input_patterns).cpu()
-                ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
-                ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
+                # ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cpu()
+                # ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel', 'gids']:
             input = datapoint[0]
-            ema_input = datapoint[1]
-            target = datapoint[2]
+            # ema_input = datapoint[1]
+            target = datapoint[1]
 
             input_entity1 = input[0]
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]
-            ema_input_entity1 = ema_input[0]
-            ema_input_entity2 = ema_input[1]
-            ema_input_inbetween_chunk = ema_input[2]
+            # ema_input_entity1 = ema_input[0]
+            # ema_input_entity2 = ema_input[1]
+            # ema_input_inbetween_chunk = ema_input[2]
 
             if torch.cuda.is_available():
                 entity1_var = torch.autograd.Variable(input_entity1).cuda()
                 entity2_var = torch.autograd.Variable(input_entity2).cuda()
                 inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
 
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
 
             else:
                 entity1_var = torch.autograd.Variable(input_entity1).cpu()
                 entity2_var = torch.autograd.Variable(input_entity2).cpu()
                 inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
 
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
 
         else:
-            ((input, ema_input), target) = datapoint
+            # ((input, ema_input), target) = datapoint
+            (input, target) = datapoint
 
             if torch.cuda.is_available():
                 input_var = torch.autograd.Variable(input).cuda()
-                ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+                # ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
             else:
                 input_var = torch.autograd.Variable(input).cpu()
-                ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cpu()
+                # ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cpu()
 
         if torch.cuda.is_available():
             target_var = torch.autograd.Variable(target.cuda())
@@ -495,36 +498,36 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
-            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
+            # ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
-            ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
+            # ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
 
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            # ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            # ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
             # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
         else:
-            ema_model_out = ema_model(ema_input_var)
+            # ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
 
         ## DONE: AJAY - WHAT IS THIS CODE BLK ACHIEVING ? Ans: THIS IS RELATED TO --logit-distance-cost .. (fc1 and fc2 in model) ...
         if isinstance(model_out, Variable):       # this is default
             assert args.logit_distance_cost < 0
             logit1 = model_out
-            ema_logit = ema_model_out
+            # ema_logit = ema_model_out
         else:
             assert len(model_out) == 2
-            assert len(ema_model_out) == 2
+            # assert len(ema_model_out) == 2
             logit1, logit2 = model_out
-            ema_logit, _ = ema_model_out
+            # ema_logit, _ = ema_model_out
 
-        ema_logit = Variable(ema_logit.detach().data, requires_grad=False) ## DO NOT UPDATE THE GRADIENTS THORUGH THE TEACHER (EMA) MODEL
+        # ema_logit = Variable(ema_logit.detach().data, requires_grad=False) ## DO NOT UPDATE THE GRADIENTS THORUGH THE TEACHER (EMA) MODEL
 
         if args.logit_distance_cost >= 0:
             class_logit, cons_logit = logit1, logit2
@@ -538,13 +541,13 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         class_loss = class_criterion(class_logit, target_var) / minibatch_size  ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
         meters.update('class_loss', class_loss.data[0])
 
-        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
-        meters.update('ema_class_loss', ema_class_loss.data[0])    # Do we need this?
+        # ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
+        # meters.update('ema_class_loss', ema_class_loss.data[0])    # Do we need this?
 
         if args.consistency:     # if pass --consistency in running script
             consistency_weight = get_current_consistency_weight(epoch)
             meters.update('cons_weight', consistency_weight)
-            consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
+            # consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
             meters.update('cons_loss', consistency_loss.data[0])
         else:
             consistency_loss = 0
@@ -559,9 +562,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             meters.update('prec', prec, num_labeled_notNA)
             meters.update('rec', rec, num_labeled_notNA)
 
-            ema_prec, ema_rec, num_labeled_notNA = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
-            meters.update('ema_prec', ema_prec, num_labeled_notNA)
-            meters.update('ema_rec', ema_rec, num_labeled_notNA)
+            # ema_prec, ema_rec, num_labeled_notNA = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
+            # meters.update('ema_prec', ema_prec, num_labeled_notNA)
+            # meters.update('ema_rec', ema_rec, num_labeled_notNA)
 
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -570,11 +573,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             meters.update('top5', prec5[0], labeled_minibatch_size)
             meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
 
-            ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
-            meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
-            meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-            meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-            meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+            # ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            # meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
+            # meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
+            # meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
+            # meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
 
 
         # compute gradient and do SGD step
@@ -582,7 +585,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         loss.backward()
         optimizer.step()
         global_step += 1
-        update_ema_variables(model, ema_model, args.ema_decay, global_step)
+        # update_ema_variables(model, ema_model, args.ema_decay, global_step)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
