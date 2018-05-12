@@ -53,6 +53,8 @@ def main(context):
 
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
+        if dataset is not None:
+            model_params['dataset'] = dataset
         model = model_factory(**model_params)
         if torch.cuda.is_available():
             model = model.cuda()
@@ -184,7 +186,7 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    if args.dataset == 'family':
+    if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         dataset = datasets.ILP_dataset(datadir, 'train', train_transformation)
 
         if args.labels:
@@ -247,7 +249,7 @@ def create_data_loaders(train_transformation,
             pin_memory=pin_memory,
             drop_last=False)
 
-    if args.dataset == 'family':
+    if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader, None

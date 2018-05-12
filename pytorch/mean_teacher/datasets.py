@@ -11,6 +11,46 @@ from .processILPdata.family_data import Data as FamilyData
 # from processILPdata.family_data import Data as FamilyData
 
 @export
+def fb237():
+
+    return {
+        'train_transformation': data.TransformTwiceILP(None),
+        'eval_transformation': None,
+        'datadir': 'data-local/neuralilp/fb15k-237',
+        'num_classes': 1000 #todo: what should be filled here??
+    }
+
+@export
+def wn18():
+
+    return {
+        'train_transformation': data.TransformTwiceILP(None),
+        'eval_transformation': None,
+        'datadir': 'data-local/neuralilp/wn-18',
+        'num_classes': 1000 #todo: what should be filled here??
+    }
+
+@export
+def kinship():
+
+    return {
+        'train_transformation': data.TransformTwiceILP(None),
+        'eval_transformation': None,
+        'datadir': 'data-local/neuralilp/kinship',
+        'num_classes': 1000 #todo: what should be filled here??
+    }
+
+@export
+def umls():
+
+    return {
+        'train_transformation': data.TransformTwiceILP(None),
+        'eval_transformation': None,
+        'datadir': 'data-local/neuralilp/umls',
+        'num_classes': 1000 #todo: what should be filled here??
+    }
+
+@export
 def family():
 
     return {
