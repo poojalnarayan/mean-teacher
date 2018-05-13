@@ -154,7 +154,7 @@ def relabel_dataset_RE(dataset, args):
         LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
         num_labels = int(args.labels)
         for i in range(num_classes):
-            num_c =  num_per_classes[i]
+            num_c = num_per_classes[i]
             num_labels_c = int(num_labels * num_c / len(all_labels))
             num_labels_per_class.append(num_labels_c)
 

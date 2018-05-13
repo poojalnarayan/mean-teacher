@@ -181,7 +181,7 @@ class FeedForwardMLPEmbed(nn.Module):
 ##### Simple architecture for relation extraction. the entity and sentence embeddings are computed by an average
 ##############################################
 @export
-def simple_MLP_embed_RE(word_vocab_size, pretrained=True, num_classes=56, word_vocab_embed=None, wordemb_size=300, hidden_size=200, update_pretrained_wordemb=False):
+def simple_MLP_embed_RE(word_vocab_size, num_classes, pretrained=True, word_vocab_embed=None, wordemb_size=300, hidden_size=200, update_pretrained_wordemb=False):
 
     model = FeedForwardMLPEmbed_RE(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
