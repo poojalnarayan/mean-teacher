@@ -15,28 +15,22 @@ import torch.cuda
 from .utils import export, parameter_count
 THR = 1e-20
 
+
 @export
-def neurallp(dataset, pretrained=False, **kwargs):
+def neurallp(dataset, num_step=3, num_layer=1, query_embed_size=128, rnn_state_size=128, pretrained=False, **kwargs):
 
-    # hyperparams here, currently hard-coded, todo: parameterize
-    num_step = 3
-    num_layer = 1
-    num_relation = 12
-    query_embed_size = 128
-    rnn_state_size = 128
-
-    model = NeuralLP(dataset)
+    model = NeuralLP(dataset, num_step, num_layer, query_embed_size, rnn_state_size)
     return model
 
-## todo: Implement this ...
+
 class NeuralLP(nn.Module):
-    def __init__(self, dataset):
+    def __init__(self, dataset, num_step, num_layer, query_embed_size, rnn_state_size):
         super().__init__()
         ## hyper-params
-        self.num_step = 3
-        self.num_layer = 1
-        self.query_embed_size = 128
-        self.rnn_state_size = 128
+        self.num_step = num_step
+        self.num_layer = num_layer
+        self.query_embed_size = query_embed_size
+        self.rnn_state_size = rnn_state_size
 
         self.num_relation = dataset.family_data.num_relation
         self.num_entity = dataset.family_data.num_entity

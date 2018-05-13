@@ -55,6 +55,11 @@ def main(context):
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
         if dataset is not None:
             model_params['dataset'] = dataset
+            model_params['num_step'] = args.num_step
+            model_params['num_layer'] = args.num_layer
+            model_params['query_embed_size'] = args.query_embed_size
+            model_params['rnn_state_size'] = args.rnn_state_size
+
         model = model_factory(**model_params)
         if torch.cuda.is_available():
             model = model.cuda()

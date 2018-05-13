@@ -78,7 +78,14 @@ def create_parser():
                         help='use pre-trained model')
     parser.add_argument('--noise', default=None, type=str,
                         help='What type of noise should be added to the input')
-
+    parser.add_argument('--num_step', default=3, type=int,
+                        help='number of steps in inference (num_step = max_rule_len+1)')
+    parser.add_argument('--num_layer', default=1, type=int,
+                        help='number of layers in the RNN')
+    parser.add_argument('--query_embed_size', default=128, type=int,
+                        help='Size of the query embedding')
+    parser.add_argument('--rnn_state_size', default=128, type=int,
+                        help='Size of the RNN')
     return parser
 
 
