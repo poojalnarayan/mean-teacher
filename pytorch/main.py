@@ -20,7 +20,7 @@ from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
-
+import contextlib
 
 LOG = logging.getLogger('main')
 
@@ -40,6 +40,9 @@ args = None
 best_prec1 = 0
 global_step = 0
 NA_label = -1
+pred_match_noNA = 0
+pred_noNA = 0
+true_noNA = 0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
@@ -49,6 +52,9 @@ NA_label = -1
 def main(context):
     global global_step
     global best_prec1
+    global pred_match_noNA
+    global pred_noNA
+    global true_noNA
 
     time_start = time.time()
 
@@ -100,6 +106,10 @@ def main(context):
     # ema_model = create_model(ema=True)
 
     LOG.info(parameters_string(model))
+
+    pred_file = dataset_config['datadir'] + '/pred.txt'
+    with contextlib.suppress(FileNotFoundError):
+        os.remove(pred_file)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
@@ -720,6 +730,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             meters.update('prec', prec, num_labeled_notNA)
             meters.update('rec', rec, num_labeled_notNA)
 
+            lbl_categories = dataset.categories
+            if epoch == args.epochs and model_type == 'teacher':
+                dump_result(i, args, output1.data, lbl_categories, topk=(1,))
+
         else:
             # measure accuracy and record loss
             prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -751,9 +765,17 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     if args.dataset in ['riedel', 'gids']:
         LOG.info(' * Precision {prec.avg:.3f}\tRecall {rec.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
                  .format(prec=meters['prec'], rec=meters['rec'], class_loss=meters['class_loss']))
+
+        if epoch == args.epochs and model_type == 'teacher':
+            precision = pred_match_noNA / pred_noNA
+            recall = pred_match_noNA / true_noNA
+            f1 = 2 * precision * recall / (precision + recall)
+            print('******* Overall Precision ' + str(precision) + '\tRecall ' + str(recall) + '\tF1 ' + str(f1) + '\t********')
+
     else:
         LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
               .format(top1=meters['top1'], class_loss=meters['class_loss']))
+
 
     log.record(epoch, {
         'step': global_step,
@@ -766,6 +788,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
 
     if args.dataset in ['riedel', 'gids']:
+
+
+
         return meters['prec'].avg
     else:
         return meters['top1'].avg
@@ -925,6 +950,43 @@ def prec_rec(output, target, NA_label, topk=(1,)):
 
     return prec, rec, tp_fn
 
+
+def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
+    global pred_match_noNA
+    global pred_noNA
+    global true_noNA
+    maxk = max(topk)
+    assert maxk == 1, "Right now only computing for topk=1"
+    score, prediction = output.topk(maxk, 1, True, True)
+
+    dataset_config = datasets.__dict__[args.dataset]()
+    evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
+    dataset_file = evaldir + "/test.txt"
+    pred_file = dataset_config['datadir'] + '/pred.txt'
+    f = open(dataset_file)
+    lines = f.readlines()
+
+    with open(pred_file, "a") as fo:
+        for p, pre in enumerate(prediction):
+            line_id = int(batch_id * args.batch_size + p)
+            line = lines[line_id].strip()
+            lbl_id = int(pre)
+            pred_label = lbl_categories[lbl_id].strip()
+
+            vals = line.split('\t')
+            true_label = vals[4].strip()
+            if pred_label == true_label and true_label != 'NA':
+                pred_match_noNA += 1
+            if pred_label != 'NA':
+                pred_noNA += 1
+            if true_label != 'NA':
+                true_noNA += 1
+
+            line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+            fo.write(line)
+
+        # if batch_id == np.ceil(len(lines)/args.batch_size)-1:
+        #     print('Num of correct predictions that is not NA: '+ str(pred_match_noNA))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
