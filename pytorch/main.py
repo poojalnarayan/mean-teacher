@@ -731,7 +731,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             meters.update('rec', rec, num_labeled_notNA)
 
             lbl_categories = dataset.categories
-            if epoch == args.epochs and model_type == 'teacher':
+            if epoch == args.epochs:
                 dump_result(i, args, output1.data, lbl_categories, topk=(1,))
 
         else:
@@ -766,7 +766,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         LOG.info(' * Precision {prec.avg:.3f}\tRecall {rec.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
                  .format(prec=meters['prec'], rec=meters['rec'], class_loss=meters['class_loss']))
 
-        if epoch == args.epochs and model_type == 'teacher':
+        if epoch == args.epochs:
             precision = pred_match_noNA / pred_noNA
             recall = pred_match_noNA / true_noNA
             f1 = 2 * precision * recall / (precision + recall)
