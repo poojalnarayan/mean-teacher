@@ -24,6 +24,7 @@ from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
 from mean_teacher.NeuralLPutils.utils import get_rules as NeuralILPRules
+from mean_teacher.NeuralLPutils.utils import get_predictions as NeuralILPPredictions
 
 LOG = logging.getLogger('main')
 
@@ -43,7 +44,7 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
+    train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -102,9 +103,9 @@ def main(context):
 
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset=dataset)
+        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset=dataset_test)
         LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset=dataset)
+        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset=dataset_test)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -116,7 +117,7 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset=dataset)
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset=dataset_test)
             if dataset is None: #todo: Currently not on the NeuralLP model
                 LOG.info("Evaluating the EMA model:")
                 ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset=dataset)
@@ -158,7 +159,8 @@ def main(context):
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
-        NeuralILPRules(model, dataset.family_data, rule_thr)
+        NeuralILPRules(model, dataset.family_data, context.result_directory(), rule_thr)
+        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory())
         print("Done!!!!")
 
 
@@ -255,7 +257,7 @@ def create_data_loaders(train_transformation,
             drop_last=False)
 
     if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
-        return train_loader, eval_loader, dataset
+        return train_loader, eval_loader, dataset, dataset_test
     else:
         return train_loader, eval_loader, None
 
@@ -267,15 +269,23 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def filter_matrix_db(dataset, batch_input):
+def filter_matrix_db(dataset, batch_input, type):
 
-    train_facts = dataset.family_data.train
-    batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
-    batch_ids = [i for i in batch_facts[0]]
-    extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
+    if type == 'train':
+        train_facts = dataset.family_data.train
+        batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
+        batch_ids = [i for i in batch_facts[0]]
+        extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
 
-    extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
-    augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
+        extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
+        augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
+    elif type == 'test':
+        augmented_mdb = dataset.family_data.augmented_mdb_test
+    elif type == 'valid':
+        augmented_mdb = dataset.family_data.augmented_mdb_valid
+    else:
+        assert False, "Wrong type of dataset type : " + type
+
     return augmented_mdb
 
 
@@ -349,11 +359,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 ema_input_var[0] = ema_input_var[0].cuda()
                 ema_input_var[1] = ema_input_var[1].cuda()
 
-
-            matrix_db = filter_matrix_db(dataset, input_triple)
+            matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
             model_out = model(input_var, matrix_db)
 
-            ema_matrix_db = filter_matrix_db(dataset, ema_input_triple)
+            ema_matrix_db = filter_matrix_db(dataset, ema_input_triple, 'train')
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
             target = input_triple[2]
@@ -499,7 +508,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
             class_loss = class_criterion(output1, target_var) / minibatch_size
         else:
-            matrix_db = filter_matrix_db(dataset, data_minibatch)
+            matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
             output1 = model(input_var, matrix_db)
             class_loss = class_criterion(output1, target_var)
 
@@ -588,4 +597,9 @@ def accuracy(output, target, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
-    main(RunContext(__file__, 0))
+    print('----------------')
+    print("Running mean teacher experiment with args:")
+    print('----------------')
+    print(args)
+    print('----------------')
+    main(RunContext(__file__, 0, args.run_name))

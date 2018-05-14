@@ -15,7 +15,6 @@ import torch.cuda
 from .utils import export, parameter_count
 THR = 1e-20
 
-
 @export
 def neurallp(dataset, num_step=3, num_layer=1, query_embed_size=128, rnn_state_size=128, pretrained=False, **kwargs):
 
@@ -163,10 +162,8 @@ class NeuralLP(nn.Module):
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
-            print('----------------------')
-            for i, t in database.items():
-                print(str(i) + "\t" + str(torch.sum(t.to_dense())))
-            print('----------------------')
+            #
+
 
         if torch.cuda.is_available():
             thr_tensor = torch.autograd.Variable(torch.cuda.FloatTensor([THR]))

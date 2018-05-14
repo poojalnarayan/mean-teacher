@@ -86,6 +86,8 @@ def create_parser():
                         help='Size of the query embedding')
     parser.add_argument('--rnn_state_size', default=128, type=int,
                         help='Size of the RNN')
+    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
+                        help='Name of the run used in storing the results for post-precessing (default: none)')
     return parser
 
 
