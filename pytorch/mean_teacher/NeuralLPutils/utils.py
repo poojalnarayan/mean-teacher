@@ -5,6 +5,7 @@ import torch.cuda
 from mean_teacher.utils import *
 from mean_teacher.data import NO_LABEL
 
+
 # todo: Repeating this function here .. remove this later
 def filter_matrix_db(dataset, batch_input, type):
 
@@ -24,6 +25,7 @@ def filter_matrix_db(dataset, batch_input, type):
         assert False, "Wrong type of dataset type : " + type
 
     return augmented_mdb
+
 
 def list_rules(attn_ops, attn_mems, the):
     """
@@ -222,7 +224,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
         hh = data_minibatch[2]
         tt = data_minibatch[3]
         for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
-            p_head = predictions_this_batch[k, h]
+            p_head = predictions_this_batch.cpu().data.numpy()[k, h]
 
             def eval_fn(p): return p > p_head
 

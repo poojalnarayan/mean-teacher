@@ -162,10 +162,8 @@ class NeuralLP(nn.Module):
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
-            print('----------------------')
-            for i, t in database.items():
-                print(str(i) + "\t" + str(torch.sum(t.to_dense())))
-            print('----------------------')
+            #
+
 
         if torch.cuda.is_available():
             thr_tensor = torch.autograd.Variable(torch.cuda.FloatTensor([THR]))
