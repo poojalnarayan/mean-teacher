@@ -44,7 +44,7 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
+    train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -163,7 +163,7 @@ def main(context):
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
         NeuralILPRules(model, dataset.family_data, rule_thr, context.result_directory)
-        NeuralILPPredictions(model, eval_loader, dataset, context.result_directory)
+        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory)
         print("Done!!!!")
 
 
@@ -254,7 +254,7 @@ def create_data_loaders(train_transformation,
             drop_last=False)
 
     if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
-        return train_loader, eval_loader, dataset
+        return train_loader, eval_loader, dataset, dataset_test
     else:
         return train_loader, eval_loader, None
 
