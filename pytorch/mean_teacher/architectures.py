@@ -119,7 +119,7 @@ class NeuralLP(nn.Module):
             # print("---------------------------------")
 
             # lines: @NeuralLP:model.py 149-155
-            a = torch.unsqueeze(rnn_outputs[t], dim=1)  # todo: IMPT--> should this be [t+1]
+            a = torch.unsqueeze(rnn_outputs[t], dim=1)  # # NOTE: IMPT--> should this be [t+1] .. ANS: No, see: https://github.com/fanyangxyz/Neural-LP/issues/10
             b = torch.stack(rnn_outputs[0:t+1], dim=2)  # IMPT--> Should this not be 0:t-1 (according to Eq 11) ? ANS: No..
             attention_memories.append(self.softmax_mem(torch.squeeze(torch.matmul(a, b), dim=1)))
 
