@@ -3,8 +3,27 @@ import time
 import numpy as np
 import torch.cuda
 from mean_teacher.utils import *
-from main import *
 from mean_teacher.data import NO_LABEL
+
+# todo: Repeating this function here .. remove this later
+def filter_matrix_db(dataset, batch_input, type):
+
+    if type == 'train':
+        train_facts = dataset.family_data.train
+        batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
+        batch_ids = [i for i in batch_facts[0]]
+        extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
+
+        extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
+        augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
+    elif type == 'test':
+        augmented_mdb = dataset.family_data.augmented_mdb_test
+    elif type == 'valid':
+        augmented_mdb = dataset.family_data.augmented_mdb_valid
+    else:
+        assert False, "Wrong type of dataset type : " + type
+
+    return augmented_mdb
 
 def list_rules(attn_ops, attn_mems, the):
     """
@@ -187,7 +206,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
         assert labeled_minibatch_size > 0
 
-        matrix_db = filter_matrix_db(dataset, data_minibatch)
+        matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
         predictions_this_batch = model(input_var, matrix_db)
 
         #todo: hardcoding topk = 10
