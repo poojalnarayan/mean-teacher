@@ -106,9 +106,9 @@ def main(context):
 
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
-        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset=dataset)
+        validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset=dataset_test)
         LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset=dataset)
+        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset=dataset_test)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -120,7 +120,7 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset=dataset)
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset=dataset_test)
             if dataset is None: #todo: Currently not on the NeuralLP model
                 LOG.info("Evaluating the EMA model:")
                 ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset=dataset)
