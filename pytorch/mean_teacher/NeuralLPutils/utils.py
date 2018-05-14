@@ -226,7 +226,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
 
             def eval_fn(p): return p > p_head
 
-            this_predictions = filter(eval_fn, enumerate(predictions_this_batch[k, :]))
+            this_predictions = filter(eval_fn, enumerate(predictions_this_batch.cpu().data.numpy()[k, :]))
             this_predictions = sorted(this_predictions, key=lambda x: x[1], reverse=True)
 
             this_predictions.append((h, p_head))
