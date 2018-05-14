@@ -138,7 +138,7 @@ def get_rules(model, data, result_dir, rule_thr=1e-20):
 
     # pickle.dump(all_listed_rules,
     #             open("rules.pckl", "w"))
-    with open(result_dir + "rules.txt", "w") as f:
+    with open(result_dir + "/rules.txt", "w") as f:
         for line in all_printed_rules:
             f.write(line + "\n")
     msg = msg_with_time("\nRules listed and printed.", start)
@@ -188,7 +188,7 @@ def get_attentions(model):
 
 def get_predictions(model, eval_loader, dataset, result_dir):
 
-    f = open(result_dir + "test_predictions.txt", "w")
+    f = open(result_dir + "/test_predictions.txt", "w")
 
     all_in_top = []
 
@@ -228,7 +228,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
 
             def eval_fn(p): return p > p_head
 
-            this_predictions = filter(eval_fn, enumerate(np.any(predictions_this_batch.cpu().data.numpy()[k, :]))) #todo: hope this is right .. esp ..any()
+            this_predictions = enumerate(list(filter(eval_fn, predictions_this_batch.cpu().data.numpy()[k, :]))) #todo: check if this is right .. mostly it is ..
             this_predictions = sorted(this_predictions, key=lambda x: x[1], reverse=True)
 
             this_predictions.append((h, p_head))
