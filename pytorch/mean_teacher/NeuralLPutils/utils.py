@@ -139,8 +139,7 @@ def get_attentions(model):
     # pickle.dump([all_attention_operators, all_attention_memories],
     #             open("attentions.pckl", "w"))
 
-    # todo: hardcoding for now ..
-    num_operators = 24
+    num_operators = model.num_operator
     all_queries = [q for q in range(0,num_operators)]  # functools.reduce(lambda x, y: list(x) + list(y), query_batches, [])
 
     for i in range(len(all_queries)):
