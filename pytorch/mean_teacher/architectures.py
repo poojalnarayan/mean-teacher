@@ -16,29 +16,23 @@ from .utils import export, parameter_count
 THR = 1e-20
 
 @export
-def neurallp(pretrained=False, **kwargs):
+def neurallp(dataset, num_step=3, num_layer=1, query_embed_size=128, rnn_state_size=128, pretrained=False, **kwargs):
 
-    # hyperparams here, currently hard-coded, todo: parameterize
-    num_step = 3
-    num_layer = 1
-    num_relation = 12
-    query_embed_size = 128
-    rnn_state_size = 128
-
-    model = NeuralLP()
+    model = NeuralLP(dataset, num_step, num_layer, query_embed_size, rnn_state_size)
     return model
 
 ## todo: Implement this ...
 class NeuralLP(nn.Module):
-    def __init__(self):
+    def __init__(self, dataset, num_step, num_layer, query_embed_size, rnn_state_size):
         super().__init__()
         ## hyper-params
-        self.num_step = 3
-        self.num_layer = 1
-        self.num_relation = 12
-        self.query_embed_size = 128
-        self.rnn_state_size = 128
-        self.num_entity = 3007  # todo: = family_data.num_entity
+        self.num_step = num_step
+        self.num_layer = num_layer
+        self.query_embed_size = query_embed_size
+        self.rnn_state_size = rnn_state_size
+
+        self.num_relation = dataset.family_data.num_relation
+        self.num_entity = dataset.family_data.num_entity
 
         self.num_query = self.num_relation * 2
         self.num_operator = self.num_relation * 2
@@ -124,7 +118,7 @@ class NeuralLP(nn.Module):
             # print("---------------------------------")
 
             # lines: @NeuralLP:model.py 149-155
-            a = torch.unsqueeze(rnn_outputs[t], dim=1)  # todo: IMPT--> should this be [t+1]
+            a = torch.unsqueeze(rnn_outputs[t], dim=1)  # NOTE: IMPT--> should this be [t+1] .. ANS: No, see: https://github.com/fanyangxyz/Neural-LP/issues/10
             b = torch.stack(rnn_outputs[0:t+1], dim=2)  # IMPT--> Should this not be 0:t-1 (according to Eq 11) ? ANS: No..
             attention_memories.append(self.softmax_mem(torch.squeeze(torch.matmul(a, b), dim=1)))
 

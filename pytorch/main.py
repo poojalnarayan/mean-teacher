@@ -53,6 +53,13 @@ def main(context):
 
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
+        if dataset is not None:
+            model_params['dataset'] = dataset
+            model_params['num_step'] = args.num_step
+            model_params['num_layer'] = args.num_layer
+            model_params['query_embed_size'] = args.query_embed_size
+            model_params['rnn_state_size'] = args.rnn_state_size
+
         model = model_factory(**model_params)
         if torch.cuda.is_available():
             model = model.cuda()
@@ -66,7 +73,7 @@ def main(context):
         return model
 
     model = create_model()
-    if args.dataset != 'family':
+    if dataset is None:
         ema_model = create_model(ema=True)
     else:
         ema_model = None
@@ -186,7 +193,7 @@ def create_data_loaders(train_transformation,
         pin_memory = False
 
 
-    if args.dataset == 'family':
+    if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         dataset = datasets.ILP_dataset(datadir, 'train')
         # TODO: For now not consider the teacher-student arch .. but just the supervised mode
         assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
@@ -244,7 +251,7 @@ def create_data_loaders(train_transformation,
             pin_memory=pin_memory,
             drop_last=False)
 
-    if args.dataset == 'family':
+    if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader, None
