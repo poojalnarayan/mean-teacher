@@ -24,6 +24,7 @@ from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
 from mean_teacher.NeuralLPutils.utils import get_rules as NeuralILPRules
+from mean_teacher.NeuralLPutils.utils import get_predictions as NeuralILPPredictions
 
 LOG = logging.getLogger('main')
 
@@ -161,7 +162,8 @@ def main(context):
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
-        NeuralILPRules(model, dataset.family_data, rule_thr)
+        NeuralILPRules(model, dataset.family_data, rule_thr, context.result_directory)
+        NeuralILPPredictions(model, eval_loader, dataset, context.result_directory)
         print("Done!!!!")
 
 
@@ -596,4 +598,9 @@ def accuracy(output, target, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
-    main(RunContext(__file__, 0))
+    print('----------------')
+    print("Running mean teacher experiment with args:")
+    print('----------------')
+    print(args)
+    print('----------------')
+    main(RunContext(__file__, 0, args.run_name))

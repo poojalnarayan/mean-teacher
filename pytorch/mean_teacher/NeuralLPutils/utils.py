@@ -1,8 +1,10 @@
 import sys
-import pickle
 import time
 import numpy as np
 import torch.cuda
+from mean_teacher.utils import *
+from main import *
+from mean_teacher.data import NO_LABEL
 
 def list_rules(attn_ops, attn_mems, the):
     """
@@ -94,7 +96,7 @@ def print_rules(q_id, rules, parser, query_is_language):
     return printed_rules
 
 
-def get_rules(model, data, rule_thr=1e-20):
+def get_rules(model, data, result_dir, rule_thr=1e-20):
     start = time.time()
     all_attention_operators, all_attention_memories, queries = get_attentions(model)
 
@@ -115,7 +117,7 @@ def get_rules(model, data, rule_thr=1e-20):
 
     # pickle.dump(all_listed_rules,
     #             open("rules.pckl", "w"))
-    with open("rules.txt", "w") as f:
+    with open(result_dir + "rules.txt", "w") as f:
         for line in all_printed_rules:
             f.write(line + "\n")
     msg = msg_with_time("\nRules listed and printed.", start)
@@ -139,8 +141,7 @@ def get_attentions(model):
     # pickle.dump([all_attention_operators, all_attention_memories],
     #             open("attentions.pckl", "w"))
 
-    # todo: hardcoding for now ..
-    num_operators = 24
+    num_operators = model.num_operator
     all_queries = [q for q in range(0,num_operators)]  # functools.reduce(lambda x, y: list(x) + list(y), query_batches, [])
 
     for i in range(len(all_queries)):
@@ -162,3 +163,62 @@ def get_attentions(model):
     print(msg)
 
     return all_attention_operators, all_attention_memories, all_queries
+
+
+def get_predictions(model, eval_loader, dataset, result_dir):
+
+    f = open(result_dir + "test_predictions.txt", "w")
+
+    all_in_top = []
+
+    for i, data_minibatch in enumerate(eval_loader):
+
+        input_batch_ids = data_minibatch[0]
+        input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
+                                         torch.autograd.Variable(data_minibatch[3], volatile=True)]
+        if torch.cuda.is_available():
+            input_var[0] = input_var[0].cuda()
+            input_var[1] = input_var[1].cuda()
+            # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
+            target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+        else:
+            target_var = torch.autograd.Variable(data_minibatch[2].cpu())
+
+        labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
+        assert labeled_minibatch_size > 0
+
+        matrix_db = filter_matrix_db(dataset, data_minibatch)
+        predictions_this_batch = model(input_var, matrix_db)
+
+        #todo: hardcoding topk = 10
+        _, topk_preds = predictions_this_batch.topk(10)
+
+        topk_preds_np = topk_preds.cpu().data.numpy()
+        target_np = data_minibatch[2].numpy()
+        in_top = np.isin(target_np, topk_preds_np)
+
+        all_in_top += list(in_top)
+
+        qq = data_minibatch[1]
+        hh = data_minibatch[2]
+        tt = data_minibatch[3]
+        for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
+            p_head = predictions_this_batch[k, h]
+
+            eval_fn = lambda p: (p > p_head)
+
+            this_predictions = filter(eval_fn, enumerate(predictions_this_batch[k, :]))
+            this_predictions = sorted(this_predictions, key=lambda x: x[1], reverse=True)
+
+            this_predictions.append((h, p_head))
+            this_predictions = [dataset.family_data.number_to_entity[j] for j, _ in this_predictions]
+            q_string = dataset.family_data.parser["query"][q]
+            h_string = dataset.family_data.number_to_entity[h]
+            t_string = dataset.family_data.number_to_entity[t]
+            to_write = [q_string, h_string, t_string] + this_predictions
+            f.write(",".join(to_write) + "\n")
+
+    f.close()
+
+    msg = "Test in top %0.4f" % np.mean(all_in_top)
+    print(msg + "\nTest predictions written.")
