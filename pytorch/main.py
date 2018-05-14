@@ -383,6 +383,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1]),
                                              torch.autograd.Variable(data_minibatch[3])]
 
+            # augment with reverse ...
+            input_var += [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1] + dataset.family_data.num_relation),
+                                             torch.autograd.Variable(data_minibatch[2])]
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
                 input_var[1] = input_var[1].cuda()
@@ -391,10 +394,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
             model_out = model(input_var, matrix_db)
 
+            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
             if torch.cuda.is_available():
-                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+                target_var = torch.autograd.Variable(target.cuda(async=True))
             else:
-                target_var = torch.autograd.Variable(data_minibatch[2].cpu())  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
+                target_var = torch.autograd.Variable(target.cpu())  # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ... #todo: verify
 
             minibatch_size = len(target_var)
             labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
