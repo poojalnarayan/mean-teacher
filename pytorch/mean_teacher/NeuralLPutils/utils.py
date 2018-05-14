@@ -224,7 +224,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
         for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
             p_head = predictions_this_batch[k, h]
 
-            eval_fn = lambda p: (p > p_head)
+            def eval_fn(p): return p > p_head
 
             this_predictions = filter(eval_fn, enumerate(predictions_this_batch[k, :]))
             this_predictions = sorted(this_predictions, key=lambda x: x[1], reverse=True)
