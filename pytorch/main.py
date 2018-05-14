@@ -162,7 +162,7 @@ def main(context):
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
-        NeuralILPRules(model, dataset.family_data, rule_thr, context.result_directory)
+        NeuralILPRules(model, dataset.family_data, context.result_directory, rule_thr)
         NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory)
         print("Done!!!!")
 
