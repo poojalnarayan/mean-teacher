@@ -220,9 +220,11 @@ def get_predictions(model, eval_loader, dataset, result_dir):
 
         all_in_top += list(in_top)
 
-        qq = data_minibatch[1]
-        hh = data_minibatch[2]
-        tt = data_minibatch[3]
+        qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1],
+                                                     dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
+        tt = torch.cat([data_minibatch[3], data_minibatch[2]])  # NOTE: augment with reverse ...
+        hh = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+
         for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
             p_head = predictions_this_batch.cpu().data.numpy()[k, h]
 

@@ -382,8 +382,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
             qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1], dataset.family_data.num_relation)]) # NOTE: augment with reverse ...
             tt = torch.cat([data_minibatch[3], data_minibatch[2]]) # NOTE: augment with reverse ...
+            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+
             input_var = [input_batch_ids + input_batch_ids] + [torch.autograd.Variable(qq),
-                                             torch.autograd.Variable(tt)]
+                                                               torch.autograd.Variable(tt)]
 
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
@@ -393,7 +395,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
             model_out = model(input_var, matrix_db)
 
-            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
             if torch.cuda.is_available():
                 target_var = torch.autograd.Variable(target.cuda(async=True))
             else:
@@ -499,15 +500,20 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
         else:
             input_batch_ids = data_minibatch[0]
-            input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
-                                             torch.autograd.Variable(data_minibatch[3], volatile=True)]
+            qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1],
+                                                         dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
+            tt = torch.cat([data_minibatch[3], data_minibatch[2]])  # NOTE: augment with reverse ...
+            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+
+            input_var = [input_batch_ids] + [torch.autograd.Variable(qq, volatile=True),
+                                             torch.autograd.Variable(tt, volatile=True)]
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
                 input_var[1] = input_var[1].cuda()
                 # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
-                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+                target_var = torch.autograd.Variable(target.cuda(async=True))
             else:
-                target_var = torch.autograd.Variable(data_minibatch[2].cpu())
+                target_var = torch.autograd.Variable(target.cpu())
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
