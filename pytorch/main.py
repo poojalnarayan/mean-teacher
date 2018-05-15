@@ -33,6 +33,23 @@ best_prec1 = 0
 global_step = 0
 
 
+# Note: from Pytorch=0.4.0, as it is not implemented in 0.3.0
+def clip_grad_value(parameters, clip_value):
+
+    r"""Clips gradient of an iterable of parameters at specified value.
+
+        Gradients are modified in-place.
+
+        Arguments:
+            parameters (Iterable[Tensor]): an iterable of Tensors that will have
+                gradients normalized
+            clip_value (float or int): maximum allowed value of the gradients
+                The gradients are clipped in the range [-clip_value, clip_value]
+        """
+    clip_value = float(clip_value)
+    for p in filter(lambda p: p.grad is not None, parameters):
+        p.grad.data.clamp_(min=-clip_value, max=clip_value)
+
 def main(context):
     global global_step
     global best_prec1
@@ -432,9 +449,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         optimizer.zero_grad()
         loss.backward()
 
-        # gradient clipping (clip_grad_value_ rather than clip_grad_norm) -- requires PyTorch==0.4.0
+        # gradient clipping (clip_grad_value_ rather than clip_grad_norm) -- reimplemented in Pytorch==0.3.0 as present in only PyTorch==0.4.0
         #  Note: https://pytorch.org/docs/stable/nn.html?highlight=torch%20nn%20utils%20clip_grad#torch.nn.utils.clip_grad_value_
-        torch.nn.utils.clip_grad_value_(model.parameters(), 5)
+        clip_grad_value(model.parameters(), 5)
 
         # do optimizer(SGD / ADAM) step
         optimizer.step()
