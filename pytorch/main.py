@@ -160,11 +160,11 @@ def main(context):
                 }, is_best, checkpoint_path, epoch + 1)
 
     if dataset is not None:
-        # todo: parameterize:
+        # todo: minibatch this ? especially for large datasets this is impt ..
         qq = np.array([i for i in range(0, dataset.family_data.num_operator)])
         hh = [0] * len(qq)
         tt = [0] * len(qq)
-        batch_ids = [-1 for _ in range(len(qq))]
+        batch_ids = [-1 for _ in range(len(qq))]  # dummy batch ids
         mdb = {r: ([(0,0)], [0.], (dataset.family_data.num_entity, dataset.family_data.num_entity))
                 for r in range(int(dataset.family_data.num_operator / 2))}
         input_var = [torch.autograd.Variable(torch.LongTensor(batch_ids)),

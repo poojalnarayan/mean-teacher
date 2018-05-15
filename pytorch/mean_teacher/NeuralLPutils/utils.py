@@ -165,14 +165,14 @@ def get_attentions(model):
     num_operators = model.num_operator
     all_queries = [q for q in range(0,num_operators)]  # functools.reduce(lambda x, y: list(x) + list(y), query_batches, [])
 
-    for i in range(len(all_queries)):
-        if torch.cuda.is_available():
-            attention_operators = model.attention_operators.data.cpu().numpy()
-            attention_memories = [mem.data.cpu().numpy() for mem in model.attention_memories]
-        else:
-            attention_operators = model.attention_operators.data.numpy()
-            attention_memories = [mem.data.numpy() for mem in model.attention_memories]
+    if torch.cuda.is_available():
+        attention_operators = model.attention_operators.data.cpu().numpy()
+        attention_memories = [mem.data.cpu().numpy() for mem in model.attention_memories]
+    else:
+        attention_operators = model.attention_operators.data.numpy()
+        attention_memories = [mem.data.numpy() for mem in model.attention_memories]
 
+    for i in range(len(all_queries)):
         all_attention_operators[all_queries[i]] = [[attn[i]  # todo: is this right ? check NeuralLP:experiment.py: lines 227-234
                                                    for attn in attn_step]
                                                    for attn_step in attention_operators]
@@ -216,7 +216,7 @@ def get_predictions(model, eval_loader, dataset, result_dir):
         matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
         predictions_this_batch = model(input_var, matrix_db)
 
-        #todo: hardcoding topk = 10
+        #todo: hardcoding topk = 10 .. parameterize
         _, topk_preds = predictions_this_batch.topk(10)
 
         topk_preds_np = topk_preds.cpu().data.numpy()
