@@ -74,12 +74,13 @@ class TransformTwice:
 
 
 def relabel_dataset_ilp(dataset, args):
+    # set random seed:
+    np.random.seed(args.seed)
+
     unlabeled_idxs = []
     labeled_ids = []
 
-    all_labels = list(enumerate(dataset.get_labels()))
-    random.shuffle(all_labels)  # randomizing the relabeling ...
-    num_classes = len(set([i for _, i in all_labels]))
+    all_labels = np.array(list(enumerate(dataset.get_labels())))
 
     if args.labels.isdigit():
         # NOTE: if it contains whole numbers --> number of labeled datapoints
@@ -97,23 +98,14 @@ def relabel_dataset_ilp(dataset, args):
             labeled_ids.append(i)
 
     else:
-        num_labels_per_cat = int(num_labels / num_classes)
-
-        labels_hist = {}
-        for _, lbl in all_labels:
-            if lbl in labels_hist:
-                labels_hist[lbl] += 1
-            else:
-                labels_hist[lbl] = 1
-
-        num_labels_per_cat_dict = {}
-        for lbl, cnt in labels_hist.items():
-            num_labels_per_cat_dict[lbl] = min(labels_hist[lbl], num_labels_per_cat)
-
+        selected_labels = all_labels[np.random.choice(all_labels.shape[0], num_labels, replace=False), :]
+        print("Selected Labels : ")
+        print("------------")
+        print(selected_labels)
+        print("------------")
         for idx, l in all_labels:
-            if num_labels_per_cat_dict[l] > 0:
+            if idx in selected_labels[:, 0]:
                 labeled_ids.append(idx)
-                num_labels_per_cat_dict[l] -= 1
             else:
                 unlabeled_idxs.append(idx)
                 dataset.relabel_datum(idx, NO_LABEL)
