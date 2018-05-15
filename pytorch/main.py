@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, SequentialSampler
 import torchvision.datasets
 import torch_extras
 setattr(torch, 'one_hot', torch_extras.one_hot)
@@ -214,10 +214,9 @@ def create_data_loaders(train_transformation,
 
     if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         dataset = datasets.ILP_dataset(datadir, 'train')
-        # TODO: For now not consider the teacher-student arch .. but just the supervised mode
         assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
         train_dataset_size = dataset.__len__()
-        sampler = SubsetRandomSampler(list(range(0, train_dataset_size)))  # TODO: generate labeled indices .. for now using all the examples in train
+        sampler = SequentialSampler(list(range(0, train_dataset_size)))  # Note: Using a sequential sampler similar to the original implementation
         batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=False)
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
