@@ -40,9 +40,9 @@ args = None
 best_prec1 = 0
 global_step = 0
 NA_label = -1
-pred_match_noNA = 0
-pred_noNA = 0
-true_noNA = 0
+pred_match_noNA = 0.0
+pred_noNA = 0.0
+true_noNA = 0.0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
@@ -107,7 +107,8 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    pred_file = dataset_config['datadir'] + '/pred.txt'
+    evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
+    pred_file = evaldir + '/' + args.run_name + '_pred.txt'
     with contextlib.suppress(FileNotFoundError):
         os.remove(pred_file)
 
@@ -565,13 +566,78 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('loss', loss.data[0])
 
         if args.dataset in ['riedel', 'gids']:
-            prec, rec, num_labeled_notNA = prec_rec(class_logit.data, target_var.data, NA_label, topk=(1,))
-            meters.update('prec', prec, num_labeled_notNA)
-            meters.update('rec', rec, num_labeled_notNA)
+            #student
+            correct, num_target_notNA, num_pred_notNA = prec_rec(class_logit.data, target_var.data, NA_label, topk=(1,))
+            if num_pred_notNA > 0:
+                prec = float(correct) / float(num_pred_notNA)
+            else:
+                prec = 0.0
 
-            ema_prec, ema_rec, num_labeled_notNA = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
-            meters.update('ema_prec', ema_prec, num_labeled_notNA)
-            meters.update('ema_rec', ema_rec, num_labeled_notNA)
+            if num_target_notNA > 0:
+                rec = float(correct) / float(num_target_notNA)
+            else:
+                rec = 0.0
+
+            if prec + rec == 0:
+                f1 = 0
+            else:
+                f1 = 2 * prec * rec / (prec + rec)
+
+            meters.update('correct', correct, 1)
+            meters.update('target_notNA', num_target_notNA, 1)
+            meters.update('pred_notNA', num_pred_notNA, 1)
+
+            if float(meters['pred_notNA'].sum) == 0:
+                accum_prec = 0
+            else:
+                accum_prec = float(meters['correct'].sum) / float(meters['pred_notNA'].sum)
+
+            if float(meters['target_notNA'].sum) == 0:
+                accum_rec = 0
+            else:
+                accum_rec = float(meters['correct'].sum) / float(meters['target_notNA'].sum)
+
+            if accum_prec + accum_rec == 0:
+                accum_f1 = 0
+            else:
+                accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
+
+            #teacher
+            ema_correct, ema_num_target_notNA, ema_num_pred_notNA  = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
+            if ema_num_pred_notNA > 0:
+                ema_prec = float(ema_correct) / float(ema_num_pred_notNA)
+            else:
+                ema_prec = 0.0
+
+            if num_target_notNA > 0:
+                ema_rec = float(ema_correct) / float(ema_num_target_notNA)
+            else:
+                ema_rec = 0.0
+
+            if ema_prec + ema_rec == 0:
+                ema_f1 = 0
+            else:
+                ema_f1 = 2 * ema_prec * ema_rec / (ema_prec + ema_rec)
+
+            meters.update('ema_correct', ema_correct, 1)
+            meters.update('ema_target_notNA', ema_num_target_notNA, 1)
+            meters.update('ema_pred_notNA', ema_num_pred_notNA, 1)
+
+
+            if float(meters['ema_pred_notNA'].sum) == 0:
+                accum_ema_prec = 0
+            else:
+                accum_ema_prec = float(meters['ema_correct'].sum) / float(meters['ema_pred_notNA'].sum)
+
+            if float(meters['ema_target_notNA'].sum) == 0:
+                accum_ema_rec = 0
+            else:
+                accum_ema_rec = float(meters['ema_correct'].sum) / float(meters['ema_target_notNA'].sum)
+
+            if accum_ema_prec + accum_ema_rec == 0:
+                accum_ema_f1 = 0
+            else:
+                accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
 
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -601,11 +667,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if i % args.print_freq == 0:
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
-                    'Epoch: [{0}][{1}/{2}]\t'
-                    'ClassLoss {meters[class_loss]:.4f}\t'
-                    'Precision {meters[prec]:.3f}\t'
-                    'Recall {meters[rec]:.3f}'.format(
-                        epoch, i, len(train_loader), meters=meters))
+                    'Epoch: [{0}][{1}/{2}]  '
+                    'Prec {prec:.3f}({accum_prec:.3f})  '
+                    'Rec {rec:.3f}({accum_rec:.3f})  '
+                    'F1 {f1:.3f}({accum_f1:.3f})  '
+                    'ema_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
+                    'ema_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
+                    'ema_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
+                        epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1, ema_prec=ema_prec, accum_ema_prec=accum_ema_prec, ema_rec=ema_rec, accum_ema_rec=accum_ema_rec, ema_f1=ema_f1, accum_ema_f1=accum_ema_f1))
 
             else:
                 LOG.info(
@@ -722,13 +791,45 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
         if args.dataset in ['riedel', 'gids']:
-            prec, rec, num_labeled_notNA = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
-            meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)    # why different from train？
-            meters.update('prec', prec, num_labeled_notNA)
-            meters.update('rec', rec, num_labeled_notNA)
+            correct, num_target_notNA, num_pred_notNA = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
+            if num_pred_notNA > 0:
+                prec = float(correct) / float(num_pred_notNA)
+            else:
+                prec = 0.0
+
+            if num_target_notNA > 0:
+                rec = float(correct) / float(num_target_notNA)
+            else:
+                rec = 0.0
+
+            if prec + rec == 0:
+                f1 = 0
+            else:
+                f1 = 2 * prec * rec / (prec + rec)
+
+            meters.update('correct', correct, 1)
+            meters.update('target_notNA', num_target_notNA, 1)
+            meters.update('pred_notNA', num_pred_notNA, 1)
+
+            if float(meters['pred_notNA'].sum) == 0:
+                accum_prec = 0
+            else:
+                accum_prec = float(meters['correct'].sum) / float(meters['pred_notNA'].sum)
+
+            if float(meters['target_notNA'].sum) == 0:
+                accum_rec = 0
+            else:
+                accum_rec = float(meters['correct'].sum) / float(meters['target_notNA'].sum)
+
+            if accum_prec + accum_rec == 0:
+                accum_f1 = 0
+            else:
+                accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
 
             lbl_categories = dataset.categories
             if epoch == args.epochs and model_type == 'teacher':
+                print('meters[\'pred_notNA\'].count=' + str(meters['pred_notNA'].count))
+                print('meters[\'target_notNA\'].sum=' + str(meters['target_notNA'].sum))
                 dump_result(i, args, output1.data, lbl_categories, topk=(1,))
 
         else:
@@ -747,11 +848,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         if i % args.print_freq == 0:
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
-                    'Test: [{0}/{1}]\t'
-                    'ClassLoss {meters[class_loss]:.4f}\t'
-                    'Precision {meters[prec]:.3f}\t'
-                    'Recall {meters[rec]:.3f}'.format(
-                        i, len(eval_loader), meters=meters))
+                    'Test: [{0}/{1}]  '
+                    'Precision {prec:.3f} ({accum_prec:.3f})  '
+                    'Recall {rec:.3f} ({accum_rec:.3f})  '
+                    'F1 {f1:.3f} ({accum_f1:.3f})'.format(
+                        i, len(eval_loader), prec=prec, accum_prec=accum_prec,rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1))
+
             else:
                 LOG.info(
                     'Test: [{0}/{1}]\t'
@@ -760,13 +862,19 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                         i, len(eval_loader), meters=meters))
 
     if args.dataset in ['riedel', 'gids']:
-        LOG.info(' * Precision {prec.avg:.3f}\tRecall {rec.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
-                 .format(prec=meters['prec'], rec=meters['rec'], class_loss=meters['class_loss']))
-
         if epoch == args.epochs and model_type == 'teacher':
-            precision = pred_match_noNA / pred_noNA
-            recall = pred_match_noNA / true_noNA
-            f1 = 2 * precision * recall / (precision + recall)
+            if pred_noNA == 0.0:
+                precision = 0.0
+            else:
+                precision = pred_match_noNA / pred_noNA
+            if true_noNA == 0.0:
+                recall = 0.0
+            else:
+                recall = pred_match_noNA / true_noNA
+            if precision + recall == 0.0:
+                f1 = 0.0
+            else:
+                f1 = 2 * precision * recall / (precision + recall)
             print('******* Overall Precision ' + str(precision) + '\tRecall ' + str(recall) + '\tF1 ' + str(f1) + '\t********')
 
     else:
@@ -785,10 +893,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
 
     if args.dataset in ['riedel', 'gids']:
-
-
-
-        return meters['prec'].avg
+        return accum_f1
     else:
         return meters['top1'].avg
 
@@ -935,17 +1040,7 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     tp_fp = pred.ne(NA_label).sum()  # number of non NA labels in pred
     tp_fn = target.ne(NA_label).sum()  # number of non NA labels in target
 
-    if tp_fp > 0:
-        prec = float(tp) / tp_fp
-    else:
-        prec = 0.0
-
-    if tp_fn > 0:
-        rec = float(tp) / tp_fn
-    else:
-        rec = 0.0
-
-    return prec, rec, tp_fn
+    return tp, tp_fn, tp_fp
 
 
 def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
@@ -959,7 +1054,7 @@ def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
     dataset_file = evaldir + "/test.txt"
-    pred_file = dataset_config['datadir'] + '/pred.txt'
+    pred_file = evaldir + '/' + args.run_name + '_pred.txt'
     f = open(dataset_file)
     lines = f.readlines()
 
@@ -973,17 +1068,14 @@ def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
             vals = line.split('\t')
             true_label = vals[4].strip()
             if pred_label == true_label and true_label != 'NA':
-                pred_match_noNA += 1
+                pred_match_noNA += 1.0
             if pred_label != 'NA':
-                pred_noNA += 1
+                pred_noNA += 1.0
             if true_label != 'NA':
-                true_noNA += 1
+                true_noNA += 1.0
 
             line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
             fo.write(line)
-
-        # if batch_id == np.ceil(len(lines)/args.batch_size)-1:
-        #     print('Num of correct predictions that is not NA: '+ str(pred_match_noNA))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
