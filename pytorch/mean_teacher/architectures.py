@@ -42,7 +42,7 @@ class NeuralLP(nn.Module):
         # init randomly the query_embedding
         xavier_value = float(6) / math.sqrt(self.query_embed_size)
         init_tensor = torch.Tensor(self.num_query + 1, self.query_embed_size)
-        self.query_embedding.weight = nn.Parameter(nn.init.uniform(init_tensor, -xavier_value, xavier_value))
+        self.query_embedding.weight = nn.Parameter(F.normalize(nn.init.uniform(init_tensor, -xavier_value, xavier_value)))  # l2 normalize the xavier init vectors
 
         ### rnn_input layer
         ## NOTE: by default LSTM hidden state is initialized to 0
