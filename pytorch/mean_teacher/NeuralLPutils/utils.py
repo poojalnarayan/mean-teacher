@@ -228,9 +228,9 @@ def get_predictions(model, eval_loader, dataset, result_dir):
         for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
             p_head = predictions_this_batch.cpu().data.numpy()[k, h]
 
-            def eval_fn(p): return p > p_head
+            def eval_fn(p): return p[1] > p_head
 
-            this_predictions = enumerate(list(filter(eval_fn, predictions_this_batch.cpu().data.numpy()[k, :]))) #todo: check if this is right .. mostly it is ..
+            this_predictions = filter(eval_fn, enumerate(predictions_this_batch.cpu().data.numpy()[k, :]))
             this_predictions = sorted(this_predictions, key=lambda x: x[1], reverse=True)
 
             this_predictions.append((h, p_head))

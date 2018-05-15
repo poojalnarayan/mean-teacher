@@ -13,7 +13,7 @@ from .processILPdata.family_data import Data as FamilyData
 def fb237():
 
     return {
-        'train_transformation': data.TransformTwiceILP(None),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/neuralilp/fb15k-237',
         'num_classes': 1000 #todo: what should be filled here??
@@ -23,7 +23,7 @@ def fb237():
 def wn18():
 
     return {
-        'train_transformation': data.TransformTwiceILP(None),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/neuralilp/wn-18',
         'num_classes': 1000 #todo: what should be filled here??
@@ -33,7 +33,7 @@ def wn18():
 def kinship():
 
     return {
-        'train_transformation': data.TransformTwiceILP(None),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/neuralilp/kinship',
         'num_classes': 1000 #todo: what should be filled here??
@@ -43,7 +43,7 @@ def kinship():
 def umls():
 
     return {
-        'train_transformation': data.TransformTwiceILP(None),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/neuralilp/umls',
         'num_classes': 1000 #todo: what should be filled here??
