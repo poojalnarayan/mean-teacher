@@ -421,7 +421,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             assert labeled_minibatch_size > 0
             meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-            class_loss = loss_criterion(model_out, target_var)
+            class_loss = loss_criterion(model_out, target_var) / minibatch_size
             meters.update('class_loss', class_loss.data[0])
 
             # print ("LOSS is " + str(loss.data[0]))
