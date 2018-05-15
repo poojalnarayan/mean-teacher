@@ -828,8 +828,6 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
             lbl_categories = dataset.categories
             if epoch == args.epochs and model_type == 'teacher':
-                print('meters[\'pred_notNA\'].count=' + str(meters['pred_notNA'].count))
-                print('meters[\'target_notNA\'].sum=' + str(meters['target_notNA'].sum))
                 dump_result(i, args, output1.data, lbl_categories, topk=(1,))
 
         else:
