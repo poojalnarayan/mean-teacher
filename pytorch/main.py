@@ -340,17 +340,27 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # print("---------------")
 
             (input_triple, ema_input_triple) = data_minibatch
-            input_batch_ids = input_triple[0]
-            ema_input_batch_ids = ema_input_triple[0]
+            input_batch_ids = input_triple[0] + input_triple[0]
+            ema_input_batch_ids = ema_input_triple[0] + ema_input_triple[0]
 
             # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
             # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
-            input_var = [input_batch_ids] + [torch.autograd.Variable(input_triple[1]),
-                                             torch.autograd.Variable(input_triple[3])]
 
-            ema_input_var = [ema_input_batch_ids] + [torch.autograd.Variable(ema_input_triple[1]),
-                                                     torch.autograd.Variable(ema_input_triple[3])]
+            qq = torch.cat([input_triple[1], torch.add(input_triple[1], dataset.family_data.num_relation)]) # NOTE: augment with reverse ...
+            tt = torch.cat([input_triple[3], input_triple[2]]) # NOTE: augment with reverse ...
+            # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ...
+            target = torch.cat([input_triple[2], input_triple[3]])  # augment with reverse ...
+
+            qq_ema = torch.cat([ema_input_triple[1], torch.add(ema_input_triple[1],
+                                                               dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
+            tt_ema = torch.cat([ema_input_triple[3], ema_input_triple[2]])  # NOTE: augment with reverse ...
+
+            input_var = [input_batch_ids] + [torch.autograd.Variable(qq),
+                                             torch.autograd.Variable(tt)]
+
+            ema_input_var = [ema_input_batch_ids] + [torch.autograd.Variable(qq_ema),
+                                                     torch.autograd.Variable(tt_ema)]
 
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
@@ -365,16 +375,15 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             ema_matrix_db = filter_matrix_db(dataset, ema_input_triple, 'train')
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
-            target = input_triple[2]
-            target_var = torch.autograd.Variable(target)
+            if torch.cuda.is_available():
+                target_var = torch.autograd.Variable(target.cuda(async=True))
+            else:
+                target_var = torch.autograd.Variable(target.cpu())
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
-
-        if torch.cuda.is_available():
-            target_var = target_var.cuda(async=True)
 
         if isinstance(model_out, Variable):
             assert args.logit_distance_cost < 0
@@ -487,15 +496,20 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True)
         else:
             input_batch_ids = data_minibatch[0]
-            input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
-                                             torch.autograd.Variable(data_minibatch[3], volatile=True)]
+            qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1],
+                                                         dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
+            tt = torch.cat([data_minibatch[3], data_minibatch[2]])  # NOTE: augment with reverse ...
+            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+
+            input_var = [input_batch_ids] + [torch.autograd.Variable(qq, volatile=True),
+                                             torch.autograd.Variable(tt, volatile=True)]
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
                 input_var[1] = input_var[1].cuda()
                 # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
-                target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+                target_var = torch.autograd.Variable(target.cuda(async=True))
             else:
-                target_var = torch.autograd.Variable(data_minibatch[2].cpu())
+                target_var = torch.autograd.Variable(target.cpu())
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()

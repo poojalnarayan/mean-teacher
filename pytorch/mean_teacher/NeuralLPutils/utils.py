@@ -194,16 +194,21 @@ def get_predictions(model, eval_loader, dataset, result_dir):
 
     for i, data_minibatch in enumerate(eval_loader):
 
-        input_batch_ids = data_minibatch[0]
-        input_var = [input_batch_ids] + [torch.autograd.Variable(data_minibatch[1], volatile=True),
-                                         torch.autograd.Variable(data_minibatch[3], volatile=True)]
+        qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1],
+                                                     dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
+        tt = torch.cat([data_minibatch[3], data_minibatch[2]])  # NOTE: augment with reverse ...
+        hh = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+
+        input_batch_ids = data_minibatch[0] + data_minibatch[0]
+        input_var = [input_batch_ids] + [torch.autograd.Variable(qq, volatile=True),
+                                         torch.autograd.Variable(tt, volatile=True)]
         if torch.cuda.is_available():
             input_var[0] = input_var[0].cuda()
             input_var[1] = input_var[1].cuda()
             # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
-            target_var = torch.autograd.Variable(data_minibatch[2].cuda(async=True))
+            target_var = torch.autograd.Variable(hh.cuda(async=True))
         else:
-            target_var = torch.autograd.Variable(data_minibatch[2].cpu())
+            target_var = torch.autograd.Variable(hh.cpu())
 
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
         assert labeled_minibatch_size > 0
@@ -220,9 +225,6 @@ def get_predictions(model, eval_loader, dataset, result_dir):
 
         all_in_top += list(in_top)
 
-        qq = data_minibatch[1]
-        hh = data_minibatch[2]
-        tt = data_minibatch[3]
         for k, (q, h, t) in enumerate(zip(qq, hh, tt)):
             p_head = predictions_this_batch.cpu().data.numpy()[k, h]
 
