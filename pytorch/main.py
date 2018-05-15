@@ -550,7 +550,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
         else:
             matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
             output1 = model(input_var, matrix_db)
-            class_loss = loss_criterion(output1, target_var)
+            class_loss = loss_criterion(output1, target_var) / minibatch_size
 
         # measure accuracy and record loss
         prec1, prec10 = accuracy(output1.data, target_var.data, topk=(1, 10))
