@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, SequentialSampler
 import torchvision.datasets
 import torch_extras
 setattr(torch, 'one_hot', torch_extras.one_hot)
@@ -217,9 +217,10 @@ def create_data_loaders(train_transformation,
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_ilp(dataset, args)
         if args.exclude_unlabeled or len(unlabeled_idxs) == 0:
-            sampler = SubsetRandomSampler(labeled_idxs)
+            # sampler = SubsetRandomSampler(labeled_idxs)
+            sampler = SequentialSampler(labeled_idxs)  # Note: Using a sequential sampler similar to the original implementation
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-        elif args.labeled_batch_size:
+        elif args.labeled_batch_size: #todo: How shld sampling be for mean teacher framework ??
             batch_sampler = data.TwoStreamBatchSampler(
                 unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
         else:
