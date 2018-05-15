@@ -220,7 +220,7 @@ def create_data_loaders(train_transformation,
             # sampler = SubsetRandomSampler(labeled_idxs)
             sampler = SequentialSampler(labeled_idxs)  # Note: Using a sequential sampler similar to the original implementation
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-        elif args.labeled_batch_size: #todo: How shld sampling be for mean teacher framework ??
+        elif args.labeled_batch_size:  # todo: How shld sampling be for mean teacher framework ??
             batch_sampler = data.TwoStreamBatchSampler(
                 unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
         else:

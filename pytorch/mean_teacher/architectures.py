@@ -47,10 +47,12 @@ class NeuralLP(nn.Module):
 
         ### rnn_input layer
         ## NOTE: by default LSTM hidden state is initialized to 0
-        self.lstm_layer = nn.LSTM(self.query_embed_size, self.rnn_state_size, num_layers=self.num_layer)  # todo: is it bidirectional?
+        self.lstm_layer = nn.LSTM(self.query_embed_size, self.rnn_state_size, num_layers=self.num_layer)
 
         ### linear layer
         self.W_b = nn.Linear(self.rnn_state_size, self.num_operator, bias=True)
+        nn.init.normal(self.W_b.weight)
+        nn.init.constant_(self.W_b.bias, 0)
         self.softmax_layer = nn.Softmax(dim=2)
 
         ### softmax over memories
@@ -152,7 +154,8 @@ class NeuralLP(nn.Module):
                         database_results.append((product * op_attn).t())
 
                 add_n = torch.sum(torch.stack(database_results), 0)
-                added_database_results = F.normalize(add_n, p=1, dim=1)  ## normalizing the database results --> computing the L1 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
+                # todo: hardcoding the thr to 1e-20 .. make it a cmd parameter ?
+                added_database_results = F.normalize(add_n, p=1, dim=1, eps=1e-20)  ## normalizing the database results --> computing the L1 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
 
                 # Populate a new cell in memory by concatenating.
                 memories = torch.cat([memories,
