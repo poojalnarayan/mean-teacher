@@ -51,7 +51,7 @@ class NeuralLP(nn.Module):
         ### linear layer
         self.W_b = nn.Linear(self.rnn_state_size, self.num_operator, bias=True)
         nn.init.normal(self.W_b.weight)
-        nn.init.constant_(self.W_b.bias, 0)
+        self.W_b.bias.data.fill_(0)
         self.softmax_layer = nn.Softmax(dim=2)
 
         ### softmax over memories
