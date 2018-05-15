@@ -428,9 +428,15 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
             meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
 
-        # compute gradient and do SGD step
+        # compute gradient
         optimizer.zero_grad()
         loss.backward()
+
+        # gradient clipping (clip_grad_value_ rather than clip_grad_norm) -- requires PyTorch==0.4.0
+        #  Note: https://pytorch.org/docs/stable/nn.html?highlight=torch%20nn%20utils%20clip_grad#torch.nn.utils.clip_grad_value_
+        torch.nn.utils.clip_grad_value_(model.parameters(), 5)
+
+        # do optimizer(SGD / ADAM) step
         optimizer.step()
         global_step += 1
 
