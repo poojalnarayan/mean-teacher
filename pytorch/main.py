@@ -307,10 +307,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
-        loss_criterion = nn.NLLLoss().cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
+        loss_criterion = nn.NLLLoss(size_average=False, ignore_index=NO_LABEL).cuda()  # todo: does it need any params ?? -- this is for the NeuralLP model
     else:
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
-        loss_criterion = nn.NLLLoss().cpu()
+        loss_criterion = nn.NLLLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
     if args.consistency_type == 'mse':
         consistency_criterion = losses.softmax_mse_loss
