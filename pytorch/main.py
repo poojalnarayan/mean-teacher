@@ -359,6 +359,7 @@ def create_matrix_tensor(matrix_db):
     database_concat = torch.cat(database)
     return torch.autograd.Variable(database_concat)
 
+
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
@@ -418,26 +419,28 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             input_batch_ids, qq, tt, target = generate_flipped_data(input_triple, dataset)
             ema_input_batch_ids, qq_ema, tt_ema, _ = generate_flipped_data(ema_input_triple, dataset)
 
-            input_var = [input_batch_ids] + [torch.autograd.Variable(qq),
-                                             torch.autograd.Variable(tt)]
+            query_end = torch.autograd.Variable(torch.LongTensor([dataset.family_data.num_query] * len(qq)))
+            queries_var = torch.stack([torch.autograd.Variable(qq)] * (args.num_step - 1) + [query_end], dim=1)
+            tails_var = torch.autograd.Variable(tt)
 
-            ema_input_var = [ema_input_batch_ids] + [torch.autograd.Variable(qq_ema),
-                                                     torch.autograd.Variable(tt_ema)]
+            ema_query_end = torch.autograd.Variable(torch.LongTensor([dataset.family_data.num_query] * len(qq)))
+            ema_queries_var = torch.stack([torch.autograd.Variable(qq_ema)] * (args.num_step - 1) + [ema_query_end], dim=1)
+            ema_tails_var = torch.autograd.Variable(tt_ema)
 
             if torch.cuda.is_available():
-                input_var[0] = input_var[0].cuda()
-                input_var[1] = input_var[1].cuda()
+                queries_var = queries_var.cuda()
+                tails_var = tails_var.cuda()
 
-                ema_input_var[0] = ema_input_var[0].cuda()
-                ema_input_var[1] = ema_input_var[1].cuda()
+                ema_queries_var = ema_queries_var.cuda()
+                ema_tails_var = ema_tails_var.cuda()
 
             matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
             matrix_db_var = create_matrix_tensor(matrix_db)
-            model_out = model(input_var, matrix_db_var)
+            model_out = model(queries_var, tails_var, matrix_db_var)
 
-            ema_matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
+            ema_matrix_db = filter_matrix_db(dataset, 'train', ema_input_batch_ids, qq_ema, target, tt_ema)
             ema_matrix_db_var = create_matrix_tensor(ema_matrix_db)
-            ema_model_out = ema_model(ema_input_var, ema_matrix_db_var)
+            ema_model_out = ema_model(ema_queries_var, ema_tails_var, ema_matrix_db_var)
 
             if torch.cuda.is_available():
                 target_var = torch.autograd.Variable(target.cuda(async=True))

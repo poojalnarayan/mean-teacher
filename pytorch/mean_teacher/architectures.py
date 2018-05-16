@@ -62,17 +62,12 @@ class NeuralLP(nn.Module):
         self.attention_memories = None
         self.attention_operators = None
 
-    def forward(self, triples, database, save_attention_vectors=False):
+    def forward(self, queries, tails, database, save_attention_vectors=False):
 
-        (idx, qq, tt) = triples  # NOTE: Not passing the head variables .. as they are used in prediction ..
-        if torch.cuda.is_available():
-            END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)).cuda())
-        else:
-            END = torch.autograd.Variable(torch.LongTensor([self.num_query] * len(qq)))
-        queries_var = torch.stack([qq] * (self.num_step - 1) + [END], dim=1)
+        # NOTE: Not passing the head variables .. as they are used in prediction ..
 
         ## input embedding --> rnn_inputs
-        rnn_inputs = self.query_embedding(queries_var).permute(1, 0, 2)   # lines: @NeuralLP:model.py 88-94
+        rnn_inputs = self.query_embedding(queries).permute(1, 0, 2)   # lines: @NeuralLP:model.py 88-94
 
         ## lstm over the rnn_inputs --> rnn_outputs
         rnn_outputs, final_state = self.lstm_layer(rnn_inputs)   # lines: @NeuralLP:model.py 96-108
@@ -101,12 +96,12 @@ class NeuralLP(nn.Module):
         # where t is the current step (zero indexed)
         # Then tensor represents currently populated memory cells.
         # --
-        size = (len(tt), self.num_entity)
+        size = (len(tails), self.num_entity)
         if torch.cuda.is_available():
-            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
+            memories = torch.one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
                 dim=1)  # lines: @NeuralLP:model.py 138-141
         else:
-            memories = torch.one_hot(size, tt.view(-1, 1)).type(torch.FloatTensor).unsqueeze(
+            memories = torch.one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).unsqueeze(
                 dim=1)  # lines: @NeuralLP:model.py 138-141
 
         # print("Init - memories size - " + str(memories.size()))
