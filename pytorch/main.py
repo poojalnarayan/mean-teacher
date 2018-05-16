@@ -288,12 +288,12 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def filter_matrix_db(dataset, batch_input, type):
+def filter_matrix_db(dataset, input_batch_ids, qq, target, tt, type):
 
     if type == 'train':
         train_facts = dataset.family_data.train
-        batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
-        batch_ids = [i for i in batch_facts[0]]
+        batch_facts = list(zip(input_batch_ids, zip(qq, target, tt)))
+        batch_ids = [i[0] for i in batch_facts]
         extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
 
         extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
@@ -417,10 +417,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 ema_input_var[0] = ema_input_var[0].cuda()
                 ema_input_var[1] = ema_input_var[1].cuda()
 
-            matrix_db = filter_matrix_db(dataset, input_triple, 'train')
+            matrix_db = filter_matrix_db(dataset, input_batch_ids, qq, target, tt, 'train')
             model_out = model(input_var, matrix_db)
 
-            ema_matrix_db = filter_matrix_db(dataset, ema_input_triple, 'train')
+            ema_matrix_db = filter_matrix_db(dataset, input_batch_ids, qq, target, tt, 'train')
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
             if torch.cuda.is_available():

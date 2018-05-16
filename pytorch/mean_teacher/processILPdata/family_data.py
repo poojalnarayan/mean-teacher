@@ -1,6 +1,6 @@
 import numpy as np 
 import os
-
+from mean_teacher.data import NO_LABEL
 
 class Data(object):
     def __init__(self, folder, type):
@@ -117,9 +117,10 @@ class Data(object):
             rel = fact[0]
             head = fact[1]
             tail = fact[2]
-            value = 1.
-            matrix_db[rel][0].append([head, tail])
-            matrix_db[rel][1].append(value)
+            if head != NO_LABEL:  # NOTE: Mainly needed for SSL .. when we remove some labels in the training dataset
+                value = 1.
+                matrix_db[rel][0].append([head, tail])
+                matrix_db[rel][1].append(value)
         return matrix_db
 
     def _combine_two_mdbs(self, mdbA, mdbB):
