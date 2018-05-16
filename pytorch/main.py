@@ -308,6 +308,43 @@ def filter_matrix_db(dataset, batch_input, type):
     return augmented_mdb
 
 
+def generate_flipped_data(input_triple, dataset):
+
+    mask_labeled_data = (input_triple[2] != NO_LABEL)
+    mask_unlabeled_data = (input_triple[2] == NO_LABEL)
+
+    input_batch_ids_lbled = torch.masked_select(input_triple[0], mask_labeled_data)
+    input_batch_ids_unlbled = torch.masked_select(input_triple[0], mask_unlabeled_data)
+
+    qq_lbled = torch.masked_select(input_triple[1], mask_labeled_data)
+    qq_unlbled = torch.masked_select(input_triple[1], mask_unlabeled_data)
+
+    tt_lbled = torch.masked_select(input_triple[3], mask_labeled_data)
+    tt_unlbled = torch.masked_select(input_triple[3], mask_unlabeled_data)
+
+    hh_lbled = torch.masked_select(input_triple[2], mask_labeled_data)
+    hh_unlbled = torch.masked_select(input_triple[2], mask_unlabeled_data)
+
+    input_batch_ids = input_batch_ids_lbled + \
+                      input_batch_ids_lbled + \
+                      input_batch_ids_unlbled  # NOTE: lbled, lbled_flipped, unlbled
+
+    qq = torch.cat([qq_lbled,                                               # lbled
+                    torch.add(qq_lbled, dataset.family_data.num_relation),  # lbled_flipped ... augment with reverse
+                    qq_unlbled])                                            # unlbled
+
+    tt = torch.cat([tt_lbled,       # lbled
+                    hh_lbled,       # lbled_flipped ... augment with reverse ...
+                    tt_unlbled])    # unlbled
+
+    # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ...
+    target = torch.cat([hh_lbled,       # lbled
+                        tt_lbled,       # lbled_flipped ... augment with reverse ...
+                        hh_unlbled])    # unlbled
+
+    return input_batch_ids, qq, tt, target
+
+
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
@@ -339,7 +376,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
-        adjust_learning_rate(optimizer, epoch, i, len(train_loader))
+        adjust_learning_rate(optimizer, epoch, i, len(train_loader)) # todo: Shld ew update learning rate for NeuralLP mean teacher ?
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
         if dataset is None:
@@ -359,21 +396,13 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # print("---------------")
 
             (input_triple, ema_input_triple) = data_minibatch
-            input_batch_ids = input_triple[0] + input_triple[0]
-            ema_input_batch_ids = ema_input_triple[0] + ema_input_triple[0]
 
             # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
             # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
 
-            qq = torch.cat([input_triple[1], torch.add(input_triple[1], dataset.family_data.num_relation)]) # NOTE: augment with reverse ...
-            tt = torch.cat([input_triple[3], input_triple[2]]) # NOTE: augment with reverse ...
-            # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ...
-            target = torch.cat([input_triple[2], input_triple[3]])  # augment with reverse ...
-
-            qq_ema = torch.cat([ema_input_triple[1], torch.add(ema_input_triple[1],
-                                                               dataset.family_data.num_relation)])  # NOTE: augment with reverse ...
-            tt_ema = torch.cat([ema_input_triple[3], ema_input_triple[2]])  # NOTE: augment with reverse ...
+            input_batch_ids, qq, tt, target = generate_flipped_data(input_triple, dataset)
+            ema_input_batch_ids, qq_ema, tt_ema, _ = generate_flipped_data(ema_input_triple, dataset)
 
             input_var = [input_batch_ids] + [torch.autograd.Variable(qq),
                                              torch.autograd.Variable(tt)]
@@ -388,7 +417,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 ema_input_var[0] = ema_input_var[0].cuda()
                 ema_input_var[1] = ema_input_var[1].cuda()
 
-            matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
+            matrix_db = filter_matrix_db(dataset, input_triple, 'train')
             model_out = model(input_var, matrix_db)
 
             ema_matrix_db = filter_matrix_db(dataset, ema_input_triple, 'train')
@@ -493,6 +522,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 **meters.averages(),
                 **meters.sums()
             })
+
 
 def validate(eval_loader, model, log, global_step, epoch, dataset):
 
