@@ -287,7 +287,7 @@ def filter_matrix_db(dataset, batch_input, type):
     if type == 'train':
         train_facts = dataset.family_data.train
         batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
-        batch_ids = [i for i in batch_facts[0]]
+        batch_ids = [i[0] for i in batch_facts]
         extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
 
         extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
