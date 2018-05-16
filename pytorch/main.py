@@ -288,9 +288,9 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def filter_matrix_db(dataset, input_batch_ids, qq, target, tt, type):
+def filter_matrix_db(dataset, dataset_type, input_batch_ids=None, qq=None, target=None, tt=None):
 
-    if type == 'train':
+    if dataset_type == 'train':
         train_facts = dataset.family_data.train
         batch_facts = list(zip(input_batch_ids, zip(qq, target, tt)))
         batch_ids = [i[0] for i in batch_facts]
@@ -298,12 +298,12 @@ def filter_matrix_db(dataset, input_batch_ids, qq, target, tt, type):
 
         extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
         augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
-    elif type == 'test':
+    elif dataset_type == 'test':
         augmented_mdb = dataset.family_data.augmented_mdb_test
-    elif type == 'valid':
+    elif dataset_type == 'valid':
         augmented_mdb = dataset.family_data.augmented_mdb_valid
     else:
-        assert False, "Wrong type of dataset type : " + type
+        assert False, "Wrong type of dataset type : " + dataset_type
 
     return augmented_mdb
 
@@ -417,10 +417,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 ema_input_var[0] = ema_input_var[0].cuda()
                 ema_input_var[1] = ema_input_var[1].cuda()
 
-            matrix_db = filter_matrix_db(dataset, input_batch_ids, qq, target, tt, 'train')
+            matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
             model_out = model(input_var, matrix_db)
 
-            ema_matrix_db = filter_matrix_db(dataset, input_batch_ids, qq, target, tt, 'train')
+            ema_matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
             ema_model_out = ema_model(ema_input_var, ema_matrix_db)
 
             if torch.cuda.is_available():
@@ -576,7 +576,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
             class_loss = class_criterion(output1, target_var) / minibatch_size
         else:
-            matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
+            matrix_db = filter_matrix_db(dataset, 'test')
             output1 = model(input_var, matrix_db)
             class_loss = class_criterion(output1, target_var)
 
