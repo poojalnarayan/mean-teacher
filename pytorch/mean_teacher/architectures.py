@@ -62,7 +62,7 @@ class NeuralLP(nn.Module):
         self.attention_memories = None
         self.attention_operators = None
 
-    def forward(self, triples, matrix_db, save_attention_vectors=False):
+    def forward(self, triples, database, save_attention_vectors=False):
 
         (idx, qq, tt) = triples  # NOTE: Not passing the head variables .. as they are used in prediction ..
         if torch.cuda.is_available():
@@ -111,12 +111,12 @@ class NeuralLP(nn.Module):
 
         # print("Init - memories size - " + str(memories.size()))
         # create the database of facts from the matrix_db
-        database = dict()
-        for rel, facts in matrix_db.items():
-            indices = torch.LongTensor(facts[0])
-            values = torch.FloatTensor(facts[1])
-            size = torch.Size(facts[2])
-            database[rel] = torch.sparse.FloatTensor(indices.t(), values, size)
+        # database = dict()
+        # for rel, facts in matrix_db.items():
+        #     indices = torch.LongTensor(facts[0])
+        #     values = torch.FloatTensor(facts[1])
+        #     size = torch.Size(facts[2])
+        #     database[rel] = torch.sparse.FloatTensor(indices.t(), values, size)
 
         # Note: MatMul in Pytorch = torch.matmul(a, b) .. https://stackoverflow.com/questions/44524901/how-to-do-product-of-matrices-in-pytorch
         for t in range(self.num_step):
@@ -147,7 +147,13 @@ class NeuralLP(nn.Module):
                                      database[r].t()],
                                     [attention_operators[t][r],
                                      attention_operators[t][r+int(self.num_operator/2)]]):
-                        op_matrix = torch.autograd.Variable(op_matrix.to_dense())  ## todo: Will this be a performance bottleneck ??
+                        # print('--------------------------------------')
+                        # print ("OP_MATX type " + str(type(op_matrix)))
+                        # print ("Database[r] type " + str(type(database[r])))
+                        # print("Database[r].t() type " + str(type(database[r].t())))
+                        # print("[ .. ] type " + str(type([database[r], database[r].t()])))
+                        # print('--------------------------------------')
+                        # op_matrix = torch.autograd.Variable(op_matrix.to_dense())  ## todo: Will this be a performance bottleneck ??
                         if torch.cuda.is_available():
                             op_matrix = op_matrix.cuda()
                         product = torch.matmul(op_matrix, memory_read)

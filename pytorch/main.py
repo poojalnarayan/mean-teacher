@@ -81,7 +81,7 @@ def main(context):
 
         model = model_factory(**model_params)
         if torch.cuda.is_available():
-            model = model.cuda()
+            model = nn.DataParallel(model).cuda()  # NOTE: make in run across multiple GPUs
         else:
             model = model.cpu()  # NOTE: removing data-parallelism in the model .. nn.DataParallel(model) #.cuda()
 
@@ -345,6 +345,20 @@ def generate_flipped_data(input_triple, dataset):
     return input_batch_ids, qq, tt, target
 
 
+def create_matrix_tensor(matrix_db):
+    # create the database of facts from the matrix_db
+    database = list()
+    for rel in sorted(list(matrix_db.keys())):
+        facts = matrix_db[rel]
+        indices = torch.LongTensor(facts[0])
+        values = torch.FloatTensor(facts[1])
+        size = torch.Size(facts[2])
+        database_item = torch.sparse.FloatTensor(indices.t(), values, size)
+        database.append(torch.unsqueeze(database_item.to_dense(), 0))
+
+    database_concat = torch.cat(database)
+    return torch.autograd.Variable(database_concat)
+
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
 
@@ -418,10 +432,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                 ema_input_var[1] = ema_input_var[1].cuda()
 
             matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
-            model_out = model(input_var, matrix_db)
+            matrix_db_var = create_matrix_tensor(matrix_db)
+            model_out = model(input_var, matrix_db_var)
 
             ema_matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
-            ema_model_out = ema_model(ema_input_var, ema_matrix_db)
+            ema_matrix_db_var = create_matrix_tensor(ema_matrix_db)
+            ema_model_out = ema_model(ema_input_var, ema_matrix_db_var)
 
             if torch.cuda.is_available():
                 target_var = torch.autograd.Variable(target.cuda(async=True))
