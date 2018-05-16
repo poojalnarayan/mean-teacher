@@ -7,12 +7,12 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Variable, Function
 
-import torch_extras  # Note: https://github.com/mrdrozdov-github/pytorch-extras
-import torch.sparse # Note: http://pytorch.org/docs/stable/sparse.html
-setattr(torch, 'one_hot', torch_extras.one_hot)
+#import torch_extras  # Note: https://github.com/mrdrozdov-github/pytorch-extras
+#import torch.sparse # Note: http://pytorch.org/docs/stable/sparse.html
+#setattr(torch, 'one_hot', torch_extras.one_hot)
 import torch.cuda
 
-from .utils import export, parameter_count
+from .utils import export, parameter_count, one_hot
 THR = 1e-20
 
 @export
@@ -64,6 +64,14 @@ class NeuralLP(nn.Module):
 
     def forward(self, queries, tails, database, save_attention_vectors=False):
 
+        print("==================================================")
+        print ("DATABASE : " + str(database.size()))
+        print ("DATABASE : " + str(type(database)))
+        print("==================================================")
+
+        print ("tails (arch) " + str(type(tails)))
+        print (tails)
+        print ('--------')
         # NOTE: Not passing the head variables .. as they are used in prediction ..
 
         ## input embedding --> rnn_inputs
@@ -97,8 +105,13 @@ class NeuralLP(nn.Module):
         # Then tensor represents currently populated memory cells.
         # --
         size = (len(tails), self.num_entity)
+        print ("TYPE of tails  "+ str(type(tails)))
+        print(tails)
+        print('--------')
         if torch.cuda.is_available():
-            memories = torch.one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
+            #memories = torch.one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
+            #    dim=1)  # lines: @NeuralLP:model.py 138-141
+            memories = one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).cuda().unsqueeze(
                 dim=1)  # lines: @NeuralLP:model.py 138-141
         else:
             memories = torch.one_hot(size, tails.view(-1, 1)).type(torch.FloatTensor).unsqueeze(

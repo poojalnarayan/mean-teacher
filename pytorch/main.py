@@ -16,8 +16,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler, SequentialSampler
 import torchvision.datasets
-import torch_extras
-setattr(torch, 'one_hot', torch_extras.one_hot)
+#import torch_extras
+#setattr(torch, 'one_hot', torch_extras.one_hot)
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -205,7 +205,8 @@ def create_data_loaders(train_transformation,
                         args):
 
     if torch.cuda.is_available():
-        pin_memory = True
+        #pin_memory = True
+        pin_memory = False
     else:
         pin_memory = False
 
@@ -417,11 +418,17 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
 
             input_batch_ids, qq, tt, target = generate_flipped_data(input_triple, dataset)
+            print ("tt (1) : " + str(type(tt)))
+            print (tt)
+            print ('--------')
             ema_input_batch_ids, qq_ema, tt_ema, _ = generate_flipped_data(ema_input_triple, dataset)
 
             query_end = torch.autograd.Variable(torch.LongTensor([dataset.family_data.num_query] * len(qq)))
             queries_var = torch.stack([torch.autograd.Variable(qq)] * (args.num_step - 1) + [query_end], dim=1)
             tails_var = torch.autograd.Variable(tt)
+            print ("tails_var : " + str(type(tails_var)))
+            print (tails_var) 
+            print ('--------')
 
             ema_query_end = torch.autograd.Variable(torch.LongTensor([dataset.family_data.num_query] * len(qq)))
             ema_queries_var = torch.stack([torch.autograd.Variable(qq_ema)] * (args.num_step - 1) + [ema_query_end], dim=1)
@@ -429,13 +436,16 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
             if torch.cuda.is_available():
                 queries_var = queries_var.cuda()
-                tails_var = tails_var.cuda()
+                #tails_var = tails_var.cuda()
 
                 ema_queries_var = ema_queries_var.cuda()
                 ema_tails_var = ema_tails_var.cuda()
 
             matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
             matrix_db_var = create_matrix_tensor(matrix_db)
+            print ("tails_var (2) : " + str(type(tails_var)))
+            print (tails_var) 
+            print ('--------')
             model_out = model(queries_var, tails_var, matrix_db_var)
 
             ema_matrix_db = filter_matrix_db(dataset, 'train', ema_input_batch_ids, qq_ema, target, tt_ema)
