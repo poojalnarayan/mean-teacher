@@ -325,9 +325,9 @@ def generate_flipped_data(input_triple, dataset):
     hh_lbled = torch.masked_select(input_triple[2], mask_labeled_data)
     hh_unlbled = torch.masked_select(input_triple[2], mask_unlabeled_data)
 
-    input_batch_ids = input_batch_ids_lbled + \
-                      input_batch_ids_lbled + \
-                      input_batch_ids_unlbled  # NOTE: lbled, lbled_flipped, unlbled
+    input_batch_ids = torch.cat([input_batch_ids_lbled,
+                                 input_batch_ids_lbled,
+                                 input_batch_ids_unlbled])  # NOTE: lbled, lbled_flipped, unlbled
 
     qq = torch.cat([qq_lbled,                                               # lbled
                     torch.add(qq_lbled, dataset.family_data.num_relation),  # lbled_flipped ... augment with reverse
