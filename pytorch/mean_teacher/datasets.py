@@ -7,6 +7,8 @@ from .utils import export
 
 from .processNLPdata.processNECdata import *
 from itertools import chain
+import os
+import contextlib
 
 @export
 def imagenet():
@@ -352,14 +354,21 @@ class REDataset(Dataset):
     def __init__(self, dir, args, transform=None, type='train'):
 
         dataset_file = dir + "/" + type + ".txt"
-        w2vfile = dir + "/../../vectors.goldbergdeps.txt"  #todo: make pretrain embedding file a parameter, replace with Glove?
+        w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
 
         if args.eval_subdir not in dir:
-            self.entities1_words, self.entities2_words, self.labels_str,\
-                self.chunks_inbetween_words, self.word_counts \
-                = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+
+            if 'syntax' in args.arch:
+                print('call read_re_data_syntax')
+                self.entities1_words, self.entities2_words, self.labels_str,\
+                    self.chunks_inbetween_words, self.word_counts \
+                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+            else:
+                self.entities1_words, self.entities2_words, self.labels_str,\
+                    self.chunks_inbetween_words, self.word_counts \
+                    = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
 
             self.word_vocab = Vocabulary()
             for word in chain.from_iterable(zip(*self.entities1_words)):
@@ -373,29 +382,31 @@ class REDataset(Dataset):
                     self.word_vocab.add(word)
             self.word_vocab.add("@PADDING", 0)
 
-            # print('word_vocab——size')
-            # print(self.word_vocab.size())
-            vocab_file = dir + "/../vocabulary_train.txt"
+            vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab.to_file(vocab_file)
 
             self.categories = sorted(list({l for l in self.labels_str}))
-            label_category_file = dir + "/../label_category_train.txt"
+            label_category_file = dir + '/../label_category_train_' + str(self.args.run_name) + '.txt'
             with io.open(label_category_file, 'w', encoding='utf8') as f:
                 for lbl in self.categories:
                     f.write(lbl + '\n')
 
         else:
-            vocab_file = dir + "/../vocabulary_train.txt"
+            vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab = Vocabulary.from_file(vocab_file)
 
             self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                 = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
             self.categories = []
-            label_category_file = dir + "/../label_category_train.txt"
+            label_category_file = dir + '/../label_category_train_' + str(self.args.run_name) + '.txt'
             with io.open(label_category_file, encoding='utf8') as f:
                 for line in f:
                     self.categories.append(line.strip())
+
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(vocab_file)
+                os.remove(label_category_file)
 
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
@@ -422,11 +433,6 @@ class REDataset(Dataset):
                 self.lbl.append(self.categories.index(l))
             else:
                 self.lbl.append(len(self.categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
-        # self.lbl = [categories.index(l) for l in self.labels_str]
-
-        # if type is 'test':
-        #     for i in range(10):
-        #         print(self.lbl[i])
 
         self.transform = transform
 

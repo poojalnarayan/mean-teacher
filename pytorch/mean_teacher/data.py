@@ -338,7 +338,6 @@ class RandomPatternWordNoise:
         return replacement
 
     def __call__(self, datums, entity_token):
-
         dropout_datums = list()
         for datum in datums:
             dropout_datum = list()

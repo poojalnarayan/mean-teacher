@@ -90,6 +90,9 @@ def create_parser():
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
     parser.add_argument('--run-name', default='', type=str, metavar='PATH',
                         help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--random-seed', default='20', type=int,
+                        help='random seed')
+
     return parser
 
 
