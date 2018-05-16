@@ -15,12 +15,13 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
 import torch.cuda
 
-
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
 import contextlib
+import random
+
 
 LOG = logging.getLogger('main')
 
@@ -40,9 +41,12 @@ args = None
 best_prec1 = 0
 global_step = 0
 NA_label = -1
-pred_match_noNA = 0.0
-pred_noNA = 0.0
-true_noNA = 0.0
+student_pred_match_noNA = 0.0
+student_pred_noNA = 0.0
+student_true_noNA = 0.0
+teacher_pred_match_noNA = 0.0
+teacher_pred_noNA = 0.0
+teacher_true_noNA = 0.0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
@@ -52,9 +56,12 @@ true_noNA = 0.0
 def main(context):
     global global_step
     global best_prec1
-    global pred_match_noNA
-    global pred_noNA
-    global true_noNA
+    global student_pred_match_noNA
+    global student_pred_noNA
+    global student_true_noNA
+    global teacher_pred_match_noNA
+    global teacher_pred_noNA
+    global teacher_true_noNA
 
     time_start = time.time()
 
@@ -108,9 +115,11 @@ def main(context):
     LOG.info(parameters_string(model))
 
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    pred_file = evaldir + '/' + args.run_name + '_pred.txt'
+    student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
+    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
     with contextlib.suppress(FileNotFoundError):
-        os.remove(pred_file)
+        os.remove(student_pred_file)
+        os.remove(teacher_pred_file)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
@@ -671,9 +680,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                     'Prec {prec:.3f}({accum_prec:.3f})  '
                     'Rec {rec:.3f}({accum_rec:.3f})  '
                     'F1 {f1:.3f}({accum_f1:.3f})  '
-                    'ema_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
-                    'ema_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
-                    'ema_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
+                    'EMA_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
+                    'EMA_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
+                    'EMA_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
                         epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1, ema_prec=ema_prec, accum_ema_prec=accum_ema_prec, ema_rec=ema_rec, accum_ema_rec=accum_ema_rec, ema_f1=ema_f1, accum_ema_f1=accum_ema_f1))
 
             else:
@@ -827,8 +836,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
 
             lbl_categories = dataset.categories
-            if epoch == args.epochs and model_type == 'teacher':
-                dump_result(i, args, output1.data, lbl_categories, topk=(1,))
+            if epoch == args.epochs:
+                dump_result(i, args, output1.data, lbl_categories, model_type, topk=(1,))
 
         else:
             # measure accuracy and record loss
@@ -860,20 +869,39 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                         i, len(eval_loader), meters=meters))
 
     if args.dataset in ['riedel', 'gids']:
-        if epoch == args.epochs and model_type == 'teacher':
-            if pred_noNA == 0.0:
-                precision = 0.0
+        if epoch == args.epochs:
+
+            if model_type == 'student':
+                if student_pred_noNA == 0.0:
+                    student_precision = 0.0
+                else:
+                    student_precision = student_pred_match_noNA / student_pred_noNA
+                if student_true_noNA == 0.0:
+                    student_recall = 0.0
+                else:
+                    student_recall = student_pred_match_noNA / student_true_noNA
+                if student_precision + student_recall == 0.0:
+                    student_f1 = 0.0
+                else:
+                    student_f1 = 2 * student_precision * student_recall / (student_precision + student_recall)
+
+                print('******* Student : Overall Precision ' + str(student_precision) + '\tRecall ' + str(student_recall) + '\tF1 ' + str(student_f1) + '\t********')
+
             else:
-                precision = pred_match_noNA / pred_noNA
-            if true_noNA == 0.0:
-                recall = 0.0
-            else:
-                recall = pred_match_noNA / true_noNA
-            if precision + recall == 0.0:
-                f1 = 0.0
-            else:
-                f1 = 2 * precision * recall / (precision + recall)
-            print('******* Overall Precision ' + str(precision) + '\tRecall ' + str(recall) + '\tF1 ' + str(f1) + '\t********')
+                if teacher_pred_noNA == 0.0:
+                    teacher_precision = 0.0
+                else:
+                    teacher_precision = teacher_pred_match_noNA / teacher_pred_noNA
+                if teacher_true_noNA == 0.0:
+                    teacher_recall = 0.0
+                else:
+                    teacher_recall = teacher_pred_match_noNA / teacher_true_noNA
+                if teacher_precision + teacher_recall == 0.0:
+                    teacher_f1 = 0.0
+                else:
+                    teacher_f1 = 2 * teacher_precision * teacher_recall / (teacher_precision + teacher_recall)
+
+                print('******* Teacher : Overall Precision ' + str(teacher_precision) + '\tRecall ' + str(teacher_recall) + '\tF1 ' + str(teacher_f1) + '\t********')
 
     else:
         LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
@@ -1041,10 +1069,14 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     return tp, tp_fn, tp_fp
 
 
-def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
-    global pred_match_noNA
-    global pred_noNA
-    global true_noNA
+def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', topk=(1,)):
+    global student_pred_match_noNA
+    global student_pred_noNA
+    global student_true_noNA
+    global teacher_pred_match_noNA
+    global teacher_pred_noNA
+    global teacher_true_noNA
+
     maxk = max(topk)
     assert maxk == 1, "Right now only computing for topk=1"
     score, prediction = output.topk(maxk, 1, True, True)
@@ -1052,32 +1084,67 @@ def dump_result(batch_id, args, output, lbl_categories, topk=(1,)):
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
     dataset_file = evaldir + "/test.txt"
-    pred_file = evaldir + '/' + args.run_name + '_pred.txt'
+
+    student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
+    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
     f = open(dataset_file)
     lines = f.readlines()
 
-    with open(pred_file, "a") as fo:
-        for p, pre in enumerate(prediction):
-            line_id = int(batch_id * args.batch_size + p)
-            line = lines[line_id].strip()
-            lbl_id = int(pre)
-            pred_label = lbl_categories[lbl_id].strip()
+    if model_type == 'teacher':
+        with open(teacher_pred_file, "a") as fo:
+            for p, pre in enumerate(prediction):
+                line_id = int(batch_id * args.batch_size + p)
+                line = lines[line_id].strip()
+                lbl_id = int(pre)
+                pred_label = lbl_categories[lbl_id].strip()
 
-            vals = line.split('\t')
-            true_label = vals[4].strip()
-            if pred_label == true_label and true_label != 'NA':
-                pred_match_noNA += 1.0
-            if pred_label != 'NA':
-                pred_noNA += 1.0
-            if true_label != 'NA':
-                true_noNA += 1.0
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if pred_label == true_label and true_label != 'NA':
+                    teacher_pred_match_noNA += 1.0
+                if pred_label != 'NA':
+                    teacher_pred_noNA += 1.0
+                if true_label != 'NA':
+                    teacher_true_noNA += 1.0
 
-            line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
-            fo.write(line)
+                line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+                fo.write(line)
+    else:
+        with open(student_pred_file, "a") as fo:
+            for p, pre in enumerate(prediction):
+                line_id = int(batch_id * args.batch_size + p)
+                line = lines[line_id].strip()
+                lbl_id = int(pre)
+                pred_label = lbl_categories[lbl_id].strip()
+
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if pred_label == true_label and true_label != 'NA':
+                    student_pred_match_noNA += 1.0
+                if pred_label != 'NA':
+                    student_pred_noNA += 1.0
+                if true_label != 'NA':
+                    student_true_noNA += 1.0
+
+                line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+                fo.write(line)
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
+    random_seed = args.random_seed
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+    if torch.cuda.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.manual_seed(args.random_seed)
+        torch.cuda.manual_seed(args.random_seed)
+        # torch.cuda.manual_seed_all(args.random_seed)
+    else:
+        torch.manual_seed(args.random_seed)
+
     print('----------------')
     print("Running mean teacher experiment with args:")
     print('----------------')

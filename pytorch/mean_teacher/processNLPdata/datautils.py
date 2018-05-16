@@ -122,22 +122,7 @@ class Datautils:
                     sentence_str = ' '.join(sentence_str.split())
                     inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
 
-                    # sentences_words = re.split( r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\.|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',sentence_str)[:-14]  # the last 14 character are "###END###"
                     inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
-
-                    # i = 0
-                    # while i < len(sentences_words):
-                    #     word = sentences_words[i]
-                    #
-                    #     if len(word) == 0 or word is ' ':
-                    #         sentences_words.remove(word)
-                    #         i -= 1
-                    #     elif word[0] is not '@' and '@' in word:
-                    #         sentences_words[i] = '@email'
-                    #     elif word[0] is not '@' and not word.isalnum() and len(word) > 1 and '&' not in word:
-                    #         print(word)
-                    #
-                    #     i += 1
 
                     i = 0
                     while i < len(inbetween_words):
@@ -153,12 +138,8 @@ class Datautils:
 
                         i += 1
 
-                    if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
-
+                    if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464
                         labels.append(vals[4])
-
-                        #fan: should we swap entities1_words and entities2_words, if entity1_idx > entity2_idx?
-
 
                         if len(entities1_words) > max_entity_len:
                             entities1_words = entities1_words[:max_entity_len]
@@ -197,6 +178,65 @@ class Datautils:
     ## Entity_Mention_1 context_mention_1 0 ## Note the last number is the mention id, needed later to associate entity mention with all its contexts
     ## Entity_Mention_1 context_mention_2 1
     ## ....
+
+    @classmethod
+    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_tokens):
+        labels = []
+        entities1 = []
+        entities2 = []
+        chunks_inbetween = []
+        word_counts = dict()
+
+        with open(filename) as f:
+            for line in f:
+                vals = line.strip().split('\t')
+
+                syntax_str = ' ' + vals[5].strip()
+                entity1 = vals[2].strip()
+                entity2 = vals[3].strip()
+                entities1_words = entity1.strip().split('_')
+                entities2_words = entity2.strip().split('_')
+
+                syntax_str = syntax_str.lower()
+                syntax_str = syntax_str.replace('-lrb-', " ( ")
+                syntax_str = syntax_str.replace('-rrb-', " ) ")
+                syntax_str = ' '.join(syntax_str.split())
+                syntax_tokens = syntax_str.split()
+
+                if len(syntax_tokens) <= max_syntax_tokens or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
+
+                    labels.append(vals[4])
+                    if len(entities1_words) > max_entity_len:
+                        entities1_words = entities1_words[:max_entity_len]
+                    if len(entities2_words) > max_entity_len:
+                        entities2_words = entities2_words[:max_entity_len]
+
+                    for word in syntax_tokens:
+                        if word not in word_counts:
+                            word_counts[word] = 1
+                        else:
+                            word_counts[word] += 1
+
+                    for word in entities1_words:
+                        if word not in word_counts:
+                            word_counts[word] = 1
+                        else:
+                            word_counts[word] += 1
+
+                    for word in entities2_words:
+                        if word not in word_counts:
+                            word_counts[word] = 1
+                        else:
+                            word_counts[word] += 1
+
+                    entities1.append(entities1_words)
+                    entities2.append(entities2_words)
+                    chunks_inbetween.append(syntax_tokens)
+                else:
+                    assert False, line
+
+        return entities1, entities2, labels, chunks_inbetween, word_counts
+
 
     @classmethod
     def prepare_for_skipgram(cls, entities, contexts):
