@@ -1137,8 +1137,8 @@ if __name__ == '__main__':
     random.seed(random_seed)
     np.random.seed(random_seed)
 
+    torch.backends.cudnn.deterministic = True
     if torch.cuda.is_available():
-        torch.backends.cudnn.deterministic = True
         torch.manual_seed(args.random_seed)
         torch.cuda.manual_seed(args.random_seed)
         # torch.cuda.manual_seed_all(args.random_seed)
