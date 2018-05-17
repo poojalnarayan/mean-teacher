@@ -175,11 +175,25 @@ def main(context):
             input_var[1] = input_var[1].cuda()
             # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
 
-        x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
-        NeuralILPRules(model, dataset.family_data, context.result_directory(), rule_thr)
-        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory())
+        # student model
+        print ("Dumping the student rules .... ")
+        x = model(input_var, mdb, save_attention_vectors=True)
+        NeuralILPRules(model, dataset.family_data, context.result_directory(), "student", rule_thr)
+
+        # teacher model
+        print("Dumping the teacher rules .... ")
+        x = ema_model(input_var, mdb, save_attention_vectors=True)
+        NeuralILPRules(model, dataset.family_data, context.result_directory(), "teacher", rule_thr)
+
+        # student model
+        print("Dumping the student predictions .... ")
+        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory(), "student")
+
+        # teacher model
+        print("Dumping the teacher predictions .... ")
+        NeuralILPPredictions(ema_model, eval_loader, dataset_test, context.result_directory(), "teacher")
         print("Done!!!!")
 
 
