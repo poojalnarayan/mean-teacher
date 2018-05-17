@@ -90,6 +90,8 @@ def create_parser():
                         help='Name of the run used in storing the results for post-precessing (default: none)')
     parser.add_argument('--seed', default=1, type=int,
                         help='seed to initialize numpy array')
+    parser.add_argument('--dropout', default=0.0, type=float, #metavar='BOOL',
+                        help='Use dropout in the final layer of the model with `p` probability (default: 0.0)')
     return parser
 
 

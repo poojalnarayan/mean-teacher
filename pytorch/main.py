@@ -78,6 +78,7 @@ def main(context):
             model_params['num_layer'] = args.num_layer
             model_params['query_embed_size'] = args.query_embed_size
             model_params['rnn_state_size'] = args.rnn_state_size
+            model_params['dropout'] = args.dropout
 
         model = model_factory(**model_params)
         if torch.cuda.is_available():

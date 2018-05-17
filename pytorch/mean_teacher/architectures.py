@@ -16,14 +16,14 @@ from .utils import export, parameter_count
 THR = 1e-20
 
 @export
-def neurallp(dataset, num_step=3, num_layer=1, query_embed_size=128, rnn_state_size=128, pretrained=False, **kwargs):
+def neurallp(dataset, num_step=3, num_layer=1, query_embed_size=128, rnn_state_size=128, dropout=0.0, pretrained=False, **kwargs):
 
-    model = NeuralLP(dataset, num_step, num_layer, query_embed_size, rnn_state_size)
+    model = NeuralLP(dataset, num_step, num_layer, query_embed_size, rnn_state_size, dropout)
     return model
 
 
 class NeuralLP(nn.Module):
-    def __init__(self, dataset, num_step, num_layer, query_embed_size, rnn_state_size):
+    def __init__(self, dataset, num_step, num_layer, query_embed_size, rnn_state_size, dropout):
         super().__init__()
         ## hyper-params
         self.num_step = num_step
@@ -36,6 +36,9 @@ class NeuralLP(nn.Module):
 
         self.num_query = self.num_relation * 2
         self.num_operator = self.num_relation * 2
+
+        self.dropout = dropout
+        self.dropout_layer = nn.Dropout(p=self.dropout)
 
         ### input embedding layer
         self.query_embedding = nn.Embedding(self.num_query + 1, self.query_embed_size)
@@ -157,6 +160,9 @@ class NeuralLP(nn.Module):
                 # todo: hardcoding the thr to 1e-20 .. make it a cmd parameter ?
                 added_database_results = F.normalize(add_n, p=1, dim=1, eps=1e-20)  ## normalizing the database results --> computing the L1 norm; Note: https://discuss.pytorch.org/t/how-to-normalize-embedding-vectors/1209/8
 
+                if self.dropout > 0:
+                    added_database_results = self.dropout_layer(added_database_results)
+
                 # Populate a new cell in memory by concatenating.
                 memories = torch.cat([memories,
                            torch.unsqueeze(added_database_results, dim=1)], 1)
@@ -170,8 +176,6 @@ class NeuralLP(nn.Module):
             self.queries_indexing_attn = qq
             self.attention_operators = attention_operators
             self.attention_memories = attention_memories
-            #
-
 
         if torch.cuda.is_available():
             thr_tensor = torch.autograd.Variable(torch.cuda.FloatTensor([THR]))
