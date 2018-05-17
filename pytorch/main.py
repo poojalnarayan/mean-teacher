@@ -424,9 +424,13 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     ema_model.train()
 
     end = time.time()
+    # datapoint: List(input_student, input teacher, labels)
     for i, datapoint in enumerate(train_loader):
-
-        # measure data loading time
+        # print("datapoint type {0} type of datapoint[0] {1}".format(type(datapoint), type(datapoint[0])))
+        # print("len(datapoint) = ", len(datapoint))
+        # print("datapoint[0] shape: {0}".format(datapoint[0].shape))
+        # sys.exit(1)
+        # measure data loading time()
         meters.update('data_time', time.time() - end)
 
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
@@ -462,30 +466,34 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_input = datapoint[1]
             target = datapoint[2]
 
-            input_entity1 = input[0]
-            input_entity2 = input[1]
-            input_inbetween_chunk = input[2]
-            ema_input_entity1 = ema_input[0]
-            ema_input_entity2 = ema_input[1]
-            ema_input_inbetween_chunk = ema_input[2]
+            # input_entity1 = input[0]
+            # input_entity2 = input[1]
+            # input_inbetween_chunk = input[2]
+            # ema_input_entity1 = ema_input[0]
+            # ema_input_entity2 = ema_input[1]
+            # ema_input_inbetween_chunk = ema_input[2]
 
             if torch.cuda.is_available():
-                entity1_var = torch.autograd.Variable(input_entity1).cuda()
-                entity2_var = torch.autograd.Variable(input_entity2).cuda()
-                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
-
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
+                input_var = torch.autograd.Variable(input).cuda()
+                ema_input_var = torch.autograd.Variable(ema_input).cuda()
+                # entity1_var = torch.autograd.Variable(input_entity1).cuda()
+                # entity2_var = torch.autograd.Variable(input_entity2).cuda()
+                # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
+                #
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
 
             else:
-                entity1_var = torch.autograd.Variable(input_entity1).cpu()
-                entity2_var = torch.autograd.Variable(input_entity2).cpu()
-                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
-
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
+                input_var = torch.autograd.Variable(input).cpu()
+                ema_input_var = torch.autograd.Variable(ema_input).cpu()
+                # entity1_var = torch.autograd.Variable(input_entity1).cpu()
+                # entity2_var = torch.autograd.Variable(input_entity2).cpu()
+                # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
+                #
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
 
         else:
             ((input, ema_input), target) = datapoint
@@ -521,14 +529,15 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
 
+        # US!!
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
-            model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
+            ema_model_out = ema_model(ema_input_var)
+            model_out = model(input_var)
 
-        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
-            model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
-            # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
+        # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
+        #     ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+        #     model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
+        #     # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
@@ -746,18 +755,20 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             input = datapoint[0]
             target = datapoint[1]
 
-            input_entity1 = input[0]
-            input_entity2 = input[1]
-            input_inbetween_chunk = input[2]
+            # input_entity1 = input[0]
+            # input_entity2 = input[1]
+            # input_inbetween_chunk = input[2]
 
             if torch.cuda.is_available():
-                entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cuda()
-                entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cuda()
-                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cuda()
+                input_var = torch.autograd.Variable(input, volatile=True).cuda()
+                # entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cuda()
+                # entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cuda()
+                # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cuda()
             else:
-                entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
-                entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
-                inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
+                input_var = torch.autograd.Variable(input, volatile=True).cpu()
+                # entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
+                # entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
+                # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
 
         else:
             (input, target) = datapoint
@@ -790,10 +801,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
+        ## US!
         elif args.dataset in ['riedel', 'gids']and args.arch == 'lstm_RE':
-            output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
-        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-            output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
+            output1 = model(input_var)
+        # ## AVG MODEL
+        # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
+        #     output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)

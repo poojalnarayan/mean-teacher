@@ -248,59 +248,45 @@ class SeqModel_RE(nn.Module):
     def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb): #todo: add lstm parameters
         super().__init__()
         self.embedding_size = word_embedding_size
-        self.entity1_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
-        self.entity2_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
-        self.between_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        self.embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        # self.entity2_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        # self.between_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
 
         if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
             print("Using a pre-initialized word-embedding vector .. loaded from disk")
-            self.entity1_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            self.entity2_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
-            self.between_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            # self.entity2_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            # self.between_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
                 print("NOT UPDATING the word embeddings ....")
-                self.entity1_word_embeddings.weight.detach_()
-                self.entity2_word_embeddings.weight.detach_()
-                self.between_word_embeddings.weight.detach_()
+                self.embeddings.weight.detach_()
+                # self.entity2_word_embeddings.weight.detach_()
+                # self.between_word_embeddings.weight.detach_()
             else:
                 print("UPDATING the word embeddings ....")
 
         # todo: do we need 3 lstm?    - mihai
-        self.lstm_entitiy1 = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
-        self.lstm_entitiy2 = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
-        self.lstm_between = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
 
-        self.layer1 = nn.Linear(lstm_hidden_size * 2 * 3, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
+        # *2 is for bidir
+        self.layer1 = nn.Linear(lstm_hidden_size * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
         self.activation = nn.ReLU()  # non-linear activation
         self.layer2 = nn.Linear(hidden_size, output_size, bias=True)
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
-    def forward(self, entity1, entity2, inbetween_chunk):
-        entity1_word_embed = self.entity1_word_embeddings(entity1).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        entity2_word_embed = self.entity2_word_embeddings(entity2).permute(1, 0, 2)
-        between_word_embed = self.between_word_embeddings(inbetween_chunk).permute(1, 0, 2)
+    def forward(self, input):
+        embed = self.embeddings(input).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
         ###############################################
         # bi-LSTM computation here
 
         # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
-        self.lstm_entitiy1.flatten_parameters()
-        self.lstm_entitiy2.flatten_parameters()
-        self.lstm_between.flatten_parameters()
+        self.lstm.flatten_parameters()
 
-        _, (entity1_lstm_out, _) = self.lstm_entitiy1(entity1_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
-        entity1_lstm_out = torch.cat([entity1_lstm_out[0], entity1_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
+        _, (lstm_out, _) = self.lstm(embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        lstm_out = torch.cat([lstm_out[0], lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
 
-        _, (entity2_lstm_out, _) = self.lstm_entitiy2(entity2_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
-        entity2_lstm_out = torch.cat([entity2_lstm_out[0], entity2_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
-
-        _, (between_lstm_out, _) = self.lstm_between(between_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
-        between_lstm_out = torch.cat([between_lstm_out[0], between_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
-
-        # concatenate the entity_lstm and avgeraged pattern_lstm representations
-        entity_and_between_lstm_out = torch.cat([entity1_lstm_out, entity2_lstm_out, between_lstm_out], dim=1)
-
-        res = self.layer1(entity_and_between_lstm_out)
+        res = self.layer1(lstm_out)
         res = self.activation(res)
         res = self.layer2(res)
         return res

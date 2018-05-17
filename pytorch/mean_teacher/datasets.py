@@ -349,11 +349,12 @@ class REDataset(Dataset):
     #todo: make them parameters
     max_entity_len = 8
     max_inbetween_len = 60
+    max_tmp = max_entity_len*2 + max_inbetween_len
     word_frequency = 300
 
     def __init__(self, dir, args, transform=None, type='train'):
 
-        w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
+        w2vfile = dir + "/../../vectors.goldbergdeps.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
 
@@ -386,6 +387,8 @@ class REDataset(Dataset):
                 if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:
                     self.word_vocab.add(word)
             self.word_vocab.add("@PADDING", 0)
+
+            self.pad_id = self.word_vocab.get_id(REDataset.PAD)
 
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab.to_file(vocab_file)
@@ -452,16 +455,19 @@ class REDataset(Dataset):
 
         self.transform = transform
 
+    # idx is the index of the datum
     def __getitem__(self, idx):
+        #List[Int]
         entity1_words_id = [self.word_vocab.get_id(w) for w in self.entities1_words[idx]]
         entity2_words_id = [self.word_vocab.get_id(w) for w in self.entities2_words[idx]]
-        entity1_words_id_padded = self.pad_item(entity1_words_id)
-        entity2_words_id_padded = self.pad_item(entity2_words_id)
-        entity1_datum = torch.LongTensor(entity1_words_id_padded)
-        entity2_datum = torch.LongTensor(entity2_words_id_padded)
+        # entity1_words_id_padded = self.pad_item(entity1_words_id)
+        # entity2_words_id_padded = self.pad_item(entity2_words_id)
+        entity1_datum = torch.LongTensor(entity1_words_id)
+        entity2_datum = torch.LongTensor(entity2_words_id)
 
         # todo: make it a function to decide what to do with the words in-between (chunks_inbetween_words)
         ##########
+        #self.chunks_inbetween_words[idx] is List(Str)
         if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:    # need to chunk
             l = 0
             refined_inbetween = list()
@@ -472,6 +478,7 @@ class REDataset(Dataset):
             self.chunks_inbetween_words[idx] = refined_inbetween
         #############
 
+        # List(Int) -- the vocabulary indices
         inbetween_words_id = [self.word_vocab.get_id(w) for w in self.chunks_inbetween_words[idx]]
 
         if self.transform is not None:
@@ -483,21 +490,37 @@ class REDataset(Dataset):
             inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
 
             if len(inbetween_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
-                inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
-                inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
-                inbetween_datums = (torch.LongTensor(inbetween_words_padded_0), torch.LongTensor(inbetween_words_padded_1))
+                # inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
+                # inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
+                # inbetween_datums = (torch.LongTensor(inbetween_words_id_dropout[0]), torch.LongTensor(inbetween_words_id_dropout[1]))
+
+                # transform twice (1. student 2. teacher): DONE
+                # Concatenate the e1 + words_betw + e2
+                # List(Int) -- the indices of whole shebang
+                # inbetween_datum_student = torch.LongTensor(entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id)
+                # inbetween_datum_teacher = torch.LongTensor(entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id)
+                datum_student = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
+                datum_student = self.pad_item(datum_student)
+                datum_teacher = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
+                datum_teacher = self.pad_item(datum_teacher)
+                datums = (datum_student, datum_teacher)
 
         else:
 
-            inbetween_words_padded = self.pad_item(inbetween_words_id, 'inbetween')
-            inbetween_datums = torch.LongTensor(inbetween_words_padded)
+            # inbetween_words_padded = self.pad_item(inbetween_words_id, 'inbetween')
+            # inbetween_datums = torch.LongTensor(inbetween_words_id)
+            #
+            datums = entity1_words_id + inbetween_words_id + entity2_words_id
+            datums = self.pad_item(datums)
 
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
-            return (entity1_datum, entity2_datum, inbetween_datums[0]), (entity1_datum, entity2_datum, inbetween_datums[1]), label
+            # return (entity1_datum, entity2_datum, inbetween_datums[0]), (entity1_datum, entity2_datum, inbetween_datums[1]), label
+            return torch.LongTensor(datums[0]), torch.LongTensor(datums[1]), label
         else:
-            return (entity1_datum, entity2_datum, inbetween_datums), label
+            # return (entity1_datum, entity2_datum, inbetween_datums), label
+            return torch.LongTensor(datums), label
 
     def sanitise_and_lookup_embedding(self, word_id):
         word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
@@ -539,20 +562,23 @@ class REDataset(Dataset):
     def get_labels(self):
         return self.lbl
 
-    def pad_item(self, dataitem, type='entity'):
-        # if (type is 'sentence'): # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
-        #     dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
-        if (type is 'entity'):  # Note: padding an entity (consisting of a seq of tokens)
-            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_entity_len - len(dataitem))
-        # elif (type is 'left'):
-            # dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_left_len - len(dataitem))
-        elif (type is 'inbetween'):
-            dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_inbetween_len - len(dataitem))
-        # elif (type is 'right'):
-            # dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_right_len - len(dataitem))
+    # def pad_item(self, dataitem, type='entity'):
+    #     # if (type is 'sentence'): # Note: precessing patterns .. consisting of list of lists (add pad to each list) and a final pad to the list of list
+    #     #     dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_sentence_len - len(dataitem))
+    #     if (type is 'entity'):  # Note: padding an entity (consisting of a seq of tokens)
+    #         dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_entity_len - len(dataitem))
+    #     # elif (type is 'left'):
+    #         # dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_left_len - len(dataitem))
+    #     elif (type is 'inbetween'):
+    #         dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_inbetween_len - len(dataitem))
+    #     # elif (type is 'right'):
+    #         # dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_right_len - len(dataitem))
+    #
+    #     return dataitem_padded
 
+    def pad_item(self, dataitem):
+        dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_tmp - len(dataitem))
         return dataitem_padded
-
 
 @export
 def riedel10():
