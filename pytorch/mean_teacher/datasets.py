@@ -353,7 +353,6 @@ class REDataset(Dataset):
 
     def __init__(self, dir, args, transform=None, type='train'):
 
-        dataset_file = dir + "/" + type + ".txt"
         w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
@@ -361,11 +360,17 @@ class REDataset(Dataset):
         if args.eval_subdir not in dir:
 
             if 'syntax' in args.arch:
-                print('call read_re_data_syntax')
+                if 'fullyLex' in args.arch:
+                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
+                    print('fullyLex')
+                else:
+                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
+                    print('headLex')
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
             else:
+                dataset_file = dir + "/" + type + ".txt"
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
@@ -392,11 +397,22 @@ class REDataset(Dataset):
                     f.write(lbl + '\n')
 
         else:
+
+            if 'syntax' in args.arch:
+                if 'fullyLex' in args.arch:
+                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
+                else:
+                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
+                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+
+            else:
+                dataset_file = dir + "/" + type + ".txt"
+                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
+                    = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab = Vocabulary.from_file(vocab_file)
-
-            self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
             self.categories = []
             label_category_file = dir + '/../label_category_train_' + str(self.args.run_name) + '.txt'

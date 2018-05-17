@@ -122,6 +122,8 @@ class Datautils:
                     sentence_str = ' '.join(sentence_str.split())
                     inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
 
+
+
                     inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
 
                     i = 0
@@ -191,7 +193,7 @@ class Datautils:
             for line in f:
                 vals = line.strip().split('\t')
 
-                syntax_str = ' ' + vals[5].strip()
+                syntax_str = vals[5].strip()
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
                 entities1_words = entity1.strip().split('_')
