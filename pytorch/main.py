@@ -487,10 +487,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             # tt = torch.cat([data_minibatch[3], data_minibatch[2]]) # NOTE: augment with reverse ...
             # target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
             #
-            # input_var = [input_batch_ids + input_batch_ids] + [torch.autograd.Variable(qq),
-            #                                                    torch.autograd.Variable(tt)]
 
             input_batch_ids, qq, tt, target = generate_flipped_data(data_minibatch, dataset)
+            input_var = [input_batch_ids] + [torch.autograd.Variable(qq),
+                                            torch.autograd.Variable(tt)]
 
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
