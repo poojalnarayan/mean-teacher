@@ -86,6 +86,8 @@ def create_parser():
                         help='Size of the RNN')
     parser.add_argument('--run-name', default='', type=str, metavar='PATH',
                         help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--random_seed', default=1, type=int,
+                        help='seed to initialize numpy array')
     return parser
 
 

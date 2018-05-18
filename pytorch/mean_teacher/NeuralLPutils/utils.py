@@ -117,7 +117,7 @@ def print_rules(q_id, rules, parser, query_is_language):
     return printed_rules
 
 
-def get_rules(model, data, result_dir, rule_thr=1e-20):
+def get_rules(model, data, result_dir, model_type, rule_thr=1e-20):
     start = time.time()
     all_attention_operators, all_attention_memories, queries = get_attentions(model)
 
@@ -138,7 +138,7 @@ def get_rules(model, data, result_dir, rule_thr=1e-20):
 
     # pickle.dump(all_listed_rules,
     #             open("rules.pckl", "w"))
-    with open(result_dir + "/rules.txt", "w") as f:
+    with open(result_dir + "/rules" + "_" + model_type + ".txt", "w") as f:
         for line in all_printed_rules:
             f.write(line + "\n")
     msg = msg_with_time("\nRules listed and printed.", start)
@@ -186,9 +186,9 @@ def get_attentions(model):
     return all_attention_operators, all_attention_memories, all_queries
 
 
-def get_predictions(model, eval_loader, dataset, result_dir):
+def get_predictions(model, eval_loader, dataset, result_dir, model_type):
 
-    f = open(result_dir + "/test_predictions.txt", "w")
+    f = open(result_dir + "/test_predictions_" + model_type + ".txt", "w")
 
     all_in_top = []
 

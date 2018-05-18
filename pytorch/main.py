@@ -5,6 +5,7 @@ import shutil
 import time
 import math
 import logging
+import random
 
 import torch.cuda
 import numpy as np
@@ -179,8 +180,23 @@ def main(context):
         x = model(input_var, mdb, save_attention_vectors=True)
         print("Dumping the Rules ...")
         rule_thr = 0.01 #todo: parameterize
-        NeuralILPRules(model, dataset.family_data, context.result_directory(), rule_thr)
-        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory())
+        # student model
+        print("Dumping the student rules .... ")
+        x = model(input_var, mdb, save_attention_vectors=True)
+        NeuralILPRules(model, dataset.family_data, context.result_directory(), "student", rule_thr)
+
+        # teacher model
+        print("Dumping the teacher rules .... ")
+        x = ema_model(input_var, mdb, save_attention_vectors=True)
+        NeuralILPRules(model, dataset.family_data, context.result_directory(), "teacher", rule_thr)
+
+        # student model
+        print("Dumping the student predictions .... ")
+        NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory(), "student")
+
+        # teacher model
+        print("Dumping the teacher predictions .... ")
+        NeuralILPPredictions(ema_model, eval_loader, dataset_test, context.result_directory(), "teacher")
         print("Done!!!!")
 
 
@@ -472,7 +488,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                     'Class {meters[class_loss]:.4f}\t'
                     'Cons {meters[cons_loss]:.4f}\t'
                     'Prec@1 {meters[top1]:.3f}\t'
-                    'Prec@5 {meters[top5]:.3f}'.format(
+                    'Prec@10 {meters[top5]:.3f}'.format(
                         epoch, i, len(train_loader), meters=meters))
                 log.record(epoch + i / len(train_loader), {
                     'step': global_step,
@@ -637,6 +653,18 @@ def accuracy(output, target, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
+    random_seed = args.random_seed
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+    torch.backends.cudnn.deterministic = True
+    if torch.cuda.is_available():
+        torch.manual_seed(args.random_seed)
+        torch.cuda.manual_seed(args.random_seed)
+        # torch.cuda.manual_seed_all(args.random_seed)
+    else:
+        torch.manual_seed(args.random_seed)
+
     print('----------------')
     print("Running mean teacher experiment with args:")
     print('----------------')
