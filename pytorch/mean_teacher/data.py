@@ -288,19 +288,23 @@ class RandomPatternWordNoise:
         self.noise_type = noise_type
 
     @staticmethod
-    def replace_with_synonym(word_str):
+    def replace_with_synonym(word_str, replace):
         wordnet_synsets = wn.synsets(word_str)
 
-        replacement = None
-        for synset in wordnet_synsets:
-            for lemma in synset.lemma_names():
-                if lemma != word_str:
-                    replacement = lemma
-                    break
-                if replacement is not None:
-                    break
+        alternate_words = [lemma for ss in wordnet_synsets for lemma in ss.lemma_names() if lemma != word_str]
+        # print("--------------------------------------")
+        # print("alternate words :-")
+        # print(alternate_words)
+        # print("--------------------------------------")
+        if len(alternate_words) > 0:
+            replacement_id = np.random.randint(len(alternate_words))
+            replacement = alternate_words[replacement_id]
+        else:  # If there are no other alternate words .. just drop the word (replace with OOV)
+            replacement = replace
 
-        print ("word: " + str(word_str) + " word replacement: " + str(replacement))
+        # print("--------------------------------------")
+        # print("word: " + str(word_str) + "; word replacement: " + str(replacement))
+        # print("--------------------------------------")
         return replacement
 
     def __call__(self, datums, entity_token):
@@ -316,9 +320,13 @@ class RandomPatternWordNoise:
                 if w in to_replace:
                     if self.noise_type == 'drop':  # Dropout .. replace with NIL word
                         dropout_datum.append(self.replace)
-                    else:  # Replace .. find a synonym of the word using wordnet
-                        replaced_synonym = self.replace_with_synonym(w)
+                    elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
+                        replaced_synonym = self.replace_with_synonym(w, self.replace)
                         dropout_datum.append(replaced_synonym)
+                    elif self.noise_type == 'add':
+                        pass  # todo: do soemthing here
+                    else:
+                        assert False, "Unknown noise type : " + self.noise_type
                 else:
                     dropout_datum.append(w)
             dropout_datums.append(dropout_datum)

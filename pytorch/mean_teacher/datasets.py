@@ -59,8 +59,8 @@ def cifar10():
 @export
 def ontonotes():
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
     else:
         assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
 
@@ -75,8 +75,8 @@ def ontonotes():
 @export
 def conll():
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
     elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
         addNoise = None
     else:
@@ -103,7 +103,7 @@ class NECDataset(Dataset):
     ENTITY = "@ENTITY"
     OOV_ID = 0
     ENTITY_ID = -1
-    NUM_WORDS_TO_REPLACE = 1
+    NUM_WORDS_TO_CHANGE = 1
     WORD_NOISE_TYPE = "drop"
 
     def __init__(self, dir, args, transform=None):
@@ -133,7 +133,7 @@ class NECDataset(Dataset):
 
         type_of_noise, size_of_noise = args.word_noise.split(":")
         NECDataset.WORD_NOISE_TYPE = type_of_noise
-        NECDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
         categories = sorted(list({l for l in self.labels_str}))
         self.lbl = [categories.index(l) for l in self.labels_str]

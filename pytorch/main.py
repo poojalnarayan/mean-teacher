@@ -217,7 +217,7 @@ def create_data_loaders(train_transformation,
         LOG.info("evaldir : " + evaldir)
         dataset = datasets.NECDataset(traindir, args, train_transformation)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
-        LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
+        LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_CHANGE))
 
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
