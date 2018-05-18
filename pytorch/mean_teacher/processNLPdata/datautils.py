@@ -56,8 +56,6 @@ class Datautils:
                 sentence_str = ' ' + vals[5].strip()
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
-                entities1_words = entity1.strip().split('_')
-                entities2_words = entity2.strip().split('_')
 
                 entity1_pattern = entity1.replace('(', "\(")
                 entity1_pattern = entity1_pattern.replace(')', "\)")
@@ -121,10 +119,21 @@ class Datautils:
                     sentence_str = sentence_str.replace('-rrb-', " ) ")
                     sentence_str = ' '.join(sentence_str.split())
                     inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
+                    inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',inbetween_str)
 
+                    entity1 = entity1.lower()
+                    entity1 = entity1.replace('-lrb-', " ( ")
+                    entity1 = entity1.replace('-rrb-', " ) ")
+                    entity1 = ' '.join(entity1.split())
 
-
-                    inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\/|\||\<|\>|\^|\`|\~)',inbetween_str)
+                    entity2 = entity2.lower()
+                    entity2 = entity2.replace('-lrb-', " ( ")
+                    entity2 = entity2.replace('-rrb-', " ) ")
+                    entity2 = ' '.join(entity2.split())
+                    # entities1_words = entity1.strip().split('_')
+                    # entities2_words = entity2.strip().split('_')
+                    entities1_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',entity1)
+                    entities2_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',entity2)
 
                     i = 0
                     while i < len(inbetween_words):
@@ -137,7 +146,38 @@ class Datautils:
                             inbetween_words[i] = '@email'
                         elif word[:3] is 'www':
                             inbetween_words[i] = '@web'
+                        elif word[-1] is '.':
+                            inbetween_words[i] = word[:-1]
+                        i += 1
 
+                    i = 0
+                    while i < len(entities1_words):
+                        word = entities1_words[i]
+
+                        if len(word) == 0 or word is ' ':
+                            entities1_words.remove(word)
+                            i -= 1
+                        elif word[0] is not '@' and '@' in word:
+                            entities1_words[i] = '@email'
+                        elif word[:3] is 'www':
+                            entities1_words[i] = '@web'
+                        elif word[-1] is '.':
+                            entities1_words[i] = word[:-1]
+                        i += 1
+
+                    i = 0
+                    while i < len(entities2_words):
+                        word = entities2_words[i]
+
+                        if len(word) == 0 or word is ' ':
+                            entities2_words.remove(word)
+                            i -= 1
+                        elif word[0] is not '@' and '@' in word:
+                            entities2_words[i] = '@email'
+                        elif word[:3] is 'www':
+                            entities2_words[i] = '@web'
+                        elif word[-1] is '.':
+                            entities2_words[i] = word[:-1]
                         i += 1
 
                     if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464
@@ -173,7 +213,6 @@ class Datautils:
                     assert False, line
 
         return entities1, entities2, labels, chunks_inbetween, word_counts
-
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...
     ## ==>
@@ -196,14 +235,72 @@ class Datautils:
                 syntax_str = vals[5].strip()
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
-                entities1_words = entity1.strip().split('_')
-                entities2_words = entity2.strip().split('_')
 
                 syntax_str = syntax_str.lower()
                 syntax_str = syntax_str.replace('-lrb-', " ( ")
                 syntax_str = syntax_str.replace('-rrb-', " ) ")
                 syntax_str = ' '.join(syntax_str.split())
-                syntax_tokens = syntax_str.split()
+                # syntax_tokens = syntax_str.split()
+                syntax_tokens = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', syntax_str)
+
+                entity1 = entity1.lower()
+                entity1 = entity1.replace('-lrb-', " ( ")
+                entity1 = entity1.replace('-rrb-', " ) ")
+                entity1 = ' '.join(entity1.split())
+
+                entity2 = entity2.lower()
+                entity2 = entity2.replace('-lrb-', " ( ")
+                entity2 = entity2.replace('-rrb-', " ) ")
+                entity2 = ' '.join(entity2.split())
+                # entities1_words = entity1.strip().split('_')
+                # entities2_words = entity2.strip().split('_')
+                entities1_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', entity1)
+                entities2_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', entity2)
+
+                i = 0
+                while i < len(syntax_tokens):
+                    word = syntax_tokens[i]
+
+                    if len(word) == 0 or word is ' ':
+                        syntax_tokens.remove(word)
+                        i -= 1
+                    elif word[0] is not '@' and '@' in word:
+                        syntax_tokens[i] = '@email'
+                    elif word[:3] is 'www':
+                        syntax_tokens[i] = '@web'
+                    elif word[-1] is '.':
+                        syntax_tokens[i] = word[:-1]
+                    i += 1
+
+                i = 0
+                while i < len(entities1_words):
+                    word = entities1_words[i]
+
+                    if len(word) == 0 or word is ' ':
+                        entities1_words.remove(word)
+                        i -= 1
+                    elif word[0] is not '@' and '@' in word:
+                        entities1_words[i] = '@email'
+                    elif word[:3] is 'www':
+                        entities1_words[i] = '@web'
+                    elif word[-1] is '.':
+                        entities1_words[i] = word[:-1]
+                    i += 1
+
+                i = 0
+                while i < len(entities2_words):
+                    word = entities2_words[i]
+
+                    if len(word) == 0 or word is ' ':
+                        entities2_words.remove(word)
+                        i -= 1
+                    elif word[0] is not '@' and '@' in word:
+                        entities2_words[i] = '@email'
+                    elif word[:3] is 'www':
+                        entities2_words[i] = '@web'
+                    elif word[-1] is '.':
+                        entities2_words[i] = word[:-1]
+                    i += 1
 
                 if len(syntax_tokens) <= max_syntax_tokens or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
 

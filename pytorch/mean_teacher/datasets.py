@@ -6,7 +6,6 @@ from . import data
 from .utils import export
 
 from .processNLPdata.processNECdata import *
-from itertools import chain
 import os
 import contextlib
 
@@ -349,7 +348,6 @@ class REDataset(Dataset):
     #todo: make them parameters
     max_entity_len = 8
     max_inbetween_len = 60
-    word_frequency = 300
 
     def __init__(self, dir, args, transform=None, type='train'):
 
@@ -359,33 +357,36 @@ class REDataset(Dataset):
 
         if args.eval_subdir not in dir:
 
-            if 'syntax' in args.arch:
-                if 'fullyLex' in args.arch:
-                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
-                    print('fullyLex')
-                else:
-                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
-                    print('headLex')
+            if 'fullyLex' in args.arch:
+                dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
+                print('fullyLex')
+                self.entities1_words, self.entities2_words, self.labels_str, \
+                    self.chunks_inbetween_words, self.word_counts \
+                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len,
+                                                    REDataset.max_inbetween_len)
+            elif 'headLex' in args.arch:
+                dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
+                print('headLex')
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
             else:
                 dataset_file = dir + "/" + type + ".txt"
+                print("dataset_file=", dataset_file)
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+                print("len(self.entities1_words)=",len(self.entities1_words))
+                print("len(self.word_counts)=", len(self.word_counts))
 
             self.word_vocab = Vocabulary()
-            for word in chain.from_iterable(zip(*self.entities1_words)):
-                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:   #todo: word_frequency can be a parameter
-                    self.word_vocab.add(word)
-            for word in chain.from_iterable(zip(*self.entities2_words)):
-                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:
-                    self.word_vocab.add(word)
-            for word in chain.from_iterable(zip(*self.chunks_inbetween_words)):
-                if word in self.word_counts and self.word_counts[word] >= REDataset.word_frequency:
-                    self.word_vocab.add(word)
+            for word in self.word_counts:
+                if self.word_counts[word] >= args.word_frequency:
+                    self.word_vocab.add(word, self.word_counts[word])
             self.word_vocab.add("@PADDING", 0)
+            print("self.word_vocab.size=", self.word_vocab.size())
+
+            self.pad_id = self.word_vocab.get_id(REDataset.PAD)
 
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab.to_file(vocab_file)
@@ -398,11 +399,13 @@ class REDataset(Dataset):
 
         else:
 
-            if 'syntax' in args.arch:
-                if 'fullyLex' in args.arch:
-                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
-                else:
-                    dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
+            if 'fullyLex' in args.arch:
+                dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
+                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+
+            elif 'headLex' in args.arch:
+                dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                     = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
@@ -412,6 +415,7 @@ class REDataset(Dataset):
                     = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
 
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
+            print("Using vocab file:", vocab_file)
             self.word_vocab = Vocabulary.from_file(vocab_file)
 
             self.categories = []
@@ -427,7 +431,7 @@ class REDataset(Dataset):
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
-                self.word_vocab_embed = self.create_word_vocab_embed()
+                self.word_vocab_embed = self.create_word_vocab_embed(args)
 
         else:
             print("Not loading the pretrained embeddings ... ")
@@ -462,7 +466,7 @@ class REDataset(Dataset):
 
         # todo: make it a function to decide what to do with the words in-between (chunks_inbetween_words)
         ##########
-        if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:    # need to chunk
+        if len(self.chunks_inbetween_words[idx]) > self.max_inbetween_len:    # need to truncation
             l = 0
             refined_inbetween = list()
             for w in self.chunks_inbetween_words[idx]:
@@ -499,23 +503,26 @@ class REDataset(Dataset):
         else:
             return (entity1_datum, entity2_datum, inbetween_datums), label
 
-    def sanitise_and_lookup_embedding(self, word_id):
+    def sanitise_and_lookup_embedding(self, word_id, args):
         word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
 
         if word in self.lookupGiga:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
+        elif args.random_initial_unkown is True:
+            random_vector = np.random.randn(args.wordemb_size)  # todo is there a way to use Xavier init     -Mihai?
+            word_embed = Gigaword.norm(random_vector)
         else:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<unk>"]])
 
         return word_embed
 
-    def create_word_vocab_embed(self):
+    def create_word_vocab_embed(self, args):
 
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
         for word_id in range(0, self.word_vocab.size() - 1):
-            word_embed = self.sanitise_and_lookup_embedding(word_id)
+            word_embed = self.sanitise_and_lookup_embedding(word_id, args)
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
