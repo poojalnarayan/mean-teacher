@@ -111,10 +111,8 @@ def main(context):
 
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
     student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
-    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
     with contextlib.suppress(FileNotFoundError):
         os.remove(student_pred_file)
-        os.remove(teacher_pred_file)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
