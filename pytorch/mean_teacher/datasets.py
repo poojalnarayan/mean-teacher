@@ -352,7 +352,7 @@ class REDataset(Dataset):
 
     def __init__(self, dir, args, transform=None, type='train'):
 
-        w2vfile = dir + "/../../vectors.goldbergdeps.txt"  #todo: make pretrain embedding file a parameter
+        w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
 
