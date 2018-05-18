@@ -75,7 +75,7 @@ class TransformTwice:
 
 def relabel_dataset_ilp(dataset, args):
     # set random seed:
-    np.random.seed(args.seed)
+    np.random.seed(args.random_seed)  # todo: already setting in main .. maybe can be removed from here
 
     unlabeled_idxs = []
     labeled_ids = []

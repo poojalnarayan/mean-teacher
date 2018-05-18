@@ -5,6 +5,7 @@ import shutil
 import time
 import math
 import logging
+import random
 
 import torch.cuda
 import numpy as np
@@ -680,6 +681,18 @@ def accuracy(output, target, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
+    random_seed = args.random_seed
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+    torch.backends.cudnn.deterministic = True
+    if torch.cuda.is_available():
+        torch.manual_seed(args.random_seed)
+        torch.cuda.manual_seed(args.random_seed)
+        # torch.cuda.manual_seed_all(args.random_seed)
+    else:
+        torch.manual_seed(args.random_seed)
+
     print('----------------')
     print("Running mean teacher experiment with args:")
     print('----------------')
