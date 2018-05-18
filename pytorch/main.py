@@ -227,13 +227,31 @@ def create_data_loaders(train_transformation,
     else:
         pin_memory = False
 
+    assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
     if args.dataset in ['family', 'umls', 'kinship', 'wn18', 'fb237']:
         dataset = datasets.ILP_dataset(datadir, 'train')
-        assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
-        train_dataset_size = dataset.__len__()
-        sampler = SequentialSampler(list(range(0, train_dataset_size)))  # Note: Using a sequential sampler similar to the original implementation
-        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=False)
+        # assert args.exclude_unlabeled, "For now not consider the teacher-student arch .. but just the supervised mode"
+
+        if args.labels:
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset_ilp(dataset, args)
+
+        if args.exclude_unlabeled or len(unlabeled_idxs) == 0:
+            # sampler = SubsetRandomSampler(labeled_idxs)
+            sampler = SequentialSampler(labeled_idxs)  # Note: Using a sequential sampler similar to the original implementation
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:  # todo: How shld sampling be for mean teacher framework ??
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
+
+        ################ Commenting previous code which only considers the whole dataset and not x% labeled data to test the student only model
+        # train_dataset_size = dataset.__len__()
+        # sampler = SequentialSampler(list(range(0, train_dataset_size)))  # Note: Using a sequential sampler similar to the original implementation
+        # batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=False)
+        ################
+
         train_loader = torch.utils.data.DataLoader(dataset,
                                                    batch_sampler=batch_sampler,
                                                    num_workers=args.workers,
@@ -253,8 +271,6 @@ def create_data_loaders(train_transformation,
 
         traindir = os.path.join(datadir, args.train_subdir)
         evaldir = os.path.join(datadir, args.eval_subdir)
-
-        assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
         dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
 
@@ -298,24 +314,79 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def filter_matrix_db(dataset, batch_input, type):
+# def filter_matrix_db(dataset, batch_input, type):
+#
+#     if type == 'train':
+#         train_facts = dataset.family_data.train
+#         batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
+#         batch_ids = [i[0] for i in batch_facts]
+#         extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
+#
+#         extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
+#         augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
+#     elif type == 'test':
+#         augmented_mdb = dataset.family_data.augmented_mdb_test
+#     elif type == 'valid':
+#         augmented_mdb = dataset.family_data.augmented_mdb_valid
+#     else:
+#         assert False, "Wrong type of dataset type : " + type
+#
+#     return augmented_mdb
 
-    if type == 'train':
+def filter_matrix_db(dataset, dataset_type, input_batch_ids=None, qq=None, target=None, tt=None):
+
+    if dataset_type == 'train':
         train_facts = dataset.family_data.train
-        batch_facts = list(zip(batch_input[0], zip(batch_input[1], batch_input[2], batch_input[3])))
+        batch_facts = list(zip(input_batch_ids, zip(qq, target, tt)))
         batch_ids = [i[0] for i in batch_facts]
         extra_facts = [fact for idx, fact in enumerate(train_facts) if idx not in batch_ids]
 
         extra_mdb = dataset.family_data._db_to_matrix_db(extra_facts)
         augmented_mdb = dataset.family_data._combine_two_mdbs(extra_mdb, dataset.family_data.matrix_db_train)
-    elif type == 'test':
+    elif dataset_type == 'test':
         augmented_mdb = dataset.family_data.augmented_mdb_test
-    elif type == 'valid':
+    elif dataset_type == 'valid':
         augmented_mdb = dataset.family_data.augmented_mdb_valid
     else:
-        assert False, "Wrong type of dataset type : " + type
+        assert False, "Wrong type of dataset type : " + dataset_type
 
     return augmented_mdb
+
+def generate_flipped_data(input_triple, dataset):
+
+    mask_labeled_data = (input_triple[2] != NO_LABEL)
+    mask_unlabeled_data = (input_triple[2] == NO_LABEL)
+
+    input_batch_ids_lbled = torch.masked_select(input_triple[0], mask_labeled_data)
+    input_batch_ids_unlbled = torch.masked_select(input_triple[0], mask_unlabeled_data)
+
+    qq_lbled = torch.masked_select(input_triple[1], mask_labeled_data)
+    qq_unlbled = torch.masked_select(input_triple[1], mask_unlabeled_data)
+
+    tt_lbled = torch.masked_select(input_triple[3], mask_labeled_data)
+    tt_unlbled = torch.masked_select(input_triple[3], mask_unlabeled_data)
+
+    hh_lbled = torch.masked_select(input_triple[2], mask_labeled_data)
+    hh_unlbled = torch.masked_select(input_triple[2], mask_unlabeled_data)
+
+    input_batch_ids = torch.cat([input_batch_ids_lbled,
+                                 input_batch_ids_lbled,
+                                 input_batch_ids_unlbled])  # NOTE: lbled, lbled_flipped, unlbled
+
+    qq = torch.cat([qq_lbled,                                               # lbled
+                    torch.add(qq_lbled, dataset.family_data.num_relation),  # lbled_flipped ... augment with reverse
+                    qq_unlbled])                                            # unlbled
+
+    tt = torch.cat([tt_lbled,       # lbled
+                    hh_lbled,       # lbled_flipped ... augment with reverse ...
+                    tt_unlbled])    # unlbled
+
+    # NOTE: the heads in the input is the target .. we are predicting a ranked list of these ...
+    target = torch.cat([hh_lbled,       # lbled
+                        tt_lbled,       # lbled_flipped ... augment with reverse ...
+                        hh_unlbled])    # unlbled
+
+    return input_batch_ids, qq, tt, target
 
 
 def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
@@ -407,24 +478,27 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
 
         else:
 
-            input_batch_ids = data_minibatch[0]
+            # input_batch_ids = data_minibatch[0]
+            #
+            # # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
+            # # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
+            # # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
+            # qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1], dataset.family_data.num_relation)]) # NOTE: augment with reverse ...
+            # tt = torch.cat([data_minibatch[3], data_minibatch[2]]) # NOTE: augment with reverse ...
+            # target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
+            #
+            # input_var = [input_batch_ids + input_batch_ids] + [torch.autograd.Variable(qq),
+            #                                                    torch.autograd.Variable(tt)]
 
-            # not necessary to compute the one-hot --- http://pytorch.org/docs/master/nn.html#nllloss
-            # size = (len(data_minibatch[2]), dataset.family_data.num_entity)
-            # target = torch.one_hot(size, data_minibatch[2].view(-1, 1))
-            qq = torch.cat([data_minibatch[1], torch.add(data_minibatch[1], dataset.family_data.num_relation)]) # NOTE: augment with reverse ...
-            tt = torch.cat([data_minibatch[3], data_minibatch[2]]) # NOTE: augment with reverse ...
-            target = torch.cat([data_minibatch[2], data_minibatch[3]])  # augment with reverse ...
-
-            input_var = [input_batch_ids + input_batch_ids] + [torch.autograd.Variable(qq),
-                                                               torch.autograd.Variable(tt)]
+            input_batch_ids, qq, tt, target = generate_flipped_data(data_minibatch, dataset)
 
             if torch.cuda.is_available():
                 input_var[0] = input_var[0].cuda()
                 input_var[1] = input_var[1].cuda()
                 # NOTE: not converting input_var[2] to cuda() since we need to use one_hot ..
 
-            matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
+            # matrix_db = filter_matrix_db(dataset, data_minibatch, 'train')
+            matrix_db = filter_matrix_db(dataset, 'train', input_batch_ids, qq, target, tt)
             model_out = model(input_var, matrix_db)
 
             if torch.cuda.is_available():
@@ -488,7 +562,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
                     'Class {meters[class_loss]:.4f}\t'
                     'Cons {meters[cons_loss]:.4f}\t'
                     'Prec@1 {meters[top1]:.3f}\t'
-                    'Prec@10 {meters[top5]:.3f}'.format(
+                    'Prec@10 {meters[top10]:.3f}'.format(
                         epoch, i, len(train_loader), meters=meters))
                 log.record(epoch + i / len(train_loader), {
                     'step': global_step,
@@ -564,7 +638,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset):
             softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
             class_loss = class_criterion(output1, target_var) / minibatch_size
         else:
-            matrix_db = filter_matrix_db(dataset, data_minibatch, 'test')
+            matrix_db = filter_matrix_db(dataset, 'test')
             output1 = model(input_var, matrix_db)
             class_loss = loss_criterion(output1, target_var) / minibatch_size
 

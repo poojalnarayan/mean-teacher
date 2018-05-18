@@ -100,6 +100,23 @@ class ILP_dataset(Dataset):
         else:
             assert False, "Wrong dataset type .. " + self.dataset_type
 
+    def get_labels(self):
+        if self.dataset_type == 'train':
+            return [datum[1] for datum in self.family_data.train]
+        elif self.dataset_type == 'test':
+            return [datum[1] for datum in self.family_data.test]
+        elif self.dataset_type == 'valid':
+            return [datum[1] for datum in self.family_data.valid]
+        else:
+            assert False, "Wrong dataset type .. " + self.dataset_type
+
+    def relabel_datum(self, idx, label):
+        if self.dataset_type == 'train':
+            self.family_data.train[idx] = (self.family_data.train[idx][0], label, self.family_data.train[idx][2])
+        else:
+            assert False, "Cannot relabel dataset of type .. " + self.dataset_type
+
+
 @export
 def imagenet():
     channel_stats = dict(mean=[0.485, 0.456, 0.406],
