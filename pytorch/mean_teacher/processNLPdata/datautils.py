@@ -268,7 +268,7 @@ class Datautils:
                         syntax_tokens[i] = '@email'
                     elif word[:3] is 'www':
                         syntax_tokens[i] = '@web'
-                    elif word[-1] is '.':
+                    elif len(word) > 1 and word[-1] is '.':
                         syntax_tokens[i] = word[:-1]
                     i += 1
 
@@ -283,7 +283,7 @@ class Datautils:
                         entities1_words[i] = '@email'
                     elif word[:3] is 'www':
                         entities1_words[i] = '@web'
-                    elif word[-1] is '.':
+                    elif len(word) > 1 and word[-1] is '.':
                         entities1_words[i] = word[:-1]
                     i += 1
 
@@ -298,7 +298,7 @@ class Datautils:
                         entities2_words[i] = '@email'
                     elif word[:3] is 'www':
                         entities2_words[i] = '@web'
-                    elif word[-1] is '.':
+                    elif len(word) > 1 and word[-1] is '.':
                         entities2_words[i] = word[:-1]
                     i += 1
 
