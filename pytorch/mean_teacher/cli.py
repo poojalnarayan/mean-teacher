@@ -84,14 +84,18 @@ def create_parser():
                         help='Use pre-trained word embeddings to be loaded from disk, if True; else random initialization of word-emb (default: True)')
     parser.add_argument('--update-pretrained-wordemb', default=False, type=str2bool, metavar='BOOL',
                         help='Update the pre-trained word embeddings during training, if True; else keep them fixed (default: False)')
+    parser.add_argument('--random-initial-unkown', default=False, type=str2bool, metavar='BOOL',
+                        help='Randomly initialize unkown words embedding. It only works when --pretrained-wordemb is True')
+    parser.add_argument('--word-frequency', default='2', type=int,
+                        help='only the word with higher frequency than this number will be added to vocabulary')
+    parser.add_argument('--random-seed', default='20', type=int,
+                        help='random seed')
+    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
+                        help='Name of the run used in storing the results for post-precessing (default: none)')
     parser.add_argument('--word-noise', default='drop:1', type=str,
                         help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
     parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
-    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
-                        help='Name of the run used in storing the results for post-precessing (default: none)')
-    parser.add_argument('--random-seed', default='20', type=int,
-                        help='random seed')
 
     return parser
 

@@ -238,7 +238,6 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 ##############################################
 ##### More advanced architecture where the entity and words in-between embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
-#todo: fan
 @export
 def lstm_RE(word_vocab_size, num_classes, pretrained=True, wordemb_size=300, hidden_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
     lstm_hidden_size = 100
