@@ -77,6 +77,8 @@ def conll():
 
     if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
         addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    elif NECDataset.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
     elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
         addNoise = None
     else:
@@ -120,7 +122,7 @@ class NECDataset(Dataset):
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
-                self.word_vocab_embed = self.create_word_vocab_embed()
+                self.word_vocab_embed = self.create_word_vocab_embed(self.WORD_NOISE_TYPE)
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -150,13 +152,16 @@ class NECDataset(Dataset):
 
         return word_embed
 
-    def create_word_vocab_embed(self):
+    def create_word_vocab_embed(self, noise_type):
 
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
         for word_id in range(0, self.word_vocab.size()-1):
             word_embed = self.sanitise_and_lookup_embedding(word_id)
+            if noise_type == 'gaussian':  # todo: hard=coding the std-dev params to 1.. make a param
+                gaussian_noise = np.random.normal(scale=1, size=word_embed.shape)
+                word_embed = word_embed + gaussian_noise
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
