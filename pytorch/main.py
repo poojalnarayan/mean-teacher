@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
 # import torch.cuda
+import random
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -759,6 +760,18 @@ def prec_rec(output, target, NA_label, topk=(1,)):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     args = cli.parse_commandline_args()
+    random_seed = args.random_seed
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+    torch.backends.cudnn.deterministic = True
+    if torch.cuda.is_available():
+        torch.manual_seed(args.random_seed)
+        torch.cuda.manual_seed(args.random_seed)
+        # torch.cuda.manual_seed_all(args.random_seed)
+    else:
+        torch.manual_seed(args.random_seed)
+
     print('----------------')
     print("Running mean teacher experiment with args:")
     print('----------------')
