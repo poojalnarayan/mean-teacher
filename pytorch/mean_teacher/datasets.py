@@ -339,7 +339,7 @@ class REDataset(Dataset):
     #todo: when use this var, instead of using self, use REDataset
     PAD = "@PADDING"
     OOV = "</s>"
-    ENTITY = "@ENTITY"
+    ENTITY = "@entity"
     OOV_ID = 0
     ENTITY_ID = -1
     NUM_WORDS_TO_REPLACE = 1
@@ -470,7 +470,7 @@ class REDataset(Dataset):
             l = 0
             refined_inbetween = list()
             for w in self.chunks_inbetween_words[idx]:
-                if w in self.word_vocab.word_to_id and l <= self.max_inbetween_len:   #keep more useful words, i.e., words appears in vocabulary
+                if w in self.word_vocab.word_to_id and l < self.max_inbetween_len:   #keep more useful words, i.e., words appears in vocabulary
                     refined_inbetween.append(w)
                     l += 1
             self.chunks_inbetween_words[idx] = refined_inbetween
