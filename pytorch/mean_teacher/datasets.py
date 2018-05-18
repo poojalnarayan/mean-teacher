@@ -110,7 +110,7 @@ class NECDataset(Dataset):
         entity_vocab_file = dir + "/entity_vocabulary.emboot.filtered.txt"
         context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
         dataset_file = dir + "/training_data_with_labels_emboot.filtered.txt"
-        w2vfile = dir + "/../../vectors.goldbergdeps.txt"
+        w2vfile = dir + "/../../glove.840B.300d.txt"  # "/../../vectors.goldbergdeps.txt" # NOTE: replacing with GLoVE
 
         self.args = args
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
