@@ -185,19 +185,9 @@ def main(context):
         x = model(input_var, mdb, save_attention_vectors=True)
         NeuralILPRules(model, dataset.family_data, context.result_directory(), "student", rule_thr)
 
-        # teacher model
-        print("Dumping the teacher rules .... ")
-        x = ema_model(input_var, mdb, save_attention_vectors=True)
-        NeuralILPRules(model, dataset.family_data, context.result_directory(), "teacher", rule_thr)
-
         # student model
         print("Dumping the student predictions .... ")
         NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory(), "student")
-
-        # teacher model
-        print("Dumping the teacher predictions .... ")
-        NeuralILPPredictions(ema_model, eval_loader, dataset_test, context.result_directory(), "teacher")
-        print("Done!!!!")
 
 
 def parse_dict_args(**kwargs):
