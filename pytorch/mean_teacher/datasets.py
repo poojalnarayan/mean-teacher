@@ -59,13 +59,8 @@ def cifar10():
 @export
 def ontonotes():
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
-    else:
-        assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
-
     return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/nec/ontonotes',
         'num_classes': 11
@@ -75,27 +70,12 @@ def ontonotes():
 @export
 def conll():
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
-    elif NECDataset.WORD_NOISE_TYPE == 'gaussian':
-        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
-    elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
-        addNoise = None
-    else:
-        assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
-
     return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'train_transformation': None,
         'eval_transformation': None,
         'datadir': 'data-local/nec/conll',
         'num_classes': 4
     }
-
-##### USING Torchtext ... now reverting to using custom code
-# def simple_tokenizer(datapoint):
-#     fields = datapoint.split("__")
-#     return fields
-######################################################################
 
 
 class NECDataset(Dataset):
@@ -122,7 +102,7 @@ class NECDataset(Dataset):
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
-                self.word_vocab_embed = self.create_word_vocab_embed(self.WORD_NOISE_TYPE)
+                self.word_vocab_embed = self.create_word_vocab_embed()
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -152,16 +132,13 @@ class NECDataset(Dataset):
 
         return word_embed
 
-    def create_word_vocab_embed(self, noise_type):
+    def create_word_vocab_embed(self):
 
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
         for word_id in range(0, self.word_vocab.size()-1):
             word_embed = self.sanitise_and_lookup_embedding(word_id)
-            if noise_type == 'gaussian':  # todo: hard=coding the std-dev params to 1.. make a param
-                gaussian_noise = np.random.normal(scale=1, size=word_embed.shape)
-                word_embed = word_embed + gaussian_noise
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
@@ -286,79 +263,3 @@ class NECDataset(Dataset):
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
         else:
             return (entity_datum, context_datums), label
-
-        ##### USING Torchtext ... now reverting to using custom code
-        # print ("Dir in NECDataset : " + dir)
-        # data_file = "training_data_with_labels_emboot.filtered.txt.processed"
-        #
-        # LABEL = Field(sequential=False, use_vocab=True)
-        # ENTITY = Field(sequential=False, use_vocab=True, lower=True)
-        # PATTERN = Field(sequential=True, use_vocab=True, lower=True, tokenize=simple_tokenizer)
-        #
-        # datafields = [("label", LABEL), ("entity", ENTITY), ("patterns", PATTERN)]
-        # dataset, _ = TabularDataset.splits(path=dir, train=data_file, validation=data_file, format='tsv',
-        #                                  fields=datafields)
-        #
-        # LABEL.build_vocab(dataset)
-        # ENTITY.build_vocab(dataset)
-        # PATTERN.build_vocab(dataset)
-
-        # APPLY THE TRANSFORMATION HERE
-        # transform = transform
-
-        # return dataset
-        ######################################################################
-
-
-@export
-def riedel10():
-
-    return {
-        'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
-        'eval_transformation': None,
-        'datadir': 'data-local/riedel10',
-        'num_classes': 56
-    }
-
-@export
-def gids():
-
-    return {
-        'train_transformation': data.TransformTwice(data.AddGaussianNoise()),
-        'eval_transformation': None,
-        'datadir': 'data-local/gids',
-        'num_classes': 5
-    }
-
-class RiedelDataset(Dataset):
-    def __init__(self, dir, transform=None):
-        numpy_file = dir + '/np_relext.npy'
-        lbl_numpy_file = dir + '/np_relext_labels.npy'
-
-        self.data = np.load(numpy_file)
-        self.lbl = np.load(lbl_numpy_file)
-
-        # self.tensor = torch.stack([torch.Tensor(datum) for datum in data])
-        # self.tensor_lbl = torch.stack([torch.IntTensor([int(lbl)]) for lbl in lbl])
-        #
-        # self.dataset = torch.utils.data.TensorDataset(self.tensor, self.tensor_lbl)
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        if self.transform is not None:
-            tensor_datum = self.transform(torch.Tensor(self.data[idx]))
-        else:
-            tensor_datum = torch.Tensor(self.data[idx])
-
-        label = self.lbl[idx]
-
-        return tensor_datum, label
-
-    def get_num_classes(self):
-        return len(list({l for l in self.lbl}))
-
-    def get_labels(self):
-        return self.lbl
