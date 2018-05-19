@@ -60,7 +60,8 @@ def main(context):
         return model
 
     model = create_model()
-    ema_model = create_model(ema=True)
+    # ema_model = create_model(ema=True)
+    ema_model = None
 
     LOG.info(parameters_string(model))
 
@@ -78,7 +79,7 @@ def main(context):
         global_step = checkpoint['global_step']
         best_prec1 = checkpoint['best_prec1']
         model.load_state_dict(checkpoint['state_dict'])
-        ema_model.load_state_dict(checkpoint['ema_state_dict'])
+        # ema_model.load_state_dict(checkpoint['ema_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         LOG.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
 
@@ -87,8 +88,8 @@ def main(context):
     if args.evaluate:
         LOG.info("Evaluating the primary model:")
         validate(eval_loader, model, validation_log, global_step, args.start_epoch)
-        LOG.info("Evaluating the EMA model:")
-        validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch)
+        # LOG.info("Evaluating the EMA model:")
+        # validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -101,11 +102,13 @@ def main(context):
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
             prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1)
-            LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1)
+            # LOG.info("Evaluating the EMA model:")
+            # ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1)
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
-            is_best = ema_prec1 > best_prec1
-            best_prec1 = max(ema_prec1, best_prec1)
+            # is_best = ema_prec1 > best_prec1
+            # best_prec1 = max(ema_prec1, best_prec1)
+            is_best = prec1 > best_prec1
+            best_prec1 = max(prec1, best_prec1)
         else:
             is_best = False
 
@@ -115,7 +118,7 @@ def main(context):
                 'global_step': global_step,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
-                'ema_state_dict': ema_model.state_dict(),
+                # 'ema_state_dict': ema_model.state_dict(),
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint_path, epoch + 1)
@@ -202,10 +205,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     # switch to train mode
     model.train()
-    ema_model.train()
+    # ema_model.train()
 
     end = time.time()
-    for i, ((input, ema_input), target) in enumerate(train_loader):
+    # for i, ((input, ema_input), target) in enumerate(train_loader):
+    for i, (input, target) in enumerate(train_loader):
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
@@ -213,7 +217,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
         input_var = torch.autograd.Variable(input)
-        ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
+        # ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
         target_var = torch.autograd.Variable(target.cuda(async=True))
 
         minibatch_size = len(target_var)
@@ -221,20 +225,20 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
-        ema_model_out = ema_model(ema_input_var)
+        # ema_model_out = ema_model(ema_input_var)
         model_out = model(input_var)
 
         if isinstance(model_out, Variable):
             assert args.logit_distance_cost < 0
             logit1 = model_out
-            ema_logit = ema_model_out
+            # ema_logit = ema_model_out
         else:
             assert len(model_out) == 2
-            assert len(ema_model_out) == 2
+            # assert len(ema_model_out) == 2
             logit1, logit2 = model_out
-            ema_logit, _ = ema_model_out
+            # ema_logit, _ = ema_model_out
 
-        ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
+        # ema_logit = Variable(ema_logit.detach().data, requires_grad=False)
 
         if args.logit_distance_cost >= 0:
             class_logit, cons_logit = logit1, logit2
@@ -247,19 +251,25 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         class_loss = class_criterion(class_logit, target_var) / minibatch_size
         meters.update('class_loss', class_loss.data[0])
 
-        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
-        meters.update('ema_class_loss', ema_class_loss.data[0])
+        # ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size
+        # meters.update('ema_class_loss', ema_class_loss.data[0])
 
         if args.consistency:
-            consistency_weight = get_current_consistency_weight(epoch)
-            meters.update('cons_weight', consistency_weight)
-            consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
-            meters.update('cons_loss', consistency_loss.data[0])
+            pass
+            # consistency_weight = get_current_consistency_weight(epoch)
+            # meters.update('cons_weight', consistency_weight)
+            # consistency_loss = consistency_weight * consistency_criterion(cons_logit, ema_logit) / minibatch_size
+            # meters.update('cons_loss', consistency_loss.data[0])
         else:
             consistency_loss = 0
             meters.update('cons_loss', 0)
 
-        loss = class_loss + consistency_loss + res_loss
+        ###################################################
+        # NOTE: REMOVING OTHER LOSSES
+        # loss = class_loss + consistency_loss + res_loss
+        loss = class_loss # + consistency_loss + res_loss
+        ###################################################
+
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
@@ -269,18 +279,18 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('top5', prec5[0], labeled_minibatch_size)
         meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
 
-        ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
-        meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+        # ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
+        # meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
+        # meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
+        # meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
+        # meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         global_step += 1
-        update_ema_variables(model, ema_model, args.ema_decay, global_step)
+        # update_ema_variables(model, ema_model, args.ema_decay, global_step)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
