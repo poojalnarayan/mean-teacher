@@ -422,7 +422,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     # switch to train mode
     model.train() ### From the documentation (nn.module,py) : i) Sets the module in training mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
-    ema_model.train()
+    # ema_model.train()
 
     end = time.time()
     for i, datapoint in enumerate(train_loader):
