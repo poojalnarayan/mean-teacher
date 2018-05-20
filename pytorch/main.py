@@ -188,6 +188,7 @@ def main(context):
         # student model
         print("Dumping the student predictions .... ")
         NeuralILPPredictions(model, eval_loader, dataset_test, context.result_directory(), "student")
+        print("Done!!!!")
 
 
 def parse_dict_args(**kwargs):
