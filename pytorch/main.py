@@ -110,16 +110,17 @@ def main(context):
         return model
 
     model = create_model()
-    ema_model = create_model(ema=True)
+    # ema_model = create_model(ema=True)
+    ema_model = None
 
     LOG.info(parameters_string(model))
 
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
     student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
-    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
+    # teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv' ## TODO: remove this ...
     with contextlib.suppress(FileNotFoundError):
         os.remove(student_pred_file)
-        os.remove(teacher_pred_file)
+        # os.remove(teacher_pred_file)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
@@ -144,7 +145,7 @@ def main(context):
         global_step = checkpoint['global_step']
         best_prec1 = checkpoint['best_prec1']
         model.load_state_dict(checkpoint['state_dict'])
-        ema_model.load_state_dict(checkpoint['ema_state_dict'])
+        # ema_model.load_state_dict(checkpoint['ema_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         LOG.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
 
@@ -159,8 +160,8 @@ def main(context):
         elif args.dataset in ['riedel', 'gids']:
             LOG.info("Evaluating the primary model:")
             validate(eval_loader, model, validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "student")
-            LOG.info("Evaluating the EMA model:")
-            validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "teacher")
+            # LOG.info("Evaluating the EMA model:")
+            # validate(eval_loader, ema_model, ema_validation_log, global_step, args.start_epoch, dataset_test, context.result_dir, "teacher")
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -173,11 +174,11 @@ def main(context):
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
             prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "student")
-            LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
+            # LOG.info("Evaluating the EMA model:")
+            # ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
-            is_best = ema_prec1 > best_prec1
-            best_prec1 = max(ema_prec1, best_prec1)
+            is_best = prec1 > best_prec1
+            best_prec1 = max(prec1, best_prec1)
         else:
             is_best = False
 
@@ -187,7 +188,7 @@ def main(context):
                 'global_step': global_step,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
-                'ema_state_dict': ema_model.state_dict(),
+                # 'ema_state_dict': ema_model.state_dict(),
                 'best_prec1': best_prec1,
                 'optimizer' : optimizer.state_dict(),
                 'dataset' : args.dataset,
@@ -459,33 +460,33 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
         elif args.dataset in ['riedel', 'gids']:
             input = datapoint[0]
-            ema_input = datapoint[1]
-            target = datapoint[2]
+            # ema_input = datapoint[1]
+            target = datapoint[1]
 
             input_entity1 = input[0]
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]
-            ema_input_entity1 = ema_input[0]
-            ema_input_entity2 = ema_input[1]
-            ema_input_inbetween_chunk = ema_input[2]
+            # ema_input_entity1 = ema_input[0]
+            # ema_input_entity2 = ema_input[1]
+            # ema_input_inbetween_chunk = ema_input[2]
 
             if torch.cuda.is_available():
                 entity1_var = torch.autograd.Variable(input_entity1).cuda()
                 entity2_var = torch.autograd.Variable(input_entity2).cuda()
                 inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
 
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cuda()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cuda()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cuda()
 
             else:
                 entity1_var = torch.autograd.Variable(input_entity1).cpu()
                 entity2_var = torch.autograd.Variable(input_entity2).cpu()
                 inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
 
-                ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
-                ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
-                ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
+                # ema_entity1_var = torch.autograd.Variable(ema_input_entity1, volatile=True).cpu()
+                # ema_entity2_var = torch.autograd.Variable(ema_input_entity2, volatile=True).cpu()
+                # ema_inbetween_chunk_var = torch.autograd.Variable(ema_input_inbetween_chunk, volatile=True).cpu()
 
         else:
             ((input, ema_input), target) = datapoint
@@ -522,11 +523,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             model_out = model(entity_var, patterns_var)
 
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            # ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
 
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-            ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
+            # ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
             model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
             # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
         else:
@@ -537,14 +538,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if isinstance(model_out, Variable):       # this is default
             assert args.logit_distance_cost < 0
             logit1 = model_out
-            ema_logit = ema_model_out
+            # ema_logit = ema_model_out
         else:
             assert len(model_out) == 2
             assert len(ema_model_out) == 2
             logit1, logit2 = model_out
             ema_logit, _ = ema_model_out
 
-        ema_logit = Variable(ema_logit.detach().data, requires_grad=False) ## DO NOT UPDATE THE GRADIENTS THORUGH THE TEACHER (EMA) MODEL
+        # ema_logit = Variable(ema_logit.detach().data, requires_grad=False) ## DO NOT UPDATE THE GRADIENTS THORUGH THE TEACHER (EMA) MODEL
 
         if args.logit_distance_cost >= 0:
             class_logit, cons_logit = logit1, logit2
@@ -558,8 +559,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         class_loss = class_criterion(class_logit, target_var) / minibatch_size  ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
         meters.update('class_loss', class_loss.data[0])
 
-        ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
-        meters.update('ema_class_loss', ema_class_loss.data[0])    # Do we need this?
+        # ema_class_loss = class_criterion(ema_logit, target_var) / minibatch_size ## DONE: AJAY - WHAT IF target_var NOT PRESENT (UNLABELED DATAPOINT) ? Ans: See  ignore index in  `class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()`
+        # meters.update('ema_class_loss', ema_class_loss.data[0])    # Do we need this?
 
         if args.consistency:     # if pass --consistency in running script
             consistency_weight = get_current_consistency_weight(epoch)
@@ -570,7 +571,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             consistency_loss = 0
             meters.update('cons_loss', 0)
 
-        loss = class_loss + consistency_loss + res_loss # NOTE: AJAY - loss is a combination of classification loss and consistency loss (+ residual loss from the 2 outputs of student model fc1 and fc2, see args.logit_distance_cost)
+        # loss = class_loss + consistency_loss + res_loss # NOTE: AJAY - loss is a combination of classification loss and consistency loss (+ residual loss from the 2 outputs of student model fc1 and fc2, see args.logit_distance_cost)
+        loss = class_loss ## NOTE: Only class loss
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
@@ -612,41 +614,41 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                 accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
 
             #teacher
-            ema_correct, ema_num_target_notNA, ema_num_pred_notNA  = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
-            if ema_num_pred_notNA > 0:
-                ema_prec = float(ema_correct) / float(ema_num_pred_notNA)
-            else:
-                ema_prec = 0.0
+            # ema_correct, ema_num_target_notNA, ema_num_pred_notNA  = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
+            # if ema_num_pred_notNA > 0:
+            #     ema_prec = float(ema_correct) / float(ema_num_pred_notNA)
+            # else:
+            #     ema_prec = 0.0
+            #
+            # if num_target_notNA > 0:
+            #     ema_rec = float(ema_correct) / float(ema_num_target_notNA)
+            # else:
+            #     ema_rec = 0.0
+            #
+            # if ema_prec + ema_rec == 0:
+            #     ema_f1 = 0
+            # else:
+            #     ema_f1 = 2 * ema_prec * ema_rec / (ema_prec + ema_rec)
+            #
+            # meters.update('ema_correct', ema_correct, 1)
+            # meters.update('ema_target_notNA', ema_num_target_notNA, 1)
+            # meters.update('ema_pred_notNA', ema_num_pred_notNA, 1)
 
-            if num_target_notNA > 0:
-                ema_rec = float(ema_correct) / float(ema_num_target_notNA)
-            else:
-                ema_rec = 0.0
 
-            if ema_prec + ema_rec == 0:
-                ema_f1 = 0
-            else:
-                ema_f1 = 2 * ema_prec * ema_rec / (ema_prec + ema_rec)
-
-            meters.update('ema_correct', ema_correct, 1)
-            meters.update('ema_target_notNA', ema_num_target_notNA, 1)
-            meters.update('ema_pred_notNA', ema_num_pred_notNA, 1)
-
-
-            if float(meters['ema_pred_notNA'].sum) == 0:
-                accum_ema_prec = 0
-            else:
-                accum_ema_prec = float(meters['ema_correct'].sum) / float(meters['ema_pred_notNA'].sum)
-
-            if float(meters['ema_target_notNA'].sum) == 0:
-                accum_ema_rec = 0
-            else:
-                accum_ema_rec = float(meters['ema_correct'].sum) / float(meters['ema_target_notNA'].sum)
-
-            if accum_ema_prec + accum_ema_rec == 0:
-                accum_ema_f1 = 0
-            else:
-                accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
+            # if float(meters['ema_pred_notNA'].sum) == 0:
+            #     accum_ema_prec = 0
+            # else:
+            #     accum_ema_prec = float(meters['ema_correct'].sum) / float(meters['ema_pred_notNA'].sum)
+            #
+            # if float(meters['ema_target_notNA'].sum) == 0:
+            #     accum_ema_rec = 0
+            # else:
+            #     accum_ema_rec = float(meters['ema_correct'].sum) / float(meters['ema_target_notNA'].sum)
+            #
+            # if accum_ema_prec + accum_ema_rec == 0:
+            #     accum_ema_f1 = 0
+            # else:
+            #     accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
 
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -667,7 +669,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         loss.backward()
         optimizer.step()
         global_step += 1
-        update_ema_variables(model, ema_model, args.ema_decay, global_step)
+        # update_ema_variables(model, ema_model, args.ema_decay, global_step)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
@@ -1086,29 +1088,30 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
     dataset_file = evaldir + "/test.txt"
 
     student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
-    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
+    # teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
     f = open(dataset_file)
     lines = f.readlines()
 
     if model_type == 'teacher':
-        with open(teacher_pred_file, "a") as fo:
-            for p, pre in enumerate(prediction):
-                line_id = int(batch_id * args.batch_size + p)
-                line = lines[line_id].strip()
-                lbl_id = int(pre)
-                pred_label = lbl_categories[lbl_id].strip()
-
-                vals = line.split('\t')
-                true_label = vals[4].strip()
-                if pred_label == true_label and true_label != 'NA':
-                    teacher_pred_match_noNA += 1.0
-                if pred_label != 'NA':
-                    teacher_pred_noNA += 1.0
-                if true_label != 'NA':
-                    teacher_true_noNA += 1.0
-
-                line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
-                fo.write(line)
+        pass
+        # with open(teacher_pred_file, "a") as fo:
+        #     for p, pre in enumerate(prediction):
+        #         line_id = int(batch_id * args.batch_size + p)
+        #         line = lines[line_id].strip()
+        #         lbl_id = int(pre)
+        #         pred_label = lbl_categories[lbl_id].strip()
+        #
+        #         vals = line.split('\t')
+        #         true_label = vals[4].strip()
+        #         if pred_label == true_label and true_label != 'NA':
+        #             teacher_pred_match_noNA += 1.0
+        #         if pred_label != 'NA':
+        #             teacher_pred_noNA += 1.0
+        #         if true_label != 'NA':
+        #             teacher_true_noNA += 1.0
+        #
+        #         line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+        #         fo.write(line)
     else:
         with open(student_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):

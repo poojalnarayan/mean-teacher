@@ -313,7 +313,7 @@ def riedel():
         assert False, "Unknown type of noise {}".format(REDataset.WORD_NOISE_TYPE)
 
     return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'train_transformation': None, #data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
         'datadir': 'data-local/re/Riedel2010',
         'num_classes': 56
@@ -328,7 +328,7 @@ def gids():
         assert False, "Unknown type of noise {}".format(REDataset.WORD_NOISE_TYPE)
 
     return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'train_transformation': None, #data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
         'datadir': 'data-local/re/gids',
         'num_classes': 5
