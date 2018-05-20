@@ -76,6 +76,18 @@ def create_parser():
                         help='evaluate model on evaluation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
+    ## snli-model args
+    parser.add_argument('--d_embed', type=int, default=100)
+    parser.add_argument('--d_proj', type=int, default=300)
+    parser.add_argument('--d_hidden', type=int, default=300)
+    parser.add_argument('--n_layers', type=int, default=1)
+    parser.add_argument('--dp_ratio', type=int, default=0.2)
+    parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
+    parser.add_argument('--preserve-case', action='store_false', dest='lower')
+    parser.add_argument('--no-projection', action='store_false', dest='projection')
+    parser.add_argument('--train_embed', action='store_false', dest='fix_emb')
+    # parser.add_argument('--word_vectors', type=str, default='glove.6B.100d')
+
     return parser
 
 

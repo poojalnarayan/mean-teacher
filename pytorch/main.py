@@ -16,6 +16,9 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
 
+from torchtext import datasets
+from torchtext import data
+
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
@@ -40,7 +43,10 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
-    train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
+    if args.dataset == 'snli':
+        train_loader, eval_loader, snli_config = create_data_loaders(**dataset_config, args=args)
+    else:
+        train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -52,6 +58,8 @@ def main(context):
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
         model = model_factory(**model_params)
         model = nn.DataParallel(model).cuda()
+        if args.dataset == 'snli':
+            model_params['config'] = snli_config
 
         if ema:
             for param in model.parameters():
@@ -147,36 +155,63 @@ def create_data_loaders(train_transformation,
 
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
-    dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
+    if args.dataset == 'snli':
+        inputs = data.Field(lower=args.lower)
+        answers = data.Field(sequential=False)
 
-    if args.labels:
-        with open(args.labels) as f:
-            labels = dict(line.split(' ') for line in f.read().splitlines())
-        labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
+        train, dev, test = datasets.SNLI.splits(inputs, answers)
 
-    if args.exclude_unlabeled:
-        sampler = SubsetRandomSampler(labeled_idxs)
-        batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-    elif args.labeled_batch_size:
-        batch_sampler = data.TwoStreamBatchSampler(
-            unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        inputs.build_vocab(train, dev, test)
+        inputs.vocab.vectors = torch.load(".vector_cache/input_vectors.pt")
+
+        answers.build_vocab(train)
+
+        train_loader, dev_iter, eval_loader = data.BucketIterator.splits(
+            (train, dev, test), batch_size=args.batch_size, device=torch.cuda.current_device())
+
+        config = args ## todo: fix this to subset the args for snli ?
+        config.n_embed = len(inputs.vocab)
+        config.d_out = len(answers.vocab)
+        config.n_cells = config.n_layers
+
+        # double the number of cells for bidirectional networks
+        if config.birnn:
+            config.n_cells *= 2
+
     else:
-        assert False, "labeled batch size {}".format(args.labeled_batch_size)
+        dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
 
-    train_loader = torch.utils.data.DataLoader(dataset,
-                                               batch_sampler=batch_sampler,
-                                               num_workers=args.workers,
-                                               pin_memory=True)
+        if args.labels:
+            with open(args.labels) as f:
+                labels = dict(line.split(' ') for line in f.read().splitlines())
+            labeled_idxs, unlabeled_idxs = data.relabel_dataset(dataset, labels)
 
-    eval_loader = torch.utils.data.DataLoader(
-        torchvision.datasets.ImageFolder(evaldir, eval_transformation),
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=2 * args.workers,  # Needs images twice as fast
-        pin_memory=True,
-        drop_last=False)
+        if args.exclude_unlabeled:
+            sampler = SubsetRandomSampler(labeled_idxs)
+            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
+        elif args.labeled_batch_size:
+            batch_sampler = data.TwoStreamBatchSampler(
+                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
+        else:
+            assert False, "labeled batch size {}".format(args.labeled_batch_size)
 
-    return train_loader, eval_loader
+        train_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_sampler=batch_sampler,
+                                                   num_workers=args.workers,
+                                                   pin_memory=True)
+
+        eval_loader = torch.utils.data.DataLoader(
+            torchvision.datasets.ImageFolder(evaldir, eval_transformation),
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=2 * args.workers,  # Needs images twice as fast
+            pin_memory=True,
+            drop_last=False)
+
+    if args.dataset == 'snli':
+        return train_loader, eval_loader, config
+    else:
+        return train_loader, eval_loader
 
 
 def update_ema_variables(model, ema_model, alpha, global_step):
