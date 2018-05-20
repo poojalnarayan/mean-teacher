@@ -682,10 +682,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                     'Prec {prec:.3f}({accum_prec:.3f})  '
                     'Rec {rec:.3f}({accum_rec:.3f})  '
                     'F1 {f1:.3f}({accum_f1:.3f})  '
-                    'EMA_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
-                    'EMA_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
-                    'EMA_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
-                        epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1, ema_prec=ema_prec, accum_ema_prec=accum_ema_prec, ema_rec=ema_rec, accum_ema_rec=accum_ema_rec, ema_f1=ema_f1, accum_ema_f1=accum_ema_f1))
+                    #'EMA_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
+                    #'EMA_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
+                    #'EMA_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
+                        .format(epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1 ))
 
             else:
                 LOG.info(
