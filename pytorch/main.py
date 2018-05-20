@@ -77,6 +77,7 @@ def main(context):
         train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
+        # padding_idx = dataset.pad_id
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
@@ -92,6 +93,7 @@ def main(context):
         if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
+            # model_params['padding_idx'] = padding_idx
             model_params['wordemb_size'] = args.wordemb_size
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
@@ -308,7 +310,7 @@ def create_data_loaders(train_transformation,
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
 
-        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test')
+        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, args.eval_subdir)
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   pin_memory=pin_memory,
@@ -1096,7 +1098,7 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
 
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    dataset_file = evaldir + "/test.txt"
+    dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
 
     student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
     teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'

@@ -9,6 +9,8 @@ from .processNLPdata.processNECdata import *
 import os
 import contextlib
 
+words_in_glove =0
+
 @export
 def imagenet():
     channel_stats = dict(mean=[0.485, 0.456, 0.406],
@@ -121,6 +123,7 @@ class NECDataset(Dataset):
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
                 self.word_vocab_embed = self.create_word_vocab_embed()
+
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -141,6 +144,7 @@ class NECDataset(Dataset):
         self.transform = transform
 
     def sanitise_and_lookup_embedding(self, word_id):
+
         word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
 
         if word in self.lookupGiga:
@@ -345,16 +349,14 @@ class REDataset(Dataset):
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
 
-    #todo: make them parameters
-    max_entity_len = 8
-    max_inbetween_len = 60
-    max_tmp = max_entity_len*2 + max_inbetween_len
-
     def __init__(self, dir, args, transform=None, type='train'):
 
         w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
+        self.max_entity_len = args.max_entity_len  # 8
+        self.max_inbetween_len = args.max_inbetween_len  # 60
+        self.pad_len = self.max_inbetween_len  # max_entity_len*2 + max_inbetween_len
 
         if args.eval_subdir not in dir:
 
@@ -363,20 +365,19 @@ class REDataset(Dataset):
                 print('fullyLex')
                 self.entities1_words, self.entities2_words, self.labels_str, \
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len,
-                                                    REDataset.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
             elif 'headLex' in args.arch:
                 dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
                 print('headLex')
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
             else:
                 dataset_file = dir + "/" + type + ".txt"
                 print("dataset_file=", dataset_file)
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+                    = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
                 print("len(self.entities1_words)=",len(self.entities1_words))
                 print("len(self.word_counts)=", len(self.word_counts))
 
@@ -426,13 +427,14 @@ class REDataset(Dataset):
                     self.categories.append(line.strip())
 
             with contextlib.suppress(FileNotFoundError):
-                os.remove(vocab_file)
+                # os.remove(vocab_file)
                 os.remove(label_category_file)
 
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
                 self.word_vocab_embed = self.create_word_vocab_embed(args)
+                print('words_in_glove= '+str(words_in_glove))
 
         else:
             print("Not loading the pretrained embeddings ... ")
@@ -470,7 +472,10 @@ class REDataset(Dataset):
         # todo: make it a function to decide what to do with the words in-between (chunks_inbetween_words)
         ##########
         #self.chunks_inbetween_words[idx]:  List(Str)
-        inbetween_max = self.max_tmp - len(entity1_words_id) - len(entity2_words_id)
+        original_len = len(entity1_words_id) + len(entity2_words_id) + len(self.chunks_inbetween_words[idx])
+        # print('original_len: ' + str(original_len))
+
+        inbetween_max = self.pad_len - len(entity1_words_id) - len(entity2_words_id)
         if len(self.chunks_inbetween_words[idx]) > inbetween_max:    # need to truncation
             l = 0
             refined_inbetween = list()
@@ -498,11 +503,21 @@ class REDataset(Dataset):
 
                 # Concatenate the e1 + words_betw + e2
                 # List(Int) -- the indices of whole shebang
-                student_id = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
+                # student_id = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
+                # student_id_padded = self.pad_item(student_id)
+                # datum_student = torch.LongTensor(student_id_padded)
+                #
+                # teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
+                # teacher_id_padded = self.pad_item(teacher_id)
+                # datum_teacher = torch.LongTensor(teacher_id_padded)
+                # datums = (datum_student, datum_teacher)
+
+
+                student_id = inbetween_words_id_dropout[0]
                 student_id_padded = self.pad_item(student_id)
                 datum_student = torch.LongTensor(student_id_padded)
 
-                teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
+                teacher_id = inbetween_words_id_dropout[1]
                 teacher_id_padded = self.pad_item(teacher_id)
                 datum_teacher = torch.LongTensor(teacher_id_padded)
                 datums = (datum_student, datum_teacher)
@@ -527,14 +542,17 @@ class REDataset(Dataset):
             return datums, label
 
     def sanitise_and_lookup_embedding(self, word_id, args):
+        global words_in_glove
         word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
 
         if word in self.lookupGiga:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
+            words_in_glove += 1
         elif args.random_initial_unkown is True:
             random_vector = np.random.randn(args.wordemb_size)      #todo is there a way to use Xavier init     -Mihai?
             word_embed = Gigaword.norm(random_vector)
         else:
+            #print(word)
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<unk>"]])
 
         return word_embed
@@ -584,7 +602,7 @@ class REDataset(Dataset):
     #     return dataitem_padded
 
     def pad_item(self, dataitem):
-        dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.max_tmp - len(dataitem))
+        dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.pad_len - len(dataitem))
         return dataitem_padded
 
 @export
