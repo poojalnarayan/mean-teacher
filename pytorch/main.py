@@ -308,7 +308,7 @@ def create_data_loaders(train_transformation,
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
 
-        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, 'test')
+        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, args.eval_subdir)
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   pin_memory=pin_memory,
@@ -1086,7 +1086,7 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
 
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    dataset_file = evaldir + "/test.txt"
+    dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
 
     student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
     teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'

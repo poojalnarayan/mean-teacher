@@ -19,7 +19,7 @@ def create_parser():
                             ' (default: conll)')
     parser.add_argument('--train-subdir', type=str, default='train',
                         help='the subdirectory inside the data directory that contains the training data')
-    parser.add_argument('--eval-subdir', type=str, default='val',
+    parser.add_argument('--eval-subdir', type=str, default='dev',
                         help='the subdirectory inside the data directory that contains the evaluation data')
     parser.add_argument('--labels', default=None, type=str, #metavar='FILE',
                         help='list of image labels (default: based on directory structure) OR \% of labeled data to be used for the NLP task (randomly selected)')
@@ -96,6 +96,10 @@ def create_parser():
                         help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
     parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
+    parser.add_argument('--max-entity-len', default='8', type=int,
+                        help='maximum number of words in entity, extra words would be truncated')
+    parser.add_argument('--max-inbetween-len', default='20', type=int,
+                        help='maximum number of words in between of two entities, extra words would be truncated')
 
     return parser
 
