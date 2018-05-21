@@ -9,6 +9,8 @@ from .processNLPdata.processNECdata import *
 import os
 import contextlib
 
+words_in_glove =0
+
 @export
 def imagenet():
     channel_stats = dict(mean=[0.485, 0.456, 0.406],
@@ -345,15 +347,14 @@ class REDataset(Dataset):
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
 
-    #todo: make them parameters
-    max_entity_len = 8
-    max_inbetween_len = 60
-
     def __init__(self, dir, args, transform=None, type='train'):
 
         w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
+        self.max_entity_len = args.max_entity_len  # 8
+        self.max_inbetween_len = args.max_inbetween_len  # 60
+        self.pad_len = self.max_inbetween_len  # max_entity_len*2 + max_inbetween_len
 
         if args.eval_subdir not in dir:
 
@@ -362,20 +363,19 @@ class REDataset(Dataset):
                 print('fullyLex')
                 self.entities1_words, self.entities2_words, self.labels_str, \
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len,
-                                                    REDataset.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
             elif 'headLex' in args.arch:
                 dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
                 print('headLex')
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
             else:
                 dataset_file = dir + "/" + type + ".txt"
                 print("dataset_file=", dataset_file)
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data(dataset_file, type, REDataset.max_entity_len, REDataset.max_inbetween_len)
+                    = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
                 print("len(self.entities1_words)=",len(self.entities1_words))
                 print("len(self.word_counts)=", len(self.word_counts))
 
@@ -432,6 +432,7 @@ class REDataset(Dataset):
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
                 self.word_vocab_embed = self.create_word_vocab_embed(args)
+                print('words_in_glove= ' + str(words_in_glove))
 
         else:
             print("Not loading the pretrained embeddings ... ")
@@ -504,10 +505,12 @@ class REDataset(Dataset):
             return (entity1_datum, entity2_datum, inbetween_datums), label
 
     def sanitise_and_lookup_embedding(self, word_id, args):
+        global words_in_glove
         word = Gigaword.sanitiseWord(self.word_vocab.get_word(word_id))
 
         if word in self.lookupGiga:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
+            words_in_glove += 1
         elif args.random_initial_unkown is True:
             random_vector = np.random.randn(args.wordemb_size)  # todo is there a way to use Xavier init     -Mihai?
             word_embed = Gigaword.norm(random_vector)

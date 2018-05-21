@@ -3,6 +3,7 @@
 import numpy as np
 from collections import defaultdict
 import re
+import io
 
 class Datautils:
 
@@ -49,11 +50,15 @@ class Datautils:
         chunks_inbetween = []
         word_counts = dict()
 
+        # sanitized_file = '/'.join(filename.split('/')[:-1]) + '/../' + type + '_sanitized_file.txt'
+        # with io.open(sanitized_file, 'w', encoding='utf8') as ff:
         with open(filename) as f:
             for line in f:
                 vals = line.strip().split('\t')
 
                 sentence_str = ' ' + vals[5].strip()
+                sentence_str = sentence_str.replace('###END###', '')
+
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
 
@@ -117,23 +122,48 @@ class Datautils:
                     sentence_str = sentence_str.lower()
                     sentence_str = sentence_str.replace('-lrb-', " ( ")
                     sentence_str = sentence_str.replace('-rrb-', " ) ")
+                    sentence_str = sentence_str.replace('-lsb-', " [ ")
+                    sentence_str = sentence_str.replace('-rsb-', " ] ")
+
                     sentence_str = ' '.join(sentence_str.split())
+                    sentence_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',sentence_str)
                     inbetween_str = sentence_str.partition("@entity")[2].partition("@entity")[0]
                     inbetween_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',inbetween_str)
 
                     entity1 = entity1.lower()
                     entity1 = entity1.replace('-lrb-', " ( ")
                     entity1 = entity1.replace('-rrb-', " ) ")
+                    entity1 = entity1.replace('-lsb-', " [ ")
+                    entity1 = entity1.replace('-rsb-', " ] ")
                     entity1 = ' '.join(entity1.split())
 
                     entity2 = entity2.lower()
                     entity2 = entity2.replace('-lrb-', " ( ")
                     entity2 = entity2.replace('-rrb-', " ) ")
+                    entity2 = entity2.replace('-lsb-', " [ ")
+                    entity2 = entity2.replace('-rsb-', " ] ")
                     entity2 = ' '.join(entity2.split())
                     # entities1_words = entity1.strip().split('_')
                     # entities2_words = entity2.strip().split('_')
                     entities1_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',entity1)
                     entities2_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)',entity2)
+
+                    i = 0
+                    while i < len(sentence_words):
+                        word = sentence_words[i]
+
+                        if len(word) == 0 or word is ' ':
+                            sentence_words.remove(word)
+                            i -= 1
+                        elif word[0] is not '@' and '@' in word:
+                            sentence_words[i] = '@email'
+                        elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
+                            sentence_words[i] = '@web'
+                        elif len(word) > 1 and word[-1] is '.':
+                            sentence_words[i] = word[:-1]
+                        elif any(char.isdigit() for char in word):
+                            sentence_words[i] = 'xnumx'
+                        i += 1
 
                     i = 0
                     while i < len(inbetween_words):
@@ -144,40 +174,46 @@ class Datautils:
                             i -= 1
                         elif word[0] is not '@' and '@' in word:
                             inbetween_words[i] = '@email'
-                        elif word[:3] is 'www':
+                        elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                             inbetween_words[i] = '@web'
                         elif len(word) > 1 and word[-1] is '.':
                             inbetween_words[i] = word[:-1]
+                        elif any(char.isdigit() for char in word):
+                            inbetween_words[i] = 'xnumx'
                         i += 1
 
                     i = 0
                     while i < len(entities1_words):
                         word = entities1_words[i]
 
-                        if len(word) == 0 or word is ' ':
+                        if len(word) == 0 or word is ' ' or word is '_':
                             entities1_words.remove(word)
                             i -= 1
                         elif word[0] is not '@' and '@' in word:
                             entities1_words[i] = '@email'
-                        elif word[:3] is 'www':
+                        elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                             entities1_words[i] = '@web'
                         elif len(word) > 1 and word[-1] is '.':
                             entities1_words[i] = word[:-1]
+                        elif any(char.isdigit() for char in word):
+                            entities1_words[i] = 'xnumx'
                         i += 1
 
                     i = 0
                     while i < len(entities2_words):
                         word = entities2_words[i]
 
-                        if len(word) == 0 or word is ' ':
+                        if len(word) == 0 or word is ' ' or word is '_':
                             entities2_words.remove(word)
                             i -= 1
                         elif word[0] is not '@' and '@' in word:
                             entities2_words[i] = '@email'
-                        elif word[:3] is 'www':
+                        elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                             entities2_words[i] = '@web'
                         elif len(word) > 1 and word[-1] is '.':
                             entities2_words[i] = word[:-1]
+                        elif any(char.isdigit() for char in word):
+                            entities2_words[i] = 'xnumx'
                         i += 1
 
                     if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464
@@ -188,6 +224,11 @@ class Datautils:
                         if len(entities2_words) > max_entity_len:
                             entities2_words = entities2_words[:max_entity_len]
 
+                        # ff.write(vals[0].strip())
+                        # ff.write('\t')
+                        # ff.write(vals[1].strip())
+                        # ff.write('\t')
+
                         for word in inbetween_words:
                             if word not in word_counts:
                                 word_counts[word] = 1
@@ -195,24 +236,37 @@ class Datautils:
                                 word_counts[word] += 1
 
                         for word in entities1_words:
+                            # ff.write(word + ' ')
                             if word not in word_counts:
                                 word_counts[word] = 1
                             else:
                                 word_counts[word] += 1
 
+                        # ff.write('\t')
+
                         for word in entities2_words:
+                            # ff.write(word + ' ')
                             if word not in word_counts:
                                 word_counts[word] = 1
                             else:
                                 word_counts[word] += 1
+                        #
+                        # ff.write('\t')
+                        # ff.write(vals[4].strip())
+                        # ff.write('\t')
+                        # for word in sentence_words:
+                        #     ff.write(word + ' ')
+                        # ff.write('\n')
 
                         entities1.append(entities1_words)
                         entities2.append(entities2_words)
                         chunks_inbetween.append(inbetween_words)
+
                 else:
                     assert False, line
 
         return entities1, entities2, labels, chunks_inbetween, word_counts
+
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...
     ## ==>
@@ -221,7 +275,7 @@ class Datautils:
     ## ....
 
     @classmethod
-    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_tokens):
+    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_len):
         labels = []
         entities1 = []
         entities2 = []
@@ -233,12 +287,17 @@ class Datautils:
                 vals = line.strip().split('\t')
 
                 syntax_str = vals[5].strip()
+                syntax_str = syntax_str.replace('###END###', '')
+
                 entity1 = vals[2].strip()
                 entity2 = vals[3].strip()
 
                 syntax_str = syntax_str.lower()
                 syntax_str = syntax_str.replace('-lrb-', " ( ")
                 syntax_str = syntax_str.replace('-rrb-', " ) ")
+                syntax_str = syntax_str.replace('-lsb-', " [ ")
+                syntax_str = syntax_str.replace('-rsb-', " ] ")
+
                 syntax_str = ' '.join(syntax_str.split())
                 # syntax_tokens = syntax_str.split()
                 syntax_tokens = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', syntax_str)
@@ -246,16 +305,21 @@ class Datautils:
                 entity1 = entity1.lower()
                 entity1 = entity1.replace('-lrb-', " ( ")
                 entity1 = entity1.replace('-rrb-', " ) ")
+                entity1 = entity1.replace('-lsb-', " [ ")
+                entity1 = entity1.replace('-rsb-', " ] ")
                 entity1 = ' '.join(entity1.split())
 
                 entity2 = entity2.lower()
                 entity2 = entity2.replace('-lrb-', " ( ")
                 entity2 = entity2.replace('-rrb-', " ) ")
+                entity2 = entity2.replace('-lsb-', " [ ")
+                entity2 = entity2.replace('-rsb-', " ] ")
                 entity2 = ' '.join(entity2.split())
                 # entities1_words = entity1.strip().split('_')
                 # entities2_words = entity2.strip().split('_')
-                entities1_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', entity1)
-                entities2_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', entity2)
+                entities1_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)', entity1)
+                entities2_words = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\<|\>|\^|\`|\~)', entity2)
+
 
                 i = 0
                 while i < len(syntax_tokens):
@@ -266,43 +330,49 @@ class Datautils:
                         i -= 1
                     elif word[0] is not '@' and '@' in word:
                         syntax_tokens[i] = '@email'
-                    elif word[:3] is 'www':
+                    elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                         syntax_tokens[i] = '@web'
                     elif len(word) > 1 and word[-1] is '.':
                         syntax_tokens[i] = word[:-1]
+                    elif any(char.isdigit() for char in word):
+                        syntax_tokens[i] = 'xnumx'
                     i += 1
 
                 i = 0
                 while i < len(entities1_words):
                     word = entities1_words[i]
 
-                    if len(word) == 0 or word is ' ':
+                    if len(word) == 0 or word is ' ' or word is '_':
                         entities1_words.remove(word)
                         i -= 1
                     elif word[0] is not '@' and '@' in word:
                         entities1_words[i] = '@email'
-                    elif word[:3] is 'www':
+                    elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                         entities1_words[i] = '@web'
                     elif len(word) > 1 and word[-1] is '.':
                         entities1_words[i] = word[:-1]
+                    elif any(char.isdigit() for char in word):
+                        entities1_words[i] = 'xnumx'
                     i += 1
 
                 i = 0
                 while i < len(entities2_words):
                     word = entities2_words[i]
 
-                    if len(word) == 0 or word is ' ':
+                    if len(word) == 0 or word is ' ' or word is '_':
                         entities2_words.remove(word)
                         i -= 1
                     elif word[0] is not '@' and '@' in word:
                         entities2_words[i] = '@email'
-                    elif word[:3] is 'www':
+                    elif word.startswith("http") or word.startswith("www") or ".com" in word or ".org" in word:
                         entities2_words[i] = '@web'
                     elif len(word) > 1 and word[-1] is '.':
                         entities2_words[i] = word[:-1]
+                    elif any(char.isdigit() for char in word):
+                        entities2_words[i] = 'xnumx'
                     i += 1
 
-                if len(syntax_tokens) <= max_syntax_tokens or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
+                if len(syntax_tokens) <= max_syntax_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
 
                     labels.append(vals[4])
                     if len(entities1_words) > max_entity_len:
@@ -331,11 +401,8 @@ class Datautils:
                     entities1.append(entities1_words)
                     entities2.append(entities2_words)
                     chunks_inbetween.append(syntax_tokens)
-                else:
-                    assert False, line
 
         return entities1, entities2, labels, chunks_inbetween, word_counts
-
 
     @classmethod
     def prepare_for_skipgram(cls, entities, contexts):
