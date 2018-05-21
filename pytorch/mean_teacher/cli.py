@@ -11,21 +11,21 @@ __all__ = ['parse_cmd_args', 'parse_dict_args']
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    parser.add_argument('--dataset', metavar='DATASET', default='imagenet',
+    parser = argparse.ArgumentParser(description='PyTorch Mean-Teacher Training')
+    parser.add_argument('--dataset', metavar='DATASET', default='conll',
                         choices=datasets.__all__,
                         help='dataset: ' +
                             ' | '.join(datasets.__all__) +
-                            ' (default: imagenet)')
+                            ' (default: conll)')
     parser.add_argument('--train-subdir', type=str, default='train',
                         help='the subdirectory inside the data directory that contains the training data')
     parser.add_argument('--eval-subdir', type=str, default='val',
                         help='the subdirectory inside the data directory that contains the evaluation data')
-    parser.add_argument('--labels', default=None, type=str, metavar='FILE',
-                        help='list of image labels (default: based on directory structure)')
+    parser.add_argument('--labels', default=None, type=str, #metavar='FILE',
+                        help='list of image labels (default: based on directory structure) OR \% of labeled data to be used for the NLP task (randomly selected)')
     parser.add_argument('--exclude-unlabeled', default=False, type=str2bool, metavar='BOOL',
                         help='exclude unlabeled examples from the training set')
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
+    parser.add_argument('--arch', '-a', metavar='ARCH', default='simple_MLP_embed',
                         choices=architectures.__all__,
                         help='model architecture: ' +
                             ' | '.join(architectures.__all__))
@@ -64,11 +64,11 @@ def create_parser():
                         help='length of the consistency loss ramp-up')
     parser.add_argument('--logit-distance-cost', default=-1, type=float, metavar='WEIGHT',
                         help='let the student model have two outputs and use an MSE loss between the logits with the given weight (default: only have one output)')
-    parser.add_argument('--checkpoint-epochs', default=1, type=int,
+    parser.add_argument('--checkpoint-epochs', default=10, type=int,
                         metavar='EPOCHS', help='checkpoint frequency in epochs, 0 to turn checkpointing off (default: 1)')
     parser.add_argument('--evaluation-epochs', default=1, type=int,
                         metavar='EPOCHS', help='evaluation frequency in epochs, 0 to turn evaluation off (default: 1)')
-    parser.add_argument('--print-freq', '-p', default=10, type=int,
+    parser.add_argument('--print-freq', '-p', default=50, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
@@ -76,6 +76,27 @@ def create_parser():
                         help='evaluate model on evaluation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
+    parser.add_argument('--wordemb-size', default=300, type=int,
+                        help='size of the word-embeddings to be used in the simple_MLP_embed model (default: 300)')
+    parser.add_argument('--hidden-size', default=200, type=int,
+                        help='size of the hidden layer to be used in the simple_MLP_embed model (default: 50)')
+    parser.add_argument('--pretrained-wordemb', default=True, type=str2bool, metavar='BOOL',
+                        help='Use pre-trained word embeddings to be loaded from disk, if True; else random initialization of word-emb (default: True)')
+    parser.add_argument('--update-pretrained-wordemb', default=False, type=str2bool, metavar='BOOL',
+                        help='Update the pre-trained word embeddings during training, if True; else keep them fixed (default: False)')
+    parser.add_argument('--random-initial-unkown', default=False, type=str2bool, metavar='BOOL',
+                        help='Randomly initialize unkown words embedding. It only works when --pretrained-wordemb is True')
+    parser.add_argument('--word-frequency', default='2', type=int,
+                        help='only the word with higher frequency than this number will be added to vocabulary')
+    parser.add_argument('--random-seed', default='20', type=int,
+                        help='random seed')
+    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
+                        help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--word-noise', default='drop:1', type=str,
+                        help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
+    parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
+                        help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
+
     return parser
 
 
