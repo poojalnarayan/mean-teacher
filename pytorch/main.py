@@ -166,7 +166,7 @@ def main(context):
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
         # train for one epoch
-        train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        train(train_loader, model, ema_model, optimizer, epoch, training_log, dataset)
         LOG.info("--- training epoch in %s seconds ---" % (time.time() - start_time))
 
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
@@ -400,7 +400,7 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def train(train_loader, model, ema_model, optimizer, epoch, log):
+def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
     global global_step
     global NA_label
 
@@ -424,7 +424,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     ema_model.train()
 
     end = time.time()
-    for i, datapoint in enumerate(train_loader):
+    #for i, datapoint in enumerate(train_loader):
+    for i, datapoint in enumerate(dataset):
 
         # measure data loading time
         meters.update('data_time', time.time() - end)
@@ -460,8 +461,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         elif args.dataset in ['riedel', 'gids']:
             input = datapoint[0]
             ema_input = datapoint[1]
-            target = datapoint[2]
-
+            target = torch.LongTensor([datapoint[2]])
+            print ("input "+ str(input))
+            print ("ema_input " + str(ema_input))
             input_entity1 = input[0]
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]
@@ -727,7 +729,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         # eval_loader.batch_size = 1
         # LOG.info("NOTE: Setting the eval_loader's batch_size=1 .. to dump all the entity and pattern embeddings ....")
 
-    for i, datapoint in enumerate(eval_loader):
+    #for i, datapoint in enumerate(eval_loader):
+    for i, datapoint in enumerate(dataset):
         meters.update('data_time', time.time() - end)
 
         if args.dataset in ['conll', 'ontonotes']:

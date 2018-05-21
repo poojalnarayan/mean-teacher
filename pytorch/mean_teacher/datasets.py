@@ -351,7 +351,8 @@ class REDataset(Dataset):
 
     def __init__(self, dir, args, transform=None, type='train'):
 
-        w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
+        #w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
+        w2vfile = dir + "/../../vectors.goldbergdeps.txt"  #todo: make pretrain embedding file a parameter
 
         self.args = args
 
@@ -459,8 +460,8 @@ class REDataset(Dataset):
     def __getitem__(self, idx):
         entity1_words_id = [self.word_vocab.get_id(w) for w in self.entities1_words[idx]]
         entity2_words_id = [self.word_vocab.get_id(w) for w in self.entities2_words[idx]]
-        entity1_words_id_padded = self.pad_item(entity1_words_id)
-        entity2_words_id_padded = self.pad_item(entity2_words_id)
+        entity1_words_id_padded = entity1_words_id  #self.pad_item(entity1_words_id)
+        entity2_words_id_padded =  entity2_words_id  #self.pad_item(entity2_words_id)
         entity1_datum = torch.LongTensor(entity1_words_id_padded)
         entity2_datum = torch.LongTensor(entity2_words_id_padded)
 
@@ -487,13 +488,13 @@ class REDataset(Dataset):
             inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
 
             if len(inbetween_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
-                inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
-                inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
+                inbetween_words_padded_0 = inbetween_words_id_dropout[0] # self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
+                inbetween_words_padded_1 = inbetween_words_id_dropout[1] #self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
                 inbetween_datums = (torch.LongTensor(inbetween_words_padded_0), torch.LongTensor(inbetween_words_padded_1))
 
         else:
 
-            inbetween_words_padded = self.pad_item(inbetween_words_id, 'inbetween')
+            inbetween_words_padded = inbetween_words_id #self.pad_item(inbetween_words_id, 'inbetween')
             inbetween_datums = torch.LongTensor(inbetween_words_padded)
 
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
