@@ -220,9 +220,25 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
     def forward(self, entity1, entity2, inbetween_chunk):
-        entity1_embed = torch.mean(self.entity1_embeddings(entity1), 1)             # Note: Average the word-embeddings
-        entity2_embed = torch.mean(self.entity2_embeddings(entity2), 1)
-        inbetween_chunk_embed = torch.mean(self.inbetween_chunk_embeddings(inbetween_chunk), 1)
+        entity1_embed = torch.mean(self.entity1_embeddings(entity1), 0)             # Note: Average the word-embeddings
+        entity2_embed = torch.mean(self.entity2_embeddings(entity2), 0)
+        if len(inbetween_chunk) != 0:
+            inbetween_chunk_embed = torch.mean(self.inbetween_chunk_embeddings(inbetween_chunk), 0)
+        else:
+            inbetween_chunk_embed = torch.autograd.Variable(torch.zeros(300)) # todo: change me
+
+        # print ("=----------")
+        # print ("entity1:" + str(entity1_embed.size()))
+        # print ("entity2:" + str(entity2_embed.size()))
+        # print ("in bet :" + str(inbetween_chunk_embed.size()))
+        # print ("------------")
+        # print (self.entity1_embeddings(entity1).size())
+        # print(self.entity2_embeddings(entity2).size())
+        # print("------------")
+
+        entity1_embed = torch.unsqueeze(entity1_embed, 0)
+        entity2_embed = torch.unsqueeze(entity2_embed, 0)
+        inbetween_chunk_embed = torch.unsqueeze(inbetween_chunk_embed, 0)
 
         concatenated = torch.cat([entity1_embed, entity2_embed, inbetween_chunk_embed], 1)
         res = self.layer1(concatenated)

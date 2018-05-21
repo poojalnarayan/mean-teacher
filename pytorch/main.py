@@ -462,8 +462,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, dataset):
             input = datapoint[0]
             ema_input = datapoint[1]
             target = torch.LongTensor([datapoint[2]])
-            print ("input "+ str(input))
-            print ("ema_input " + str(ema_input))
+            # print ("input "+ str(input))
+            # print ("ema_input " + str(ema_input))
             input_entity1 = input[0]
             input_entity2 = input[1]
             input_inbetween_chunk = input[2]

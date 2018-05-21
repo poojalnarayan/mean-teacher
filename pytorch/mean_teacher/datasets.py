@@ -426,7 +426,7 @@ class REDataset(Dataset):
                     self.categories.append(line.strip())
 
             with contextlib.suppress(FileNotFoundError):
-                os.remove(vocab_file)
+                #os.remove(vocab_file)
                 os.remove(label_category_file)
 
         if args.pretrained_wordemb:
