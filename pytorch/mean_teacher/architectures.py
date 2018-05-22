@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Variable, Function
+from torch.nn.utils.rnn import pack_padded_sequence
 
 from .utils import export, parameter_count
 ###############
@@ -239,8 +240,8 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 ##### More advanced architecture where the entity and words in-between embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def lstm_RE(word_vocab_size, num_classes, pretrained=True, wordemb_size=300, hidden_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
-    lstm_hidden_size = 100
+def lstm_RE(word_vocab_size, num_classes, hidden_size, pretrained=True, wordemb_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
+    lstm_hidden_size = 50 # was 100
     model = SeqModel_RE(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
 
@@ -276,21 +277,32 @@ class SeqModel_RE(nn.Module):
         self.layer2 = nn.Linear(hidden_size, output_size, bias=True)
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
-    def forward(self, input):
-        embed = self.embeddings(input).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        ###############################################
-        # bi-LSTM computation here
+    def forward(self, input_tuple):
+        input = input_tuple[0]
+        lengths = input_tuple[1]
+
+        # https://gist.github.com/Tushar-N/dfca335e370a2bc3bc79876e6270099e
+        seq_lengths = torch.LongTensor([x for x in lengths])
+        #print("shape of seq_lengths:", seq_lengths.shape)
+
+        sorted_lengths, perm_idx = seq_lengths.sort(0, descending=True)
+        input_sorted = input[perm_idx]
+
+        embed = self.embeddings(input_sorted).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        #print("shape of embed:", embed.shape)
+
+        packed = pack_padded_sequence(embed, sorted_lengths.cpu().numpy(), batch_first=False)
 
         # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
         self.lstm.flatten_parameters()
 
-        _, (lstm_out, _) = self.lstm(embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        _, (lstm_out, _) = self.lstm(packed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
         lstm_out = torch.cat([lstm_out[0], lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
 
         res = self.layer1(lstm_out)
         res = self.activation(res)
         res = self.layer2(res)
-        return res
+        return res, perm_idx
 
 
 @export

@@ -7,6 +7,7 @@ import parser
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
@@ -41,12 +42,19 @@ args = None
 best_prec1 = 0
 global_step = 0
 NA_label = -1
-student_pred_match_noNA = 0.0
-student_pred_noNA = 0.0
-student_true_noNA = 0.0
-teacher_pred_match_noNA = 0.0
-teacher_pred_noNA = 0.0
-teacher_true_noNA = 0.0
+test_student_pred_match_noNA = 0.0
+test_student_pred_noNA = 0.0
+test_student_true_noNA = 0.0
+test_teacher_pred_match_noNA = 0.0
+test_teacher_pred_noNA = 0.0
+test_teacher_true_noNA = 0.0
+
+train_student_pred_match_noNA = 0.0
+train_student_pred_noNA = 0.0
+train_student_true_noNA = 0.0
+train_teacher_pred_match_noNA = 0.0
+train_teacher_pred_noNA = 0.0
+train_teacher_true_noNA = 0.0
 ###########
 # NOTE: To change to a new NEC dataset .. currently some params are hardcoded
 # 1. Change args.dataset in the command line
@@ -56,12 +64,6 @@ teacher_true_noNA = 0.0
 def main(context):
     global global_step
     global best_prec1
-    global student_pred_match_noNA
-    global student_pred_noNA
-    global student_true_noNA
-    global teacher_pred_match_noNA
-    global teacher_pred_noNA
-    global teacher_true_noNA
 
     time_start = time.time()
 
@@ -77,7 +79,7 @@ def main(context):
         train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
-        # padding_idx = dataset.pad_id
+
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
@@ -117,20 +119,25 @@ def main(context):
     LOG.info(parameters_string(model))
 
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
-    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
+    train_student_pred_file = evaldir + '/' + args.run_name + '_train_student_pred.tsv'
+    train_teacher_pred_file = evaldir + '/' + args.run_name + '_train_teacher_pred.tsv'
+    test_student_pred_file = evaldir + '/' + args.run_name + '_test_student_pred.tsv'
+    test_teacher_pred_file = evaldir + '/' + args.run_name + '_test_teacher_pred.tsv'
     with contextlib.suppress(FileNotFoundError):
-        os.remove(student_pred_file)
-        os.remove(teacher_pred_file)
+        os.remove(train_student_pred_file)
+        os.remove(train_teacher_pred_file)
+        os.remove(test_student_pred_file)
+        os.remove(test_teacher_pred_file)
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-        optimizer = torch.optim.SGD(filtered_parameters, args.lr,
-                                    momentum=args.momentum,
-                                    weight_decay=args.weight_decay,
-                                    nesterov=args.nesterov)
+        optimizer = torch.optim.Adam(filtered_parameters)
+        # optimizer = torch.optim.SGD(filtered_parameters, args.lr,
+        #                             momentum=args.momentum,
+        #                             weight_decay=args.weight_decay,
+        #                             nesterov=args.nesterov)
     else:
         optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -168,7 +175,7 @@ def main(context):
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
         # train for one epoch
-        train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        train(train_loader, model, ema_model, optimizer, epoch, dataset, training_log)
         LOG.info("--- training epoch in %s seconds ---" % (time.time() - start_time))
 
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
@@ -286,7 +293,7 @@ def create_data_loaders(train_transformation,
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.REDataset(traindir, args, train_transformation, 'train')
+        dataset = datasets.REDataset(traindir, args, train_transformation, args.train_subdir)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
@@ -402,9 +409,15 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def train(train_loader, model, ema_model, optimizer, epoch, log):
+def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
     global global_step
     global NA_label
+    global train_student_pred_match_noNA
+    global train_student_pred_noNA
+    global train_student_true_noNA
+    global train_teacher_pred_match_noNA
+    global train_teacher_pred_noNA
+    global train_teacher_true_noNA
 
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
@@ -428,10 +441,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     end = time.time()
     # datapoint: List(input_student, input teacher, labels)
     for i, datapoint in enumerate(train_loader):
-        # print("datapoint type {0} type of datapoint[0] {1}".format(type(datapoint), type(datapoint[0])))
         # print("len(datapoint) = ", len(datapoint))
         # print("datapoint[0] shape: {0}".format(datapoint[0].shape))
         # sys.exit(1)
+
         # measure data loading time()
         meters.update('data_time', time.time() - end)
 
@@ -464,9 +477,15 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                 ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel', 'gids']:
-            input = datapoint[0]
-            ema_input = datapoint[1]
+            input = datapoint[0][0]
+            ema_input = datapoint[0][1]
+            lengths = datapoint[1]
             target = datapoint[2]
+
+            # print("input shape: ", input.shape)
+            # print("ema_input shape: ", ema_input.shape)
+            # print("lengths shape: ", lengths.shape)
+            # print("target shape: ", target.shape)
 
             # input_entity1 = input[0]
             # input_entity2 = input[1]
@@ -531,10 +550,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
 
-        # US!!
+        # US - TRAIN!!
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            ema_model_out = ema_model(ema_input_var)
-            model_out = model(input_var)
+            model_out, perm_idx = model((input_var, lengths))
+            ema_model_out, perm_idx_ema = ema_model((ema_input_var, lengths))
+            if (perm_idx_ema.ne(perm_idx).sum() > 0):
+                print('perm_idx_ema != perm_idx')
+
+            target_var = target_var[perm_idx]
 
         # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
         #     ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
@@ -623,13 +646,13 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                 accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
 
             #teacher
-            ema_correct, ema_num_target_notNA, ema_num_pred_notNA  = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
+            ema_correct, ema_num_target_notNA, ema_num_pred_notNA = prec_rec(ema_logit.data, target_var.data, NA_label, topk=(1,))
             if ema_num_pred_notNA > 0:
                 ema_prec = float(ema_correct) / float(ema_num_pred_notNA)
             else:
                 ema_prec = 0.0
 
-            if num_target_notNA > 0:
+            if ema_num_target_notNA > 0:
                 ema_rec = float(ema_correct) / float(ema_num_target_notNA)
             else:
                 ema_rec = 0.0
@@ -659,6 +682,11 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             else:
                 accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
 
+            lbl_categories = dataset.categories
+            if epoch == args.epochs - 1:
+                dump_result(i, args, class_logit.data, lbl_categories, perm_idx, 'train_student', topk=(1,))
+                dump_result(i, args, ema_logit.data, lbl_categories, perm_idx_ema, 'train_teacher', topk=(1,))
+
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
             meters.update('top1', prec1[0], labeled_minibatch_size)
@@ -684,7 +712,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('batch_time', time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i % args.print_freq == 0 or i == len(train_loader) - 1:
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Epoch: [{0}][{1}/{2}]  '
@@ -714,6 +742,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
     global NA_label
+    global test_student_pred_match_noNA
+    global test_student_pred_noNA
+    global test_student_true_noNA
+    global test_teacher_pred_match_noNA
+    global test_teacher_pred_noNA
+    global test_teacher_true_noNA
 
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
@@ -754,12 +788,13 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 patterns_var = torch.autograd.Variable(patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel', 'gids']:
+            # print("AT TEST, datapoint len = ", len(datapoint))
             input = datapoint[0]
-            target = datapoint[1]
-
-            # input_entity1 = input[0]
-            # input_entity2 = input[1]
-            # input_inbetween_chunk = input[2]
+            # print("input shape: ", input.shape)
+            lengths = datapoint[1]
+            # print("lengths shape: ", lengths.shape)
+            target = datapoint[2]
+            # print("target shape: ", target.shape)
 
             if torch.cuda.is_available():
                 input_var = torch.autograd.Variable(input, volatile=True).cuda()
@@ -803,9 +838,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
         elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
-        ## US!
+
+        ## US -- TEST!
         elif args.dataset in ['riedel', 'gids']and args.arch == 'lstm_RE':
-            output1 = model(input_var)
+            output1, perm_idx_test = model((input_var, lengths))
+            target_var = target_var[perm_idx_test]
+
         # ## AVG MODEL
         # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
         #     output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
@@ -815,44 +853,44 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
         if args.dataset in ['riedel', 'gids']:
-            correct, num_target_notNA, num_pred_notNA = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
-            if num_pred_notNA > 0:
-                prec = float(correct) / float(num_pred_notNA)
+            correct_test, num_target_notNA_test, num_pred_notNA_test = prec_rec(output1.data, target_var.data, NA_label, topk=(1,))
+            if num_pred_notNA_test > 0:
+                prec_test = float(correct_test) / float(num_pred_notNA_test)
             else:
-                prec = 0.0
+                prec_test = 0.0
 
-            if num_target_notNA > 0:
-                rec = float(correct) / float(num_target_notNA)
+            if num_target_notNA_test > 0:
+                rec_test = float(correct_test) / float(num_target_notNA_test)
             else:
-                rec = 0.0
+                rec_test = 0.0
 
-            if prec + rec == 0:
-                f1 = 0
+            if prec_test + rec_test == 0:
+                f1_test = 0
             else:
-                f1 = 2 * prec * rec / (prec + rec)
+                f1_test = 2 * prec_test * rec_test / (prec_test + rec_test)
 
-            meters.update('correct', correct, 1)
-            meters.update('target_notNA', num_target_notNA, 1)
-            meters.update('pred_notNA', num_pred_notNA, 1)
+            meters.update('correct_test', correct_test, 1)
+            meters.update('target_notNA_test', num_target_notNA_test, 1)
+            meters.update('pred_notNA_test', num_pred_notNA_test, 1)
 
-            if float(meters['pred_notNA'].sum) == 0:
-                accum_prec = 0
+            if float(meters['pred_notNA_test'].sum) == 0:
+                accum_prec_test = 0
             else:
-                accum_prec = float(meters['correct'].sum) / float(meters['pred_notNA'].sum)
+                accum_prec_test = float(meters['correct_test'].sum) / float(meters['pred_notNA_test'].sum)
 
-            if float(meters['target_notNA'].sum) == 0:
-                accum_rec = 0
+            if float(meters['target_notNA_test'].sum) == 0:
+                accum_rec_test = 0
             else:
-                accum_rec = float(meters['correct'].sum) / float(meters['target_notNA'].sum)
+                accum_rec_test = float(meters['correct_test'].sum) / float(meters['target_notNA_test'].sum)
 
-            if accum_prec + accum_rec == 0:
-                accum_f1 = 0
+            if accum_prec_test + accum_rec_test == 0:
+                accum_f1_test = 0
             else:
-                accum_f1 = 2 * accum_prec * accum_rec / (accum_prec + accum_rec)
+                accum_f1_test = 2 * accum_prec_test * accum_rec_test / (accum_prec_test + accum_rec_test)
 
             lbl_categories = dataset.categories
             if epoch == args.epochs:
-                dump_result(i, args, output1.data, lbl_categories, model_type, topk=(1,))
+                dump_result(i, args, output1.data, lbl_categories, perm_idx_test, 'test_'+model_type, topk=(1,))
 
         else:
             # measure accuracy and record loss
@@ -867,14 +905,14 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         meters.update('batch_time', time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i % args.print_freq == 0 or i == len(eval_loader) - 1:
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Test: [{0}/{1}]  '
                     'Precision {prec:.3f} ({accum_prec:.3f})  '
                     'Recall {rec:.3f} ({accum_rec:.3f})  '
                     'F1 {f1:.3f} ({accum_f1:.3f})'.format(
-                        i, len(eval_loader), prec=prec, accum_prec=accum_prec,rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1))
+                        i, len(eval_loader), prec=prec_test, accum_prec=accum_prec_test, rec=rec_test, accum_rec=accum_rec_test, f1=f1_test, accum_f1=accum_f1_test))
 
             else:
                 LOG.info(
@@ -887,14 +925,14 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         if epoch == args.epochs:
 
             if model_type == 'student':
-                if student_pred_noNA == 0.0:
+                if test_student_pred_noNA == 0.0:
                     student_precision = 0.0
                 else:
-                    student_precision = student_pred_match_noNA / student_pred_noNA
-                if student_true_noNA == 0.0:
+                    student_precision = test_student_pred_match_noNA / test_student_pred_noNA
+                if test_student_true_noNA == 0.0:
                     student_recall = 0.0
                 else:
-                    student_recall = student_pred_match_noNA / student_true_noNA
+                    student_recall = test_student_pred_match_noNA / test_student_true_noNA
                 if student_precision + student_recall == 0.0:
                     student_f1 = 0.0
                 else:
@@ -903,14 +941,14 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 print('******* Student : Overall Precision ' + str(student_precision) + '\tRecall ' + str(student_recall) + '\tF1 ' + str(student_f1) + '\t********')
 
             else:
-                if teacher_pred_noNA == 0.0:
+                if test_teacher_pred_noNA == 0.0:
                     teacher_precision = 0.0
                 else:
-                    teacher_precision = teacher_pred_match_noNA / teacher_pred_noNA
-                if teacher_true_noNA == 0.0:
+                    teacher_precision = test_teacher_pred_match_noNA / test_teacher_pred_noNA
+                if test_teacher_true_noNA == 0.0:
                     teacher_recall = 0.0
                 else:
-                    teacher_recall = teacher_pred_match_noNA / teacher_true_noNA
+                    teacher_recall = test_teacher_pred_match_noNA / test_teacher_true_noNA
                 if teacher_precision + teacher_recall == 0.0:
                     teacher_f1 = 0.0
                 else:
@@ -934,7 +972,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
 
     if args.dataset in ['riedel', 'gids']:
-        return accum_f1
+        return accum_f1_test
     else:
         return meters['top1'].avg
 
@@ -1051,6 +1089,8 @@ def get_current_consistency_weight(epoch):
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
+
+    print('error: else !!!!!!!!!!!!!!!!!!!!!!!!')
     maxk = max(topk)
     labeled_minibatch_size = max(target.ne(NO_LABEL).sum(), 1e-8)
 
@@ -1075,22 +1115,28 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
 
-    # index() takes same size of pred with idx value 0 and 1, and only return pred[idx] where idx is 1
-    tp = pred.index(pred.eq(target.view(1, -1).expand_as(pred))).ne(
-        NA_label).sum()  # number of cases where pred matches with target and that is not NA label
     tp_fp = pred.ne(NA_label).sum()  # number of non NA labels in pred
     tp_fn = target.ne(NA_label).sum()  # number of non NA labels in target
+
+    # index() takes same size of pred with idx value 0 and 1, and only return pred[idx] where idx is 1
+    tp = pred.index(pred.eq(target.view(1, -1).expand_as(pred))).ne(NA_label).sum()  # number of cases where pred matches with target and that is not NA label
 
     return tp, tp_fn, tp_fp
 
 
-def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', topk=(1,)):
-    global student_pred_match_noNA
-    global student_pred_noNA
-    global student_true_noNA
-    global teacher_pred_match_noNA
-    global teacher_pred_noNA
-    global teacher_true_noNA
+def dump_result(batch_id, args, output, lbl_categories, perm_idx, model_type='train_teacher', topk=(1,)):
+    global test_student_pred_match_noNA
+    global test_student_pred_noNA
+    global test_student_true_noNA
+    global test_teacher_pred_match_noNA
+    global test_teacher_pred_noNA
+    global test_teacher_true_noNA
+    global train_student_pred_match_noNA
+    global train_student_pred_noNA
+    global train_student_true_noNA
+    global train_teacher_pred_match_noNA
+    global train_teacher_pred_noNA
+    global train_teacher_true_noNA
 
     maxk = max(topk)
     assert maxk == 1, "Right now only computing for topk=1"
@@ -1098,17 +1144,19 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
 
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
+    traindir = os.path.join(dataset_config['datadir'], args.train_subdir)
+    student_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
+    teacher_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
 
-    student_pred_file = evaldir + '/' + args.run_name + '_pred_student.tsv'
-    teacher_pred_file = evaldir + '/' + args.run_name + '_pred_teacher.tsv'
-    f = open(dataset_file)
-    lines = f.readlines()
+    order_idx = perm_idx.numpy()
 
-    if model_type == 'teacher':
+    if model_type == 'test_teacher':
+        dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
+        f = open(dataset_file)
+        lines = f.readlines()
         with open(teacher_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
-                line_id = int(batch_id * args.batch_size + p)
+                line_id = int(batch_id * args.batch_size + order_idx[p])
                 line = lines[line_id].strip()
                 lbl_id = int(pre)
                 pred_label = lbl_categories[lbl_id].strip()
@@ -1116,18 +1164,22 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
                 vals = line.split('\t')
                 true_label = vals[4].strip()
                 if pred_label == true_label and true_label != 'NA':
-                    teacher_pred_match_noNA += 1.0
+                    test_teacher_pred_match_noNA += 1.0
                 if pred_label != 'NA':
-                    teacher_pred_noNA += 1.0
+                    test_teacher_pred_noNA += 1.0
                 if true_label != 'NA':
-                    teacher_true_noNA += 1.0
+                    test_teacher_true_noNA += 1.0
 
                 line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
                 fo.write(line)
-    else:
+
+    elif model_type == 'test_student':
+        dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
+        f = open(dataset_file)
+        lines = f.readlines()
         with open(student_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
-                line_id = int(batch_id * args.batch_size + p)
+                line_id = int(batch_id * args.batch_size + order_idx[p])
                 line = lines[line_id].strip()
                 lbl_id = int(pre)
                 pred_label = lbl_categories[lbl_id].strip()
@@ -1135,14 +1187,62 @@ def dump_result(batch_id, args, output, lbl_categories, model_type='teacher', to
                 vals = line.split('\t')
                 true_label = vals[4].strip()
                 if pred_label == true_label and true_label != 'NA':
-                    student_pred_match_noNA += 1.0
+                    test_student_pred_match_noNA += 1.0
                 if pred_label != 'NA':
-                    student_pred_noNA += 1.0
+                    test_student_pred_noNA += 1.0
                 if true_label != 'NA':
-                    student_true_noNA += 1.0
+                    test_student_true_noNA += 1.0
 
                 line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
                 fo.write(line)
+
+    elif model_type == 'train_teacher':
+        dataset_file = traindir + '/' + args.train_subdir + '.txt'
+        f = open(dataset_file)
+        lines = f.readlines()
+        with open(teacher_pred_file, "a") as fo:
+            for p, pre in enumerate(prediction):
+                line_id = int(batch_id * args.batch_size + order_idx[p])
+                line = lines[line_id].strip()
+                lbl_id = int(pre)
+                pred_label = lbl_categories[lbl_id].strip()
+
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if pred_label == true_label and true_label != 'NA':
+                    train_teacher_pred_match_noNA += 1.0
+                if pred_label != 'NA':
+                    train_teacher_pred_noNA += 1.0
+                if true_label != 'NA':
+                    train_teacher_true_noNA += 1.0
+
+                line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+                fo.write(line)
+
+    elif model_type == 'train_student':
+        dataset_file = traindir + '/' + args.train_subdir + '.txt'
+        f = open(dataset_file)
+        lines = f.readlines()
+        with open(student_pred_file, "a") as fo:
+            for p, pre in enumerate(prediction):
+                line_id = int(batch_id * args.batch_size + order_idx[p])
+                line = lines[line_id].strip()
+                lbl_id = int(pre)
+                pred_label = lbl_categories[lbl_id].strip()
+
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if pred_label == true_label and true_label != 'NA':
+                    train_student_pred_match_noNA += 1.0
+                if pred_label != 'NA':
+                    train_student_pred_noNA += 1.0
+                if true_label != 'NA':
+                    train_student_true_noNA += 1.0
+
+                line = line + '\t' + pred_label + '\t' + str(float(score[p])) + '\n'
+                fo.write(line)
+
+
 
 
 if __name__ == '__main__':

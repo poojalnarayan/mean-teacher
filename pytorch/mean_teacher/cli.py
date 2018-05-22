@@ -78,7 +78,7 @@ def create_parser():
                         help='use pre-trained model')
     parser.add_argument('--wordemb-size', default=300, type=int,
                         help='size of the word-embeddings to be used in the simple_MLP_embed model (default: 300)')
-    parser.add_argument('--hidden-size', default=200, type=int,
+    parser.add_argument('--hidden-size', default=100, type=int, #was 200
                         help='size of the hidden layer to be used in the simple_MLP_embed model (default: 50)')
     parser.add_argument('--pretrained-wordemb', default=True, type=str2bool, metavar='BOOL',
                         help='Use pre-trained word embeddings to be loaded from disk, if True; else random initialization of word-emb (default: True)')
@@ -98,7 +98,7 @@ def create_parser():
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
     parser.add_argument('--max-entity-len', default='8', type=int,
                         help='maximum number of words in entity, extra words would be truncated')
-    parser.add_argument('--max-inbetween-len', default='20', type=int,
+    parser.add_argument('--max-inbetween-len', default='50', type=int,
                         help='maximum number of words in between of two entities, extra words would be truncated')
 
     return parser

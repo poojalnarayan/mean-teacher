@@ -216,7 +216,7 @@ class Datautils:
                             entities2_words[i] = 'xnumx'
                         i += 1
 
-                    if len(inbetween_words) <= max_inbetween_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464
+                    if len(inbetween_words) <= 2*max_inbetween_len or type is not 'train':   # throw away sentences with too many inbetween words
                         labels.append(vals[4])
 
                         if len(entities1_words) > max_entity_len:
@@ -372,7 +372,7 @@ class Datautils:
                         entities2_words[i] = 'xnumx'
                     i += 1
 
-                if len(syntax_tokens) <= max_syntax_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
+                if len(syntax_tokens) <= 2*max_syntax_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
 
                     labels.append(vals[4])
                     if len(entities1_words) > max_entity_len:

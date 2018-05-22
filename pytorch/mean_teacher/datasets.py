@@ -356,7 +356,7 @@ class REDataset(Dataset):
         self.args = args
         self.max_entity_len = args.max_entity_len  # 8
         self.max_inbetween_len = args.max_inbetween_len  # 60
-        self.pad_len = self.max_inbetween_len  # max_entity_len*2 + max_inbetween_len
+        self.pad_len = self.max_inbetween_len + self.max_entity_len*2 #+ max_inbetween_len
 
         if args.eval_subdir not in dir:
 
@@ -365,19 +365,19 @@ class REDataset(Dataset):
                 print('fullyLex')
                 self.entities1_words, self.entities2_words, self.labels_str, \
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
             elif 'headLex' in args.arch:
                 dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
                 print('headLex')
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
             else:
                 dataset_file = dir + "/" + type + ".txt"
                 print("dataset_file=", dataset_file)
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
                 print("len(self.entities1_words)=",len(self.entities1_words))
                 print("len(self.word_counts)=", len(self.word_counts))
 
@@ -404,17 +404,17 @@ class REDataset(Dataset):
             if 'fullyLex' in args.arch:
                 dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
 
             elif 'headLex' in args.arch:
                 dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data_syntax(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
 
             else:
                 dataset_file = dir + "/" + type + ".txt"
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data(dataset_file, type, self.max_entity_len, self.max_inbetween_len)
+                    = Datautils.read_re_data(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
 
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             print("Using vocab file:", vocab_file)
@@ -427,7 +427,7 @@ class REDataset(Dataset):
                     self.categories.append(line.strip())
 
             with contextlib.suppress(FileNotFoundError):
-                # os.remove(vocab_file)
+                os.remove(vocab_file)
                 os.remove(label_category_file)
 
         if args.pretrained_wordemb:
@@ -472,23 +472,38 @@ class REDataset(Dataset):
         # todo: make it a function to decide what to do with the words in-between (chunks_inbetween_words)
         ##########
         #self.chunks_inbetween_words[idx]:  List(Str)
-        original_len = len(entity1_words_id) + len(entity2_words_id) + len(self.chunks_inbetween_words[idx])
-        # print('original_len: ' + str(original_len))
-
         inbetween_max = self.pad_len - len(entity1_words_id) - len(entity2_words_id)
         if len(self.chunks_inbetween_words[idx]) > inbetween_max:    # need to truncation
-            l = 0
+            # l = 0
+            # refined_inbetween = list()
+            # for w in self.chunks_inbetween_words[idx]:
+            #     if w in self.word_vocab.word_to_id and l < inbetween_max:   #keep more useful words, i.e., words appears in vocabulary
+            #         refined_inbetween.append(w)
+            #         l += 1
+            # self.chunks_inbetween_words[idx] = refined_inbetween
+
+            remove_len = len(self.chunks_inbetween_words[idx]) - inbetween_max
             refined_inbetween = list()
-            for w in self.chunks_inbetween_words[idx]:
-                if w in self.word_vocab.word_to_id and l < inbetween_max:   #keep more useful words, i.e., words appears in vocabulary
+            for w_id, w in enumerate(self.chunks_inbetween_words[idx]):
+                if remove_len > 0 and w not in self.word_vocab.word_to_id :   #keep more useful words, i.e., words appears in vocabulary
+                    remove_len -= 1
+                elif remove_len > 0 and w in self.word_vocab.word_to_id and len(refined_inbetween) < inbetween_max:
                     refined_inbetween.append(w)
-                    l += 1
+                elif remove_len == 0 and len(refined_inbetween) < inbetween_max:   # only remove words exceed the max
+                    refined_inbetween.extend(self.chunks_inbetween_words[idx][w_id:w_id+inbetween_max-len(refined_inbetween)])
+
+                if len(refined_inbetween) == inbetween_max:
+                    break
+
             self.chunks_inbetween_words[idx] = refined_inbetween
+
         #############
 
         # List(Int) -- the vocabulary indices
         inbetween_words_id = [self.word_vocab.get_id(w) for w in self.chunks_inbetween_words[idx]]
+        original_len = len(entity1_words_id) + len(entity2_words_id) + len(inbetween_words_id)   #before padding
 
+        # Training:
         if self.transform is not None:
 
             inbetween_words_dropout = self.transform([self.chunks_inbetween_words[idx]], REDataset.ENTITY)
@@ -503,21 +518,14 @@ class REDataset(Dataset):
 
                 # Concatenate the e1 + words_betw + e2
                 # List(Int) -- the indices of whole shebang
-                # student_id = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
-                # student_id_padded = self.pad_item(student_id)
-                # datum_student = torch.LongTensor(student_id_padded)
-                #
-                # teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
-                # teacher_id_padded = self.pad_item(teacher_id)
-                # datum_teacher = torch.LongTensor(teacher_id_padded)
-                # datums = (datum_student, datum_teacher)
 
-
-                student_id = inbetween_words_id_dropout[0]
+                #student_id = inbetween_words_id_dropout[0]
+                student_id = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
                 student_id_padded = self.pad_item(student_id)
                 datum_student = torch.LongTensor(student_id_padded)
 
-                teacher_id = inbetween_words_id_dropout[1]
+                #teacher_id = inbetween_words_id_dropout[1]
+                teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
                 teacher_id_padded = self.pad_item(teacher_id)
                 datum_teacher = torch.LongTensor(teacher_id_padded)
                 datums = (datum_student, datum_teacher)
@@ -526,7 +534,7 @@ class REDataset(Dataset):
                 datum = entity1_words_id + inbetween_words_id_dropout + entity2_words_id
                 datum_padded = self.pad_item(datum)
                 datums = torch.LongTensor(datum_padded)
-
+        # test:
         else:
             datum = entity1_words_id + inbetween_words_id + entity2_words_id
             datum_padded = self.pad_item(datum)
@@ -534,12 +542,13 @@ class REDataset(Dataset):
 
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
-        if self.transform is not None:
-            # return (entity1_datum, entity2_datum, inbetween_datums[0]), (entity1_datum, entity2_datum, inbetween_datums[1]), label
-            return datums[0], datums[1], label
-        else:
-            # return (entity1_datum, entity2_datum, inbetween_datums), label
-            return datums, label
+        # if self.transform is not None:
+        #     # return (entity1_datum, entity2_datum, inbetween_datums[0]), (entity1_datum, entity2_datum, inbetween_datums[1]), label
+        #     return datums[0], datums[1], original_len, label
+        # else:
+        #     # return (entity1_datum, entity2_datum, inbetween_datums), label
+        #     return datums, original_len, label
+        return datums, original_len, label
 
     def sanitise_and_lookup_embedding(self, word_id, args):
         global words_in_glove
