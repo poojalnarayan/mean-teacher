@@ -94,6 +94,8 @@ def create_parser():
                         help='Use dropout in the final layer of the model (p=0.2) (default: False)')
     parser.add_argument('--random_seed', default=1, type=int,
                         help='seed to initialize numpy array')
+    parser.add_argument('--data-subset', default=100.0, type=float,
+                        help='percentage of train dataset to be used for training (from which select labeled & unlabaled data)')
     return parser
 
 

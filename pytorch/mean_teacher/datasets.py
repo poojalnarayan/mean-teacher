@@ -1,6 +1,7 @@
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 import torch
+import random
 
 from . import data
 from .utils import export
@@ -118,6 +119,19 @@ class NECDataset(Dataset):
         self.entity_vocab = Vocabulary.from_file(entity_vocab_file)
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
+
+        if self.args.data_subset != 100.0:
+            dataset_sz = len(self.mentions)
+            print("[SUBSETTING THE DATA] Original dataset size" + str(dataset_sz))
+            print("[SUBSETTING THE DATA] SELECTING " + str(self.args.data_subset) + "% of the data ..")
+            subset_sz = int(dataset_sz * dataset_sz / 100.0)
+            datums = list(zip(self.mentions, self.contexts, self.labels_str))
+            datums_subset = random.sample(datums, subset_sz)
+            self.mentions, self.contexts, self.labels_str = [list(i) for i in list(zip(*datums_subset))]
+            print("[SUBSETTING THE DATA] NEW DATASET " + str(len(self.mentions)) + " consists of data-points")
+        else:
+            print("[NO SUBSETTING THE DATA] Using the whole dataset for training (selecting labeled and unlabaled data from this)")
+
         self.word_vocab, self.max_entity_len, self.max_pattern_len, self.max_num_patterns = self.build_word_vocabulary()
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
