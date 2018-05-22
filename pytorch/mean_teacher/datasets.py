@@ -3,6 +3,14 @@ import torchvision.transforms as transforms
 from . import data
 from .utils import export
 
+@export
+def snli():
+    return {
+        'train_transformation': None,
+        'eval_transformation': None,
+        'datadir': '.data/snli/snli_1.0',
+        'num_classes': 10 # todo: change this ??
+    }
 
 @export
 def imagenet():

@@ -8,7 +8,6 @@ from PIL import Image
 import numpy as np
 from torch.utils.data.sampler import Sampler
 
-
 LOG = logging.getLogger('main')
 NO_LABEL = -1
 

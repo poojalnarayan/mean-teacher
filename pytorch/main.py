@@ -16,8 +16,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
 
-from torchtext import datasets
-from torchtext import data
+from torchtext import datasets as torchtext_datasets
+from torchtext import data as torchtextdata
 
 from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
@@ -156,17 +156,17 @@ def create_data_loaders(train_transformation,
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
     if args.dataset == 'snli':
-        inputs = data.Field(lower=args.lower)
-        answers = data.Field(sequential=False)
+        inputs = torchtextdata.Field(lower=args.lower)
+        answers = torchtextdata.Field(sequential=False)
 
-        train, dev, test = datasets.SNLI.splits(inputs, answers)
+        train, dev, test = torchtext_datasets.SNLI.splits(inputs, answers)
 
         inputs.build_vocab(train, dev, test)
         inputs.vocab.vectors = torch.load(".vector_cache/input_vectors.pt")
 
         answers.build_vocab(train)
 
-        train_loader, dev_iter, eval_loader = data.BucketIterator.splits(
+        train_loader, dev_iter, eval_loader = torchtextdata.BucketIterator.splits(
             (train, dev, test), batch_size=args.batch_size, device=torch.cuda.current_device())
 
         config = args ## todo: fix this to subset the args for snli ?
