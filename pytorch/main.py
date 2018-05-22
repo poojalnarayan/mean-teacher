@@ -1151,7 +1151,10 @@ def dump_result(batch_id, args, output, lbl_categories, perm_idx, model_type='tr
     student_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
     teacher_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
 
-    order_idx = perm_idx.numpy()
+    if torch.cuda.is_available():
+        order_idx = perm_idx.cpu().numpy()
+    else:
+        order_idx = perm_idx.numpy()
 
     if model_type == 'test_teacher':
         dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
