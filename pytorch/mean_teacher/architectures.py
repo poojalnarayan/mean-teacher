@@ -279,11 +279,12 @@ class SeqModel_RE(nn.Module):
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, input_tuple):
         input = input_tuple[0]
-        lengths = input_tuple[1]
+        # lengths = input_tuple[1]
+        seq_lengths = input_tuple[1]
 
         # https://gist.github.com/Tushar-N/dfca335e370a2bc3bc79876e6270099e
-        seq_lengths = torch.LongTensor([x for x in lengths])
-        #print("shape of seq_lengths:", seq_lengths.shape)
+        # seq_lengths = torch.LongTensor([x for x in lengths])
+        # #print("shape of seq_lengths:", seq_lengths.shape)
 
         sorted_lengths, perm_idx = seq_lengths.sort(0, descending=True)
         input_sorted = input[perm_idx]

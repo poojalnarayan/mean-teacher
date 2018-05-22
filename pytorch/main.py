@@ -497,6 +497,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             if torch.cuda.is_available():
                 input_var = torch.autograd.Variable(input).cuda()
                 ema_input_var = torch.autograd.Variable(ema_input).cuda()
+                seq_lengths = torch.cuda.LongTensor([x for x in lengths])
                 # entity1_var = torch.autograd.Variable(input_entity1).cuda()
                 # entity2_var = torch.autograd.Variable(input_entity2).cuda()
                 # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cuda()
@@ -508,6 +509,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             else:
                 input_var = torch.autograd.Variable(input).cpu()
                 ema_input_var = torch.autograd.Variable(ema_input).cpu()
+                seq_lengths = torch.LongTensor([x for x in lengths])
                 # entity1_var = torch.autograd.Variable(input_entity1).cpu()
                 # entity2_var = torch.autograd.Variable(input_entity2).cpu()
                 # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk).cpu()
@@ -552,8 +554,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
 
         # US - TRAIN!!
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            model_out, perm_idx = model((input_var, lengths))
-            ema_model_out, perm_idx_ema = ema_model((ema_input_var, lengths))
+            model_out, perm_idx = model((input_var, seq_lengths))
+            ema_model_out, perm_idx_ema = ema_model((ema_input_var, seq_lengths))
             if (perm_idx_ema.ne(perm_idx).sum() > 0):
                 print('perm_idx_ema != perm_idx')
 
@@ -798,11 +800,13 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
             if torch.cuda.is_available():
                 input_var = torch.autograd.Variable(input, volatile=True).cuda()
+                seq_lengths = torch.cuda.LongTensor([x for x in lengths])
                 # entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cuda()
                 # entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cuda()
                 # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cuda()
             else:
                 input_var = torch.autograd.Variable(input, volatile=True).cpu()
+                seq_lengths = torch.LongTensor([x for x in lengths])
                 # entity1_var = torch.autograd.Variable(input_entity1, volatile=True).cpu()
                 # entity2_var = torch.autograd.Variable(input_entity2, volatile=True).cpu()
                 # inbetween_chunk_var = torch.autograd.Variable(input_inbetween_chunk, volatile=True).cpu()
@@ -841,7 +845,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
         ## US -- TEST!
         elif args.dataset in ['riedel', 'gids']and args.arch == 'lstm_RE':
-            output1, perm_idx_test = model((input_var, lengths))
+            output1, perm_idx_test = model((input_var, seq_lengths))
             target_var = target_var[perm_idx_test]
 
         # ## AVG MODEL
@@ -1090,7 +1094,6 @@ def get_current_consistency_weight(epoch):
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
 
-    print('error: else !!!!!!!!!!!!!!!!!!!!!!!!')
     maxk = max(topk)
     labeled_minibatch_size = max(target.ne(NO_LABEL).sum(), 1e-8)
 
