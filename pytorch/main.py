@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torchvision.datasets
+import torch.cuda
 
 from torchtext import datasets as torchtext_datasets
 from torchtext import data as torchtextdata
@@ -56,10 +57,13 @@ def main(context):
 
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
-        model = model_factory(**model_params)
-        model = nn.DataParallel(model).cuda()
         if args.dataset == 'snli':
             model_params['config'] = snli_config
+
+        model = model_factory(**model_params)
+
+        if torch.cuda.is_available():
+            model = nn.DataParallel(model).cuda()
 
         if ema:
             for param in model.parameters():
@@ -102,7 +106,10 @@ def main(context):
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
         # train for one epoch
-        train(train_loader, model, ema_model, optimizer, epoch, training_log)
+        if args.dataset == 'snli':
+            train_loader.init_epoch()
+
+        train(train_loader, model, ema_model, optimizer, epoch, training_log, args)
         LOG.info("--- training epoch in %s seconds ---" % (time.time() - start_time))
 
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
@@ -166,8 +173,12 @@ def create_data_loaders(train_transformation,
 
         answers.build_vocab(train)
 
-        train_loader, dev_iter, eval_loader = torchtextdata.BucketIterator.splits(
-            (train, dev, test), batch_size=args.batch_size, device=torch.cuda.current_device())
+        if torch.cuda.is_available():
+            train_loader, dev_iter, eval_loader = torchtextdata.BucketIterator.splits(
+                (train, dev, test), batch_size=args.batch_size, device=torch.cuda.current_device())
+        else:
+            train_loader, dev_iter, eval_loader = torchtextdata.BucketIterator.splits(
+                (train, dev, test), batch_size=args.batch_size, device=-1) #torch.cuda.current_device())
 
         config = args ## todo: fix this to subset the args for snli ?
         config.n_embed = len(inputs.vocab)
@@ -221,7 +232,7 @@ def update_ema_variables(model, ema_model, alpha, global_step):
         ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-def train(train_loader, model, ema_model, optimizer, epoch, log):
+def train(train_loader, model, ema_model, optimizer, epoch, log, args):
     global global_step
 
     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
@@ -240,24 +251,43 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     ema_model.train()
 
     end = time.time()
-    for i, ((input, ema_input), target) in enumerate(train_loader):
+    print (type(train_loader))
+    for i, data_minibatch in enumerate(train_loader):
+
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        input_var = torch.autograd.Variable(input)
-        ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        if args.dataset == 'snli':
+            # print (data_minibatch)
+            input_prem_var = data_minibatch.premise
+            input_hyp_var = data_minibatch.hypothesis
+            model_out = model(input_prem_var, input_hyp_var)
+
+            ema_input_prem_var = data_minibatch.premise
+            ema_input_prem_var.volatile = True
+            ema_input_hyp_var = data_minibatch.hypothesis
+            ema_input_hyp_var.volatile = True
+            ema_model_out = model(ema_input_prem_var, ema_input_hyp_var)
+
+            target_var = data_minibatch.label
+
+        else:
+            ((input, ema_input), target) = data_minibatch
+
+            input_var = torch.autograd.Variable(input)
+            ema_input_var = torch.autograd.Variable(ema_input, volatile=True)
+            target_var = torch.autograd.Variable(target.cuda(async=True))
+
+            ema_model_out = ema_model(ema_input_var)
+            model_out = model(input_var)
 
         minibatch_size = len(target_var)
         labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
         assert labeled_minibatch_size > 0
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
-
-        ema_model_out = ema_model(ema_input_var)
-        model_out = model(input_var)
 
         if isinstance(model_out, Variable):
             assert args.logit_distance_cost < 0
@@ -298,17 +328,17 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
 
-        prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 5))
+        prec1, _ = accuracy(class_logit.data, target_var.data, topk=(1,1))  # note: changing to top1
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
+        # meters.update('top5', prec5[0], labeled_minibatch_size)
+        # meters.update('error5', 100. - prec5[0], labeled_minibatch_size)
 
-        ema_prec1, ema_prec5 = accuracy(ema_logit.data, target_var.data, topk=(1, 5))
+        ema_prec1, _ = accuracy(ema_logit.data, target_var.data, topk=(1,1))  # note: changing to top1
         meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
         meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
-        meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+        # meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
+        # meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -329,7 +359,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
                 'Class {meters[class_loss]:.4f}\t'
                 'Cons {meters[cons_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
+                # 'Prec@5 {meters[top5]:.3f}'
+                    .format(
                     epoch, i, len(train_loader), meters=meters))
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
@@ -364,12 +395,12 @@ def validate(eval_loader, model, log, global_step, epoch):
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
         # measure accuracy and record loss
-        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 5))
+        prec1, _ = accuracy(output1.data, target_var.data, topk=(1,1))  # note: changing to top1
         meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
+        # meters.update('top5', prec5[0], labeled_minibatch_size)
+        # meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
@@ -382,7 +413,8 @@ def validate(eval_loader, model, log, global_step, epoch):
                 'Data {meters[data_time]:.3f}\t'
                 'Class {meters[class_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}\t'
-                'Prec@5 {meters[top5]:.3f}'.format(
+                # 'Prec@5 {meters[top5]:.3f}'
+                    .format(
                     i, len(eval_loader), meters=meters))
 
     LOG.info(' * Prec@1 {top1.avg:.3f}\tPrec@5 {top5.avg:.3f}'
