@@ -319,8 +319,7 @@ def riedel():
     return {
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
-        'datadir': 'data-local/re/Riedel2010',
-        'num_classes': 56
+        'datadir': 'data-local/re/Riedel2010'
     }
 
 @export
@@ -334,8 +333,7 @@ def gids():
     return {
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
-        'datadir': 'data-local/re/gids',
-        'num_classes': 5
+        'datadir': 'data-local/re/gids'
     }
 
 class REDataset(Dataset):
@@ -349,9 +347,9 @@ class REDataset(Dataset):
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
 
-    def __init__(self, dir, args, transform=None, type='train'):
+    def __init__(self, dir, args, transform=None):
 
-        w2vfile = dir + "/../../glove.840B.300d.txt"  #todo: make pretrain embedding file a parameter
+        w2vfile = dir + "/../../" + args.pretrained_wordemb_file
 
         self.args = args
         self.max_entity_len = args.max_entity_len  # 8
@@ -360,26 +358,19 @@ class REDataset(Dataset):
 
         if args.eval_subdir not in dir:
 
-            if 'fullyLex' in args.arch:
-                dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
-                print('fullyLex')
+            dataset_file = dir + "/" + args.train_subdir + ".txt"
+            print('training data file:' + dataset_file)
+
+            if 'fullyLex' in args.train_subdir or 'headLex' in args.train_subdir:
                 self.entities1_words, self.entities2_words, self.labels_str, \
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
-            elif 'headLex' in args.arch:
-                dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
-                print('headLex')
-                self.entities1_words, self.entities2_words, self.labels_str,\
-                    self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
             else:
-                dataset_file = dir + "/" + type + ".txt"
-                print("dataset_file=", dataset_file)
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts \
                     = Datautils.read_re_data(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
-                print("len(self.entities1_words)=",len(self.entities1_words))
-                print("len(self.word_counts)=", len(self.word_counts))
+            print("number of lines counts)=",len(self.entities1_words))
+            print("len(self.word_counts)=", len(self.word_counts))
 
             self.word_vocab = Vocabulary()
             for word in self.word_counts:
@@ -401,18 +392,14 @@ class REDataset(Dataset):
 
         else:
 
-            if 'fullyLex' in args.arch:
-                dataset_file = dir + "/" + type + ".txt.sanitized.deps.fullyLex"
-                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
+            dataset_file = dir + "/" + args.eval_subdir + ".txt"
+            print('validation data file:' + dataset_file)
 
-            elif 'headLex' in args.arch:
-                dataset_file = dir + "/" + type + ".txt.sanitized.deps.headLex"
+            if 'fullyLex' in args.eval_subdir or 'headLex' in args.eval_subdir:
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                     = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
 
             else:
-                dataset_file = dir + "/" + type + ".txt"
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
                     = Datautils.read_re_data(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
 
@@ -455,7 +442,7 @@ class REDataset(Dataset):
             if l in self.categories:
                 self.lbl.append(self.categories.index(l))
             else:
-                self.lbl.append(len(self.categories)-1)  #if test label is not recognized, consider it as the last label 'NA' of train
+                self.lbl.append(len(self.categories) - 1)
 
         self.transform = transform
 

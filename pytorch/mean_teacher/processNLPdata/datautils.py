@@ -286,20 +286,24 @@ class Datautils:
             for line in f:
                 vals = line.strip().split('\t')
 
-                syntax_str = vals[5].strip()
-                syntax_str = syntax_str.replace('###END###', '')
+                if len(vals) > 5 :
+                    syntax_str = vals[5].strip()
+                    syntax_str = syntax_str.replace('###END###', '')
 
-                entity1 = vals[2].strip()
-                entity2 = vals[3].strip()
+                    entity1 = vals[2].strip()
+                    entity2 = vals[3].strip()
 
-                syntax_str = syntax_str.lower()
-                syntax_str = syntax_str.replace('-lrb-', " ( ")
-                syntax_str = syntax_str.replace('-rrb-', " ) ")
-                syntax_str = syntax_str.replace('-lsb-', " [ ")
-                syntax_str = syntax_str.replace('-rsb-', " ] ")
+                    syntax_str = syntax_str.lower()
+                    syntax_str = syntax_str.replace('-lrb-', " ( ")
+                    syntax_str = syntax_str.replace('-rrb-', " ) ")
+                    syntax_str = syntax_str.replace('-lsb-', " [ ")
+                    syntax_str = syntax_str.replace('-rsb-', " ] ")
 
-                syntax_str = ' '.join(syntax_str.split())
-                # syntax_tokens = syntax_str.split()
+                    syntax_str = ' '.join(syntax_str.split())
+
+                else:
+                    syntax_str = ''
+
                 syntax_tokens = re.split(r'(\\n| |#|%|\'|\"|,|:|-|_|;|!|=|\(|\)|\$|\?|\*|\+|\]|\[|\{|\}|\\|\||\^|\`|\~)', syntax_str)
 
                 entity1 = entity1.lower()

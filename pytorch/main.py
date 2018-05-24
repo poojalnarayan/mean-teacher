@@ -73,15 +73,19 @@ def main(context):
     ema_validation_log = context.create_train_log("ema_validation")
 
     dataset_config = datasets.__dict__[args.dataset]()
-    num_classes = dataset_config.pop('num_classes')
 
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
         train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
-
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
+
+    if args.dataset in ['riedel', 'gids']:
+        num_classes = len(dataset.categories)
+        print('number of classes: ' + str(num_classes))
+    else:
+        num_classes = dataset_config.pop('num_classes')
 
     def create_model(ema=False):
         LOG.info("=> creating {pretrained}{ema}model '{arch}'".format(
@@ -293,7 +297,7 @@ def create_data_loaders(train_transformation,
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.REDataset(traindir, args, train_transformation, args.train_subdir)
+        dataset = datasets.REDataset(traindir, args, train_transformation)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
@@ -317,7 +321,7 @@ def create_data_loaders(train_transformation,
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
 
-        dataset_test = datasets.REDataset(evaldir, args, eval_transformation, args.eval_subdir)
+        dataset_test = datasets.REDataset(evaldir, args, eval_transformation)
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   pin_memory=pin_memory,
@@ -659,8 +663,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             else:
                 accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
 
-            lbl_categories = dataset.categories
             if epoch == args.epochs - 1:
+                lbl_categories = dataset.categories
                 dump_result(i, args, class_logit.data, target_var.data, lbl_categories, perm_idx, 'train_student', topk=(1,))
                 dump_result(i, args, ema_logit.data, target_var.data, lbl_categories, perm_idx_ema, 'train_teacher', topk=(1,))
 
@@ -894,8 +898,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             else:
                 accum_f1_test = 2 * accum_prec_test * accum_rec_test / (accum_prec_test + accum_rec_test)
 
-            lbl_categories = dataset.categories
             if epoch == args.epochs:
+                lbl_categories = dataset.categories
                 dump_result(i, args, output1.data, target_var.data, lbl_categories, perm_idx_test, 'test_'+model_type, topk=(1,))
 
         else:
@@ -1187,14 +1191,14 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
                 vals = line.split('\t')
                 true_label = vals[4].strip()
                 match = pred_label == target_label
+
+                assert true_label == target_label
+
                 if match and true_label != 'NA':
-                    assert true_label == target_label
                     test_teacher_pred_match_noNA += 1.0
                 if pred_label != 'NA':
-                    assert true_label == target_label
                     test_teacher_pred_noNA += 1.0
                 if true_label != 'NA':
-                    assert true_label == target_label
                     test_teacher_true_noNA += 1.0
 
                 line = line + '\t' + target_label + '\t' + pred_label + '\t' + str(match) + '\t' + str(float(score[p])) + '\n'
@@ -1218,14 +1222,14 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
                 vals = line.split('\t')
                 true_label = vals[4].strip()
                 match = pred_label == target_label
+
+                assert true_label == target_label
+
                 if match and true_label != 'NA':
-                    assert true_label == target_label
                     test_student_pred_match_noNA += 1.0
                 if pred_label != 'NA':
-                    assert true_label == target_label
                     test_student_pred_noNA += 1.0
                 if true_label != 'NA':
-                    assert true_label == target_label
                     test_student_true_noNA += 1.0
 
                 line = line + '\t' + target_label + '\t' + pred_label + '\t' + str(match) + '\t' + str(float(score[p])) + '\n'
@@ -1241,6 +1245,9 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
                 # line_id = int(batch_id * args.batch_size + order_idx[p])
                 # line = lines[line_id].strip()
                 lbl_id = int(pre)
+                if lbl_id >= len(lbl_categories):
+                    print('pred_label id'+ str(lbl_id))
+                    print('number of labels: ' + str(len(lbl_categories)))
                 pred_label = lbl_categories[lbl_id].strip()
                 if target[p] != NO_LABEL:
                     target_label = lbl_categories[target[p]].strip()
@@ -1269,6 +1276,9 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
                 # line_id = int(batch_id * args.batch_size + order_idx[p])
                 # line = lines[line_id].strip()
                 lbl_id = int(pre)
+                if lbl_id >= len(lbl_categories):
+                    print('pred_label id'+ str(lbl_id))
+                    print('number of labels: ' + str(len(lbl_categories)))
                 pred_label = lbl_categories[lbl_id].strip()
                 if target[p] != NO_LABEL:
                     target_label = lbl_categories[target[p]].strip()
