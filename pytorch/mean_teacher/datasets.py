@@ -338,7 +338,6 @@ def gids():
 
 class REDataset(Dataset):
 
-    #todo: when use this var, instead of using self, use REDataset
     PAD = "@PADDING"
     OOV = "</s>"
     ENTITY = "@entity"
@@ -377,10 +376,9 @@ class REDataset(Dataset):
                 if self.word_counts[word] >= args.word_frequency:
                     self.word_vocab.add(word, self.word_counts[word])
             self.word_vocab.add("@PADDING", 0)
-            print("self.word_vocab.size=", self.word_vocab.size())
-
             self.pad_id = self.word_vocab.get_id(REDataset.PAD)
 
+            print("self.word_vocab.size=", self.word_vocab.size())
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             self.word_vocab.to_file(vocab_file)
 
@@ -406,6 +404,7 @@ class REDataset(Dataset):
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             print("Using vocab file:", vocab_file)
             self.word_vocab = Vocabulary.from_file(vocab_file)
+            self.pad_id = self.word_vocab.get_id(REDataset.PAD)
 
             self.categories = []
             label_category_file = dir + '/../label_category_train_' + str(self.args.run_name) + '.txt'
@@ -598,7 +597,7 @@ class REDataset(Dataset):
     #     return dataitem_padded
 
     def pad_item(self, dataitem):
-        dataitem_padded = dataitem + [self.word_vocab.get_id(REDataset.PAD)] * (self.pad_len - len(dataitem))
+        dataitem_padded = dataitem + [self.pad_id] * (self.pad_len - len(dataitem))
         return dataitem_padded
 
 @export

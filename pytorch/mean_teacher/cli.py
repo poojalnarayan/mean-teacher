@@ -76,7 +76,7 @@ def create_parser():
                         help='evaluate model on evaluation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
-    parser.add_argument('--wordemb-size', default=300, type=int,
+    parser.add_argument('--wordemb-size', default=100, type=int,
                         help='size of the word-embeddings to be used in the simple_MLP_embed model (default: 300)')
     parser.add_argument('--hidden-size', default=100, type=int, #was 200
                         help='size of the hidden layer to be used in the simple_MLP_embed model (default: 50)')

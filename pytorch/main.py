@@ -99,7 +99,6 @@ def main(context):
         if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
-            # model_params['padding_idx'] = padding_idx
             model_params['wordemb_size'] = args.wordemb_size
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
@@ -533,17 +532,20 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
 
         # US - TRAIN!!
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'lstm_RE':
-            model_out, perm_idx = model((input_var, seq_lengths))
+            model_out, perm_idx = model((input_var, seq_lengths))            # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
             ema_model_out, perm_idx_ema = ema_model((ema_input_var, seq_lengths))
-            if (perm_idx_ema.ne(perm_idx).sum() > 0):
-                print('perm_idx_ema != perm_idx')
+            assert perm_idx_ema.ne(perm_idx).sum() == 0
 
             target_var = target_var[perm_idx]
 
-        # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-        #     ema_model_out = ema_model(ema_entity1_var, ema_entity2_var, ema_inbetween_chunk_var)
-        #     model_out = model(entity1_var, entity2_var, inbetween_chunk_var)
-        #     # model_out: size of one batch(256) * score of each label (torch.FloatTensor of size 56)
+        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
+
+            model_out, perm_idx = model((input_var, seq_lengths, dataset.pad_id))
+            ema_model_out, perm_idx_ema = ema_model((ema_input_var, seq_lengths, dataset.pad_id))
+            assert perm_idx_ema.ne(perm_idx).sum() == 0
+
+            target_var = target_var[perm_idx]
+
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
@@ -854,9 +856,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             output1, perm_idx_test = model((input_var, seq_lengths))
             target_var = target_var[perm_idx_test]
 
-        # ## AVG MODEL
-        # elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-        #     output1 = model(entity1_var, entity2_var, inbetween_chunk_var)
+        ## AVG MODEL
+        elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
+            output1, perm_idx_test = model((input_var, seq_lengths, dataset.pad_id))
+            target_var = target_var[perm_idx_test]
+
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)

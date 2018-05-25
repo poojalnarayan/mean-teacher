@@ -182,7 +182,7 @@ class FeedForwardMLPEmbed(nn.Module):
 ##### Simple architecture for relation extraction. the entity and sentence embeddings are computed by an average
 ##############################################
 @export
-def simple_MLP_embed_RE(word_vocab_size, num_classes, pretrained=True, word_vocab_embed=None, wordemb_size=300, hidden_size=200, update_pretrained_wordemb=False):
+def simple_MLP_embed_RE(word_vocab_size, num_classes, wordemb_size, pretrained=True, word_vocab_embed=None, hidden_size=200, update_pretrained_wordemb=False):
 
     model = FeedForwardMLPEmbed_RE(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
@@ -215,14 +215,32 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
         # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
-    def forward(self, input_tuple):
+    def forward(self, input_tuple, pad_id):
         input = input_tuple[0]
         seq_lengths = input_tuple[1]
 
-        # todo: need to add mask so that padding does not effect backprop
-        embed = torch.mean(self.embeddings(input), 1)  # Note: Average the word-embeddings
+        # Embed the input
+        embedded = self.embeddings(input)
+        print('embedded.shape: ' + str(embedded.shape))
 
-        res = self.layer1(embed)
+        # Make the mask for removing the padded items
+        mask = input.ne(pad_id)
+        # mask = mask.type(torch.LongTensor)
+        mask = mask.type(torch.FloatTensor)
+
+        # add an extra dimension, initially of size 1
+        # then "expand_as" copies the last dimension into the new dimension
+        # This essentially propogates the mask through the final dimension
+        # input.shape[0] should be batch size and input.shape[1] should be the num_words
+        expanded_mask = mask.view(input.shape[0], input.shape[1], 1).expand_as(embedded)
+
+        # Apply mask (clear out the embeddings of padded items)
+        masked_embedded = embedded * expanded_mask
+
+        summation = masked_embedded.sum(1)
+        avg = summation / seq_lengths.view(-1,1).expand_as(summation)
+
+        res = self.layer1(avg)
         res = self.activation(res)
         res = self.layer2(res)
 
@@ -232,7 +250,7 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 ##### More advanced architecture where the entity and words in-between embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def lstm_RE(word_vocab_size, num_classes, hidden_size, pretrained=True, wordemb_size=300, word_vocab_embed=None, update_pretrained_wordemb=False):
+def lstm_RE(word_vocab_size, num_classes, wordemb_size, hidden_size, pretrained=True, word_vocab_embed=None, update_pretrained_wordemb=False):
     lstm_hidden_size = 50 # was 100
     model = SeqModel_RE(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
