@@ -700,13 +700,16 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Epoch: [{0}][{1}/{2}]  '
+                    'ClassLoss {meters[class_loss]:.4f}  '
+                    'Loss {meters[loss]:.4f}  '
                     'Prec {prec:.3f}({accum_prec:.3f})  '
                     'Rec {rec:.3f}({accum_rec:.3f})  '
                     'F1 {f1:.3f}({accum_f1:.3f})  '
+                    'EMA_ClassLoss {meters[ema_class_loss]:.4f}  '
                     'EMA_Prec {ema_prec:.3f}({accum_ema_prec:.3f})  '
                     'EMA_Rec {ema_rec:.3f}({accum_ema_rec:.3f})  '
                     'EMA_F1 {ema_f1:.3f}({accum_ema_f1:.3f})'.format(
-                        epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1, ema_prec=ema_prec, accum_ema_prec=accum_ema_prec, ema_rec=ema_rec, accum_ema_rec=accum_ema_rec, ema_f1=ema_f1, accum_ema_f1=accum_ema_f1))
+                        epoch, i, len(train_loader), prec=prec, accum_prec=accum_prec, rec=rec, accum_rec=accum_rec, f1=f1, accum_f1=accum_f1, ema_prec=ema_prec, accum_ema_prec=accum_ema_prec, ema_rec=ema_rec, accum_ema_rec=accum_ema_rec, ema_f1=ema_f1, accum_ema_f1=accum_ema_f1, meters=meters))
 
             else:
                 LOG.info(
@@ -739,9 +742,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             else:
                 student_f1 = 2 * student_precision * student_recall / (student_precision + student_recall)
 
-            print('******* Student : Overall Precision ' + str(student_precision) + '\tRecall ' + str(
-                student_recall) + '\tF1 ' + str(student_f1) + '\t********')
-
+            LOG.info('******* [Train] Student : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
+                    student_precision, student_recall, student_f1))
 
             if train_teacher_pred_noNA == 0.0:
                 teacher_precision = 0.0
@@ -756,9 +758,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             else:
                 teacher_f1 = 2 * teacher_precision * teacher_recall / (teacher_precision + teacher_recall)
 
-            print('******* Teacher : Overall Precision ' + str(teacher_precision) + '\tRecall ' + str(
-                teacher_recall) + '\tF1 ' + str(teacher_f1) + '\t********')
-
+            LOG.info('******* [Train] Teacher : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
+                teacher_precision, teacher_recall, teacher_f1))
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
     global NA_label
@@ -908,6 +909,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             else:
                 accum_f1_test = 2 * accum_prec_test * accum_rec_test / (accum_prec_test + accum_rec_test)
 
+            meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
+
             if epoch == args.epochs:
                 dump_result(i, args, output1.data, target_var.data, dataset, perm_idx_test, 'test_'+model_type, topk=(1,))
 
@@ -928,10 +931,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             if args.dataset in ['riedel', 'gids']:
                 LOG.info(
                     'Test: [{0}/{1}]  '
+                    'ClassLoss {meters[class_loss]:.4f}  '
                     'Precision {prec:.3f} ({accum_prec:.3f})  '
                     'Recall {rec:.3f} ({accum_rec:.3f})  '
                     'F1 {f1:.3f} ({accum_f1:.3f})'.format(
-                        i, len(eval_loader), prec=prec_test, accum_prec=accum_prec_test, rec=rec_test, accum_rec=accum_rec_test, f1=f1_test, accum_f1=accum_f1_test))
+                        i, len(eval_loader), prec=prec_test, accum_prec=accum_prec_test, rec=rec_test, accum_rec=accum_rec_test, f1=f1_test, accum_f1=accum_f1_test, meters=meters))
 
             else:
                 LOG.info(
@@ -958,7 +962,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 else:
                     student_f1 = 2 * student_precision * student_recall / (student_precision + student_recall)
 
-                print('******* Student : Overall Precision ' + str(student_precision) + '\tRecall ' + str(student_recall) + '\tF1 ' + str(student_f1) + '\t********')
+                LOG.info('******* [Test] Student : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
+                        student_precision, student_recall, student_f1))
 
             else:
                 if test_teacher_pred_noNA == 0.0:
@@ -974,8 +979,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 else:
                     teacher_f1 = 2 * teacher_precision * teacher_recall / (teacher_precision + teacher_recall)
 
-                print('******* Teacher : Overall Precision ' + str(teacher_precision) + '\tRecall ' + str(teacher_recall) + '\tF1 ' + str(teacher_f1) + '\t********')
-
+                LOG.info('******* [Test] Teacher : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
+                    teacher_precision, teacher_recall, teacher_f1))
     else:
         LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
               .format(top1=meters['top1'], class_loss=meters['class_loss']))
