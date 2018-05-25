@@ -362,13 +362,13 @@ class REDataset(Dataset):
 
             if 'fullyLex' in args.train_subdir or 'headLex' in args.train_subdir:
                 self.entities1_words, self.entities2_words, self.labels_str, \
-                    self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
+                    self.chunks_inbetween_words, self.word_counts, _ \
+                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len, [])
             else:
                 self.entities1_words, self.entities2_words, self.labels_str,\
-                    self.chunks_inbetween_words, self.word_counts \
-                    = Datautils.read_re_data(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len)
-            print("number of lines counts)=",len(self.entities1_words))
+                    self.chunks_inbetween_words, self.word_counts, _ \
+                    = Datautils.read_re_data(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len, [])
+            print("number of lines in train counts = ", len(self.entities1_words))
             print("len(self.word_counts)=", len(self.word_counts))
 
             self.word_vocab = Vocabulary()
@@ -390,17 +390,6 @@ class REDataset(Dataset):
 
         else:
 
-            dataset_file = dir + "/" + args.eval_subdir + ".txt"
-            print('validation data file:' + dataset_file)
-
-            if 'fullyLex' in args.eval_subdir or 'headLex' in args.eval_subdir:
-                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
-
-            else:
-                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _ \
-                    = Datautils.read_re_data(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len)
-
             vocab_file = dir + '/../vocabulary_train_' + str(self.args.run_name) + '.txt'
             print("Using vocab file:", vocab_file)
             self.word_vocab = Vocabulary.from_file(vocab_file)
@@ -415,6 +404,18 @@ class REDataset(Dataset):
             with contextlib.suppress(FileNotFoundError):
                 os.remove(vocab_file)
                 os.remove(label_category_file)
+
+            dataset_file = dir + "/" + args.eval_subdir + ".txt"
+            print('validation data file:' + dataset_file)
+
+            if 'fullyLex' in args.eval_subdir or 'headLex' in args.eval_subdir:
+                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _, self.oov_label_lineid \
+                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len, self.categories)
+
+            else:
+                self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _, self.oov_label_lineid \
+                    = Datautils.read_re_data(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len, self.categories)
+            print("number of lines in test counts = ", len(self.entities1_words))
 
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
@@ -438,10 +439,11 @@ class REDataset(Dataset):
 
         self.lbl = []
         for l in self.labels_str:
-            if l in self.categories:
-                self.lbl.append(self.categories.index(l))
-            else:
-                self.lbl.append(len(self.categories) - 1)
+            self.lbl.append(self.categories.index(l))
+            # if l in self.categories:
+            #     self.lbl.append(self.categories.index(l))
+            # else:
+            #     self.lbl.append(len(self.categories) - 1)
 
         self.transform = transform
 

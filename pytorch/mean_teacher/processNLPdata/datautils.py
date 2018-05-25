@@ -43,18 +43,23 @@ class Datautils:
         return entities, contexts, labels
 
     @classmethod
-    def read_re_data(cls, filename, type, max_entity_len, max_inbetween_len):
+    def read_re_data(cls, filename, type, max_entity_len, max_inbetween_len, train_labels):
         labels = []
         entities1 = []
         entities2 = []
         chunks_inbetween = []
         word_counts = dict()
-
+        oov_label = []
         # sanitized_file = '/'.join(filename.split('/')[:-1]) + '/../' + type + '_sanitized_file.txt'
         # with io.open(sanitized_file, 'w', encoding='utf8') as ff:
         with open(filename) as f:
-            for line in f:
+            for line_id, line in enumerate(f):
                 vals = line.strip().split('\t')
+
+                label = vals[4]
+                if type is 'test' and label not in train_labels:
+                    oov_label.append(line_id)
+                    continue
 
                 sentence_str = ' ' + vals[5].strip()
                 sentence_str = sentence_str.replace('###END###', '')
@@ -217,7 +222,8 @@ class Datautils:
                         i += 1
 
                     if len(inbetween_words) <= 2*max_inbetween_len or type is not 'train':   # throw away sentences with too many inbetween words
-                        labels.append(vals[4])
+
+                        labels.append(label)
 
                         if len(entities1_words) > max_entity_len:
                             entities1_words = entities1_words[:max_entity_len]
@@ -265,7 +271,10 @@ class Datautils:
                 else:
                     assert False, line
 
-        return entities1, entities2, labels, chunks_inbetween, word_counts
+        if type is 'test' and len(oov_label) > 0:
+            print('Number of test datapoints thrown away because of its label did not seen in train:' + str(len(oov_label)))
+
+        return entities1, entities2, labels, chunks_inbetween, word_counts, oov_label
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...
@@ -275,16 +284,22 @@ class Datautils:
     ## ....
 
     @classmethod
-    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_len):
+    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_len, train_labels):
         labels = []
         entities1 = []
         entities2 = []
         chunks_inbetween = []
         word_counts = dict()
+        oov_label = []
 
         with open(filename) as f:
-            for line in f:
+            for line_id, line in enumerate(f):
                 vals = line.strip().split('\t')
+
+                label = vals[4]
+                if type is 'test' and label not in train_labels:
+                    oov_label.append(line_id)
+                    continue
 
                 if len(vals) > 5 :
                     syntax_str = vals[5].strip()
@@ -378,7 +393,7 @@ class Datautils:
 
                 if len(syntax_tokens) <= 2*max_syntax_len or type is not 'train':   # when max_inbetween_len = 60, filter out 2464 noise
 
-                    labels.append(vals[4])
+                    labels.append(label)
                     if len(entities1_words) > max_entity_len:
                         entities1_words = entities1_words[:max_entity_len]
                     if len(entities2_words) > max_entity_len:
@@ -406,7 +421,10 @@ class Datautils:
                     entities2.append(entities2_words)
                     chunks_inbetween.append(syntax_tokens)
 
-        return entities1, entities2, labels, chunks_inbetween, word_counts
+        if type is 'test' and len(oov_label) > 0:
+            print('Number of test datapoints thrown away because of its label did not seen in train:' + str(len(oov_label)))
+
+        return entities1, entities2, labels, chunks_inbetween, word_counts, oov_label
 
     @classmethod
     def prepare_for_skipgram(cls, entities, contexts):

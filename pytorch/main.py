@@ -669,9 +669,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
                 accum_ema_f1 = 2 * accum_ema_prec * accum_ema_rec / (accum_ema_prec + accum_ema_rec)
 
             if epoch == args.epochs - 1:
-                lbl_categories = dataset.categories
-                dump_result(i, args, class_logit.data, target_var.data, lbl_categories, perm_idx, 'train_student', topk=(1,))
-                dump_result(i, args, ema_logit.data, target_var.data, lbl_categories, perm_idx, 'train_teacher', topk=(1,))
+                dump_result(i, args, class_logit.data, target_var.data, dataset, perm_idx, 'train_student', topk=(1,))
+                dump_result(i, args, ema_logit.data, target_var.data, dataset, perm_idx, 'train_teacher', topk=(1,))
 
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -910,8 +909,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 accum_f1_test = 2 * accum_prec_test * accum_rec_test / (accum_prec_test + accum_rec_test)
 
             if epoch == args.epochs:
-                lbl_categories = dataset.categories
-                dump_result(i, args, output1.data, target_var.data, lbl_categories, perm_idx_test, 'test_'+model_type, topk=(1,))
+                dump_result(i, args, output1.data, target_var.data, dataset, perm_idx_test, 'test_'+model_type, topk=(1,))
 
         else:
             # measure accuracy and record loss
@@ -1155,7 +1153,7 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     return tp, tp_fn, tp_fp
 
 
-def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_type='train_teacher', topk=(1,)):
+def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='train_teacher', topk=(1,)):
     global test_student_pred_match_noNA
     global test_student_pred_noNA
     global test_student_true_noNA
@@ -1184,10 +1182,17 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
     else:
         order_idx = perm_idx.numpy()
 
+    lbl_categories = dataset.categories
+
     if model_type == 'test_teacher':
+        oov_label_lineid = dataset.oov_label_lineid
         dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
         f = open(dataset_file)
-        lines = f.readlines()
+        lines = []
+        for line_id, line in enumerate(f):
+            if line_id not in oov_label_lineid:
+                lines.append(line)
+
         with open(teacher_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
                 line_id = int(batch_id * args.batch_size + order_idx[p])
@@ -1216,9 +1221,14 @@ def dump_result(batch_id, args, output, target, lbl_categories, perm_idx, model_
                 fo.write(line)
 
     elif model_type == 'test_student':
+        oov_label_lineid = dataset.oov_label_lineid
         dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
         f = open(dataset_file)
-        lines = f.readlines()
+        lines = []
+        for line_id, line in enumerate(f):
+            if line_id not in oov_label_lineid:
+                lines.append(line)
+
         with open(student_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
                 line_id = int(batch_id * args.batch_size + order_idx[p])
