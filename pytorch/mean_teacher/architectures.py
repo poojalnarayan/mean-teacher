@@ -225,7 +225,11 @@ class FeedForwardMLPEmbed_RE(nn.Module):
 
         # Make the mask for removing the padded items
         mask = input.ne(pad_id)
-        mask = mask.type(torch.FloatTensor)
+
+        if torch.cuda.is_available():
+            mask = mask.type(torch.cuda.FloatTensor)
+        else:
+            mask = mask.type(torch.FloatTensor)
 
         # add an extra dimension, initially of size 1
         # then "expand_as" copies the last dimension into the new dimension
@@ -237,7 +241,12 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         masked_embedded = embedded * expanded_mask
 
         summation = masked_embedded.sum(1)  # Variable containing torch.FloatTensor of size 256x100
-        seq_lengths = torch.autograd.Variable(seq_lengths.type(torch.FloatTensor))  # Variable containing torch.FloatTensor of size 256x100
+
+        if torch.cuda.is_available():
+            seq_lengths = torch.autograd.Variable(seq_lengths.type(torch.cuda.FloatTensor))
+        else:
+            seq_lengths = torch.autograd.Variable(seq_lengths.type(torch.FloatTensor))  # Variable containing torch.FloatTensor of size 256x100
+
         seq_lengths = seq_lengths.view(-1, 1).expand_as(summation)
 
         avg = summation / seq_lengths
