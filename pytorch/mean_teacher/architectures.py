@@ -215,17 +215,16 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         self.layer2 = nn.Linear(hidden_sz, output_sz, bias=True)
         # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
-    def forward(self, input_tuple, pad_id):
+    def forward(self, input_tuple):
         input = input_tuple[0]
-        seq_lengths = input_tuple[1]
+        seq_lengths = input_tuple[1]   # LongTensor
+        pad_id = input_tuple[2]
 
         # Embed the input
-        embedded = self.embeddings(input)
-        print('embedded.shape: ' + str(embedded.shape))
+        embedded = self.embeddings(input)   # embedded.shape: torch.Size([256, 66, 100])
 
         # Make the mask for removing the padded items
         mask = input.ne(pad_id)
-        # mask = mask.type(torch.LongTensor)
         mask = mask.type(torch.FloatTensor)
 
         # add an extra dimension, initially of size 1
@@ -237,8 +236,11 @@ class FeedForwardMLPEmbed_RE(nn.Module):
         # Apply mask (clear out the embeddings of padded items)
         masked_embedded = embedded * expanded_mask
 
-        summation = masked_embedded.sum(1)
-        avg = summation / seq_lengths.view(-1,1).expand_as(summation)
+        summation = masked_embedded.sum(1)  # Variable containing torch.FloatTensor of size 256x100
+        seq_lengths = torch.autograd.Variable(seq_lengths.type(torch.FloatTensor))  # Variable containing torch.FloatTensor of size 256x100
+        seq_lengths = seq_lengths.view(-1, 1).expand_as(summation)
+
+        avg = summation / seq_lengths
 
         res = self.layer1(avg)
         res = self.activation(res)

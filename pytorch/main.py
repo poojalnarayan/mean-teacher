@@ -540,11 +540,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
 
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
 
-            model_out, perm_idx = model((input_var, seq_lengths, dataset.pad_id))
-            ema_model_out, perm_idx_ema = ema_model((ema_input_var, seq_lengths, dataset.pad_id))
-            assert perm_idx_ema.ne(perm_idx).sum() == 0
+            model_out = model((input_var, seq_lengths, dataset.pad_id))
+            ema_model_out = ema_model((ema_input_var, seq_lengths, dataset.pad_id))
 
-            target_var = target_var[perm_idx]
+            # just to match lstm_RE, needed to be passed to dump_result
+            if torch.cuda.is_available():
+                perm_idx = torch.cuda.LongTensor([i for i in range(len(input_var))])
+            else:
+                perm_idx = torch.LongTensor([i for i in range(len(input_var))])
 
         else:
             ema_model_out = ema_model(ema_input_var)
@@ -668,7 +671,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, dataset, log):
             if epoch == args.epochs - 1:
                 lbl_categories = dataset.categories
                 dump_result(i, args, class_logit.data, target_var.data, lbl_categories, perm_idx, 'train_student', topk=(1,))
-                dump_result(i, args, ema_logit.data, target_var.data, lbl_categories, perm_idx_ema, 'train_teacher', topk=(1,))
+                dump_result(i, args, ema_logit.data, target_var.data, lbl_categories, perm_idx, 'train_teacher', topk=(1,))
 
         else:
             prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
@@ -858,8 +861,12 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
         ## AVG MODEL
         elif args.dataset in ['riedel', 'gids'] and args.arch == 'simple_MLP_embed_RE':
-            output1, perm_idx_test = model((input_var, seq_lengths, dataset.pad_id))
-            target_var = target_var[perm_idx_test]
+            output1 = model((input_var, seq_lengths, dataset.pad_id))
+
+            if torch.cuda.is_available():
+                perm_idx_test = torch.cuda.LongTensor([i for i in range(len(input_var))])
+            else:
+                perm_idx_test = torch.LongTensor([i for i in range(len(input_var))])
 
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
