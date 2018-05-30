@@ -312,29 +312,21 @@ class NECDataset(Dataset):
 def riedel():
 
     if REDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(REDataset.NUM_WORDS_TO_REPLACE, REDataset.OOV, REDataset.WORD_NOISE_TYPE)
-    else:
-        assert False, "Unknown type of noise {}".format(REDataset.WORD_NOISE_TYPE)
-
-    return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
-        'eval_transformation': None,
-        'datadir': 'data-local/re/Riedel2010'
-    }
+        return {
+            'train_transformation': data.RandomPatternWordNoise(REDataset.NUM_WORDS_TO_REPLACE, REDataset.OOV, REDataset.WORD_NOISE_TYPE),
+            'eval_transformation': None,
+            'datadir': 'data-local/re/Riedel2010'
+        }
 
 @export
 def gids():
 
     if REDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(REDataset.NUM_WORDS_TO_REPLACE, REDataset.OOV, REDataset.WORD_NOISE_TYPE)
-    else:
-        assert False, "Unknown type of noise {}".format(REDataset.WORD_NOISE_TYPE)
-
-    return {
-        'train_transformation': data.TransformTwiceNEC(addNoise),
-        'eval_transformation': None,
-        'datadir': 'data-local/re/gids'
-    }
+        return {
+            'train_transformation': data.RandomPatternWordNoise(REDataset.NUM_WORDS_TO_REPLACE, REDataset.OOV, REDataset.WORD_NOISE_TYPE),
+            'eval_transformation': None,
+            'datadir': 'data-local/re/gids'
+        }
 
 class REDataset(Dataset):
 
@@ -495,33 +487,34 @@ class REDataset(Dataset):
         if self.transform is not None:
 
             inbetween_words_dropout = self.transform([self.chunks_inbetween_words[idx]], REDataset.ENTITY)
-            inbetween_words_id_dropout = list()
-            inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[0][0]])
-            inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
+            inbetween_words_id_dropout = [self.word_vocab.get_id(w) for w in inbetween_words_dropout[0]]
+            # inbetween_words_id_dropout = list()
+            # inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[0][0]])
+            # inbetween_words_id_dropout.append([self.word_vocab.get_id(w) for w in inbetween_words_dropout[1][0]])
+            #
+            # if len(inbetween_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
+            #     # inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
+            #     # inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
+            #     # inbetween_datums = (torch.LongTensor(inbetween_words_id_dropout[0]), torch.LongTensor(inbetween_words_id_dropout[1]))
+            #
+            #     # Concatenate the e1 + words_betw + e2
+            #     # List(Int) -- the indices of whole shebang
 
-            if len(inbetween_words_id_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
-                # inbetween_words_padded_0 = self.pad_item(inbetween_words_id_dropout[0], 'inbetween')
-                # inbetween_words_padded_1 = self.pad_item(inbetween_words_id_dropout[1], 'inbetween')
-                # inbetween_datums = (torch.LongTensor(inbetween_words_id_dropout[0]), torch.LongTensor(inbetween_words_id_dropout[1]))
+            #student_id = inbetween_words_id_dropout[0]
+            student_id = entity1_words_id + inbetween_words_id_dropout + entity2_words_id
+            student_id_padded = self.pad_item(student_id)
+            datum_student = torch.LongTensor(student_id_padded)
 
-                # Concatenate the e1 + words_betw + e2
-                # List(Int) -- the indices of whole shebang
+                # #teacher_id = inbetween_words_id_dropout[1]
+                # teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
+                # teacher_id_padded = self.pad_item(teacher_id)
+                # datum_teacher = torch.LongTensor(teacher_id_padded)
+            datums = (datum_student)
 
-                #student_id = inbetween_words_id_dropout[0]
-                student_id = entity1_words_id + inbetween_words_id_dropout[0] + entity2_words_id
-                student_id_padded = self.pad_item(student_id)
-                datum_student = torch.LongTensor(student_id_padded)
-
-                #teacher_id = inbetween_words_id_dropout[1]
-                teacher_id = entity1_words_id + inbetween_words_id_dropout[1] + entity2_words_id
-                teacher_id_padded = self.pad_item(teacher_id)
-                datum_teacher = torch.LongTensor(teacher_id_padded)
-                datums = (datum_student, datum_teacher)
-
-            else:
-                datum = entity1_words_id + inbetween_words_id_dropout + entity2_words_id
-                datum_padded = self.pad_item(datum)
-                datums = torch.LongTensor(datum_padded)
+            # else:
+            #     datum = entity1_words_id + inbetween_words_id_dropout + entity2_words_id
+            #     datum_padded = self.pad_item(datum)
+            #     datums = torch.LongTensor(datum_padded)
         # test:
         else:
             datum = entity1_words_id + inbetween_words_id + entity2_words_id
