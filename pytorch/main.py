@@ -184,9 +184,11 @@ def main(context):
         if args.evaluation_epochs and (epoch + 1) % args.evaluation_epochs == 0:
             start_time = time.time()
             LOG.info("Evaluating the primary model:")
-            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "student")
+            prec1 = validate(eval_loader, model, validation_log, global_step, epoch + 1, dataset_test,
+                             context.result_dir, "student")
             LOG.info("Evaluating the EMA model:")
-            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test, context.result_dir, "teacher")
+            ema_prec1 = validate(eval_loader, ema_model, ema_validation_log, global_step, epoch + 1, dataset_test,
+                                 context.result_dir, "teacher")
             LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
             is_best = ema_prec1 > best_prec1
             best_prec1 = max(ema_prec1, best_prec1)
@@ -1085,7 +1087,7 @@ def save_checkpoint(state, is_best, dirpath, epoch):
     torch.save(state, checkpoint_path)
     LOG.info("--- checkpoint saved to %s ---" % checkpoint_path)
     if is_best:
-        shutil.copyfile(checkpoint_path, best_path)
+        shutil.copyfile(checkpoint_path, best_path)   #new copy
         LOG.info("--- checkpoint copied to %s ---" % best_path)
         if args.epochs != epoch: # Note: Save the last checkpoint
             os.remove(checkpoint_path)

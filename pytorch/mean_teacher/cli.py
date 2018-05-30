@@ -102,6 +102,7 @@ def create_parser():
                         help='maximum number of words in entity, extra words would be truncated')
     parser.add_argument('--max-inbetween-len', default='50', type=int,
                         help='maximum number of words in between of two entities, extra words would be truncated')
+    parser.add_argument('--ckpt-file', type=str, default='best.ckpt', help='best checkpoint file')
 
     return parser
 
