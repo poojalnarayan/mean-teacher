@@ -103,6 +103,8 @@ def create_parser():
     parser.add_argument('--max-inbetween-len', default='50', type=int,
                         help='maximum number of words in between of two entities, extra words would be truncated')
     parser.add_argument('--ckpt-file', type=str, default='best.ckpt', help='best checkpoint file')
+    parser.add_argument('--ckpt-path', type=str, default='', help='path where best checkpoint file locates')
+    parser.add_argument('--ckpt-path', type=str, default='', help='path where best checkpoint file locates')
 
     return parser
 
