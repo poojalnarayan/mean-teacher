@@ -11,7 +11,7 @@ import random
 import numpy as np
 import contextlib
 import logging
-from mean_teacher.run_context import RunContext
+import torch.nn.functional as F
 from mean_teacher.processNLPdata.processNECdata import *
 
 LOG = logging.getLogger('main')
@@ -26,6 +26,7 @@ test_teacher_true_noNA = 0.0
 
 def main():
     start_time = time.time()
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     pr_log = 'pr_files/' + args.run_name + '.pr.scores'
     ema_pr_log = 'pr_files/' + args.run_name + '.pr.scores.ema'
     ckpt_file = 'results/' + args.ckpt_path + '/' + args.ckpt_file  # args.ckpt_path: main_log_gids_l1.0_64_e100_cons1_ramp5_pre_update_rand1000_wf20_fullyLex/2018-05-24_06:46:19/0/transient
@@ -114,8 +115,6 @@ def create_data_loaders(train_transformation,
     global NA_label
     traindir = os.path.join(datadir, args.train_subdir)
     evaldir = os.path.join(datadir, args.eval_subdir)
-
-    assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
     if torch.cuda.is_available():
         pin_memory = True
@@ -220,6 +219,8 @@ def validate(eval_loader, model, pr_log, dataset, model_type):
 
         class_loss = class_criterion(output1, target_var) / minibatch_size
 
+        output_softmax = F.softmax(output1, dim=1)
+
         # Print the scores for the data in the minibatch
         # output1: Variable
         # out_data is size (batch_size, num_classes)
@@ -263,7 +264,7 @@ def validate(eval_loader, model, pr_log, dataset, model_type):
             meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
 
 
-            dump_result(i, args, output1.data, target_var.data, dataset, perm_idx_test, pr_log, 'test_'+model_type, topk=(1,))
+            dump_result(i, args, output1.data, target_var.data, dataset, perm_idx_test, output_softmax, pr_log, 'test_'+model_type, topk=(1,))
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
@@ -278,13 +279,6 @@ def validate(eval_loader, model, pr_log, dataset, model_type):
                     'Recall {rec:.3f} ({accum_rec:.3f})  '
                     'F1 {f1:.3f} ({accum_f1:.3f})'.format(
                         i, len(eval_loader), prec=prec_test, accum_prec=accum_prec_test, rec=rec_test, accum_rec=accum_rec_test, f1=f1_test, accum_f1=accum_f1_test, meters=meters))
-
-            else:
-                LOG.info(
-                    'Test: [{0}/{1}]\t'
-                    'ClassLoss {meters[class_loss]:.4f}\t'
-                    'Prec@1 {meters[top1]:.3f}'.format(
-                        i, len(eval_loader), meters=meters))
 
     # FINAL PERFORMANCE
     if args.dataset in ['riedel', 'gids']:
@@ -350,7 +344,7 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     return tp, tp_fn, tp_fp
 
 
-def dump_result(batch_id, args, output, target, dataset, perm_idx, pr_log, model_type='test_teacher', topk=(1,)):
+def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softmax, pr_log, model_type='test_teacher', topk=(1,)):
     global test_student_pred_match_noNA
     global test_student_pred_noNA
     global test_student_true_noNA
@@ -389,12 +383,15 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, pr_log, model
                 lines.append(line)
 
         with open(pr_log, "a") as fpr:
-            for data_idx, scores in enumerate(output):
+            for data_idx, scores in enumerate(output_softmax):
                 line_id = int(batch_id * args.batch_size + order_idx[data_idx])
                 line = lines[line_id].strip()
                 entity_pair = '&&'.join(line.split('\t')[2:3]).replace(',', '')
                 for label_idx in range(num_labels):
-                    label_confidence = scores[label_idx]
+                    if torch.cuda.is_available():
+                        label_confidence = scores[label_idx].data.cpu().numpy()[0]
+                    else:
+                        label_confidence = scores[label_idx].data.numpy()[0]
                     to_print = "{0},{1},{2},{3},{4}\n".format(line_id, label_idx, label_confidence, entity_pair, target[data_idx])
                     fpr.write(to_print)
 
@@ -435,12 +432,15 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, pr_log, model
                 lines.append(line)
 
         with open(pr_log, "a") as fpr:
-            for data_idx, scores in enumerate(output):
+            for data_idx, scores in enumerate(output_softmax):
                 line_id = int(batch_id * args.batch_size + order_idx[data_idx])
                 line = lines[line_id].strip()
                 entity_pair = '&&'.join(line.split('\t')[2:3]).replace(',', '')
                 for label_idx in range(num_labels):
-                    label_confidence = scores[label_idx]
+                    if torch.cuda.is_available():
+                        label_confidence = scores[label_idx].data.cpu().numpy()[0]
+                    else:
+                        label_confidence = scores[label_idx].data.numpy()[0]
                     to_print = "{0},{1},{2},{3},{4}\n".format(line_id, label_idx, label_confidence, entity_pair, target[data_idx])
                     fpr.write(to_print)
 
