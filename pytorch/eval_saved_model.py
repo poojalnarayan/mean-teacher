@@ -92,8 +92,8 @@ def main():
 
     LOG.info(parameters_string(model))
 
-    test_student_pred_file = 'pr_files/' + args.run_name + '_test_student_pred.tsv'
-    test_teacher_pred_file = 'pr_files/' + args.run_name + '_test_teacher_pred.tsv'
+    test_student_pred_file = 'test_results/' + args.run_name + '_test_student_pred.tsv'
+    test_teacher_pred_file = 'test_results/' + args.run_name + '_test_teacher_pred.tsv'
     with contextlib.suppress(FileNotFoundError):
         os.remove(test_student_pred_file)
         os.remove(test_teacher_pred_file)
@@ -363,8 +363,8 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softma
 
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    student_pred_file = 'pr_files/' + args.run_name + '_' + model_type + '_pred.tsv'
-    teacher_pred_file = 'pr_files/' + args.run_name + '_' + model_type + '_pred.tsv'
+    student_pred_file = 'test_results/' + args.run_name + '_' + model_type + '_pred.tsv'
+    teacher_pred_file = 'test_results/' + args.run_name + '_' + model_type + '_pred.tsv'
 
     if torch.cuda.is_available():
         order_idx = perm_idx.cpu().numpy()
