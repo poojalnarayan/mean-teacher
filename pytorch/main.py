@@ -483,7 +483,7 @@ def train(train_loader, model, optimizer, epoch, dataset, log):
                 # ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cpu()
 
         elif args.dataset in ['riedel', 'gids']:
-            input = datapoint[0][0]
+            input = datapoint[0]
             # ema_input = datapoint[0][1]
             lengths = datapoint[1]
             target = datapoint[2]
