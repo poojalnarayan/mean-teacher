@@ -20,15 +20,15 @@ NA_label = -1
 test_student_pred_match_noNA = 0.0
 test_student_pred_noNA = 0.0
 test_student_true_noNA = 0.0
-test_teacher_pred_match_noNA = 0.0
-test_teacher_pred_noNA = 0.0
-test_teacher_true_noNA = 0.0
+# test_teacher_pred_match_noNA = 0.0
+# test_teacher_pred_noNA = 0.0
+# test_teacher_true_noNA = 0.0
 
 def main():
     start_time = time.time()
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     pr_log = 'pr_files/' + args.run_name + '.pr.scores'
-    ema_pr_log = 'pr_files/' + args.run_name + '.pr.scores.ema'
+    # ema_pr_log = 'pr_files/' + args.run_name + '.pr.scores.ema'
     ckpt_file = 'results/' + args.ckpt_path + '/' + args.ckpt_file  # args.ckpt_path: main_log_gids_l1.0_64_e100_cons1_ramp5_pre_update_rand1000_wf20_fullyLex/2018-05-24_06:46:19/0/transient
     ckpt = torch.load(ckpt_file)
     LOG.info("Loading the checkpoint from :{ckpt_file} ".format(ckpt_file=ckpt_file))
@@ -84,26 +84,26 @@ def main():
         return model
 
     model = create_model()
-    ema_model = create_model(ema=True)
+    # ema_model = create_model(ema=True)
 
     # Init model state dicts
     model.load_state_dict(ckpt['state_dict'])
-    ema_model.load_state_dict(ckpt['ema_state_dict'])
+    # ema_model.load_state_dict(ckpt['ema_state_dict'])
 
     LOG.info(parameters_string(model))
 
     test_student_pred_file = 'test_results/' + args.run_name + '_test_student_pred.tsv'
-    test_teacher_pred_file = 'test_results/' + args.run_name + '_test_teacher_pred.tsv'
+    # test_teacher_pred_file = 'test_results/' + args.run_name + '_test_teacher_pred.tsv'
     with contextlib.suppress(FileNotFoundError):
         os.remove(test_student_pred_file)
-        os.remove(test_teacher_pred_file)
+        # os.remove(test_teacher_pred_file)
         os.remove(pr_log)
-        os.remove(ema_pr_log)
+        # os.remove(ema_pr_log)
 
     LOG.info("Evaluating the primary model:")
     f1 = validate(eval_loader, model, pr_log, dataset, "student")
-    LOG.info("Evaluating the EMA model:")
-    ema_f1 = validate(eval_loader, ema_model, ema_pr_log, dataset, "teacher")
+    # LOG.info("Evaluating the EMA model:")
+    # ema_f1 = validate(eval_loader, ema_model, ema_pr_log, dataset, "teacher")
     LOG.info("--- validation in %s seconds ---" % (time.time() - start_time))
 
 
@@ -149,9 +149,9 @@ def validate(eval_loader, model, pr_log, dataset, model_type):
     global test_student_pred_match_noNA
     global test_student_pred_noNA
     global test_student_true_noNA
-    global test_teacher_pred_match_noNA
-    global test_teacher_pred_noNA
-    global test_teacher_true_noNA
+    # global test_teacher_pred_match_noNA
+    # global test_teacher_pred_noNA
+    # global test_teacher_true_noNA
 
     if torch.cuda.is_available():
         class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
@@ -300,22 +300,22 @@ def validate(eval_loader, model, pr_log, dataset, model_type):
             LOG.info('******* [Test] Student : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
                     student_precision, student_recall, student_f1))
 
-        else:
-            if test_teacher_pred_noNA == 0.0:
-                teacher_precision = 0.0
-            else:
-                teacher_precision = test_teacher_pred_match_noNA / test_teacher_pred_noNA
-            if test_teacher_true_noNA == 0.0:
-                teacher_recall = 0.0
-            else:
-                teacher_recall = test_teacher_pred_match_noNA / test_teacher_true_noNA
-            if teacher_precision + teacher_recall == 0.0:
-                teacher_f1 = 0.0
-            else:
-                teacher_f1 = 2 * teacher_precision * teacher_recall / (teacher_precision + teacher_recall)
-
-            LOG.info('******* [Test] Teacher : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
-                teacher_precision, teacher_recall, teacher_f1))
+        # else:
+        #     if test_teacher_pred_noNA == 0.0:
+        #         teacher_precision = 0.0
+        #     else:
+        #         teacher_precision = test_teacher_pred_match_noNA / test_teacher_pred_noNA
+        #     if test_teacher_true_noNA == 0.0:
+        #         teacher_recall = 0.0
+        #     else:
+        #         teacher_recall = test_teacher_pred_match_noNA / test_teacher_true_noNA
+        #     if teacher_precision + teacher_recall == 0.0:
+        #         teacher_f1 = 0.0
+        #     else:
+        #         teacher_f1 = 2 * teacher_precision * teacher_recall / (teacher_precision + teacher_recall)
+        #
+        #     LOG.info('******* [Test] Teacher : Overall Precision {0}  Recall {1}  F1 {2}  ********'.format(
+        #         teacher_precision, teacher_recall, teacher_f1))
 
     return accum_f1_test
 
@@ -344,13 +344,13 @@ def prec_rec(output, target, NA_label, topk=(1,)):
     return tp, tp_fn, tp_fp
 
 
-def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softmax, pr_log, model_type='test_teacher', topk=(1,)):
+def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softmax, pr_log, model_type='test_student', topk=(1,)):
     global test_student_pred_match_noNA
     global test_student_pred_noNA
     global test_student_true_noNA
-    global test_teacher_pred_match_noNA
-    global test_teacher_pred_noNA
-    global test_teacher_true_noNA
+    # global test_teacher_pred_match_noNA
+    # global test_teacher_pred_noNA
+    # global test_teacher_true_noNA
 
     _, num_labels = output.shape
 
@@ -364,7 +364,7 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softma
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
     student_pred_file = 'test_results/' + args.run_name + '_' + model_type + '_pred.tsv'
-    teacher_pred_file = 'test_results/' + args.run_name + '_' + model_type + '_pred.tsv'
+    # teacher_pred_file = 'test_results/' + args.run_name + '_' + model_type + '_pred.tsv'
 
     if torch.cuda.is_available():
         order_idx = perm_idx.cpu().numpy()
@@ -373,56 +373,56 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, output_softma
 
     lbl_categories = dataset.categories
 
-    if model_type == 'test_teacher':
-        oov_label_lineid = dataset.oov_label_lineid
-        dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
-        f = open(dataset_file)
-        lines = []
-        for line_id, line in enumerate(f):
-            if line_id not in oov_label_lineid:
-                lines.append(line)
+    # if model_type == 'test_teacher':
+    #     oov_label_lineid = dataset.oov_label_lineid
+    #     dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
+    #     f = open(dataset_file)
+    #     lines = []
+    #     for line_id, line in enumerate(f):
+    #         if line_id not in oov_label_lineid:
+    #             lines.append(line)
+    #
+    #     with open(pr_log, "a") as fpr:
+    #         for data_idx, scores in enumerate(output_softmax):
+    #             line_id = int(batch_id * args.batch_size + order_idx[data_idx])
+    #             line = lines[line_id].strip()
+    #             entity_pair = '&&'.join(line.split('\t')[2:3]).replace(',', '')
+    #             for label_idx in range(num_labels):
+    #                 if torch.cuda.is_available():
+    #                     label_confidence = scores[label_idx].data.cpu().numpy()[0]
+    #                 else:
+    #                     label_confidence = scores[label_idx].data.numpy()[0]
+    #                 to_print = "{0},{1},{2},{3},{4}\n".format(line_id, label_idx, label_confidence, entity_pair, target[data_idx])
+    #                 fpr.write(to_print)
+    #
+    #     with open(teacher_pred_file, "a") as fo:
+    #         for p, pre in enumerate(prediction):
+    #             line_id = int(batch_id * args.batch_size + order_idx[p])
+    #             line = lines[line_id].strip()
+    #             lbl_id = int(pre)
+    #             pred_label = lbl_categories[lbl_id].strip()
+    #             if target[p] != NO_LABEL:
+    #                 target_label = lbl_categories[target[p]].strip()
+    #             else:
+    #                 target_label = 'removed'
+    #
+    #             vals = line.split('\t')
+    #             true_label = vals[4].strip()
+    #             match = pred_label == target_label
+    #
+    #             assert true_label == target_label
+    #
+    #             if match and true_label != 'NA':
+    #                 test_teacher_pred_match_noNA += 1.0
+    #             if pred_label != 'NA':
+    #                 test_teacher_pred_noNA += 1.0
+    #             if true_label != 'NA':
+    #                 test_teacher_true_noNA += 1.0
+    #
+    #             line = line + '\t' + target_label + '\t' + pred_label + '\t' + str(match) + '\t' + str(float(score[p])) + '\n'
+    #             fo.write(line)
 
-        with open(pr_log, "a") as fpr:
-            for data_idx, scores in enumerate(output_softmax):
-                line_id = int(batch_id * args.batch_size + order_idx[data_idx])
-                line = lines[line_id].strip()
-                entity_pair = '&&'.join(line.split('\t')[2:3]).replace(',', '')
-                for label_idx in range(num_labels):
-                    if torch.cuda.is_available():
-                        label_confidence = scores[label_idx].data.cpu().numpy()[0]
-                    else:
-                        label_confidence = scores[label_idx].data.numpy()[0]
-                    to_print = "{0},{1},{2},{3},{4}\n".format(line_id, label_idx, label_confidence, entity_pair, target[data_idx])
-                    fpr.write(to_print)
-
-        with open(teacher_pred_file, "a") as fo:
-            for p, pre in enumerate(prediction):
-                line_id = int(batch_id * args.batch_size + order_idx[p])
-                line = lines[line_id].strip()
-                lbl_id = int(pre)
-                pred_label = lbl_categories[lbl_id].strip()
-                if target[p] != NO_LABEL:
-                    target_label = lbl_categories[target[p]].strip()
-                else:
-                    target_label = 'removed'
-
-                vals = line.split('\t')
-                true_label = vals[4].strip()
-                match = pred_label == target_label
-
-                assert true_label == target_label
-
-                if match and true_label != 'NA':
-                    test_teacher_pred_match_noNA += 1.0
-                if pred_label != 'NA':
-                    test_teacher_pred_noNA += 1.0
-                if true_label != 'NA':
-                    test_teacher_true_noNA += 1.0
-
-                line = line + '\t' + target_label + '\t' + pred_label + '\t' + str(match) + '\t' + str(float(score[p])) + '\n'
-                fo.write(line)
-
-    elif model_type == 'test_student':
+    if model_type == 'test_student':
         oov_label_lineid = dataset.oov_label_lineid
         dataset_file = evaldir + '/' + args.eval_subdir + '.txt'
         f = open(dataset_file)
