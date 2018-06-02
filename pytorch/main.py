@@ -334,6 +334,7 @@ def create_data_loaders(train_transformation,
 
         NA_label = dataset.categories.index('NA')
 
+        print('NA_label: ' + str(NA_label))
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
     ## Used for loading the riedel10 arrays into pytorch
     elif args.dataset in ['riedel10']:

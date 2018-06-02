@@ -31,7 +31,7 @@ def main():
     ema_pr_log = 'pr_files/' + args.run_name + '.pr.scores.ema'
     ckpt_file = 'results/' + args.ckpt_path + '/' + args.ckpt_file  # args.ckpt_path: main_log_gids_l1.0_64_e100_cons1_ramp5_pre_update_rand1000_wf20_fullyLex/2018-05-24_06:46:19/0/transient
     ckpt = torch.load(ckpt_file)
-    LOG.info("Loading the checkpoint from :{ckpt_file} ".format(ckpt_file=args.ckpt_file))
+    LOG.info("Loading the checkpoint from :{ckpt_file} ".format(ckpt_file=ckpt_file))
     args.arch = ckpt['arch']
 
     dataset_config = datasets.__dict__[args.dataset]()
