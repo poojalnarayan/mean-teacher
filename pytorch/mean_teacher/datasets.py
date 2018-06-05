@@ -109,6 +109,27 @@ class NECDataset(Dataset):
     NUM_WORDS_TO_CHANGE = 1
     WORD_NOISE_TYPE = "drop"
 
+    def select_random_sample(self, datums, data_percent):
+        lbl_hist = {}
+        for lbl in self.labels_str:
+            if lbl in lbl_hist:
+                lbl_hist[lbl] = lbl_hist[lbl]+1
+            else:
+                lbl_hist[lbl] = 1
+
+        lbl_sizes = [lbl_hist[lbl] * data_percent / 100.0 for lbl in lbl_hist.keys()]
+        random.shuffle(datums)  # randomizing the relabeling ...
+
+        datums_subset = []
+        for datum in datums:
+            if lbl_sizes[datum[2]] != 0:
+                datums_subset.append(datum)
+                lbl_sizes[datum[2]] = lbl_sizes[datum[2]] - 1
+
+        print("[SUBSETTING THE DATA] Original data distribution : " + str(lbl_hist))
+        print("[SUBSETTING THE DATA] Subset data distribution : " + str(lbl_sizes))
+        return datums_subset
+
     def __init__(self, dir, args, transform=None):
         entity_vocab_file = dir + "/entity_vocabulary.emboot.filtered.txt"
         context_vocab_file = dir + "/pattern_vocabulary_emboot.filtered.txt"
@@ -120,13 +141,13 @@ class NECDataset(Dataset):
         self.context_vocab = Vocabulary.from_file(context_vocab_file)
         self.mentions, self.contexts, self.labels_str = Datautils.read_data(dataset_file, self.entity_vocab, self.context_vocab)
 
-        if self.args.data_subset != 100.0:
+        if self.args.data_subset != 100.0 and args.eval_subdir not in dir:
             dataset_sz = len(self.mentions)
             print("[SUBSETTING THE DATA] Original dataset size" + str(dataset_sz))
             print("[SUBSETTING THE DATA] SELECTING " + str(self.args.data_subset) + "% of the data ..")
-            subset_sz = int(dataset_sz * dataset_sz / 100.0)
+            # subset_sz = int(dataset_sz * self.args.data_subset / 100.0)
             datums = list(zip(self.mentions, self.contexts, self.labels_str))
-            datums_subset = random.sample(datums, subset_sz)
+            datums_subset = self.select_random_sample(datums, self.args.data_subset)  # datums_subset = random.sample(datums, subset_sz)
             self.mentions, self.contexts, self.labels_str = [list(i) for i in list(zip(*datums_subset))]
             print("[SUBSETTING THE DATA] NEW DATASET " + str(len(self.mentions)) + " consists of data-points")
         else:
