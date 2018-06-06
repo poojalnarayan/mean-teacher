@@ -117,7 +117,7 @@ class NECDataset(Dataset):
             else:
                 lbl_hist[lbl] = 1
 
-        lbl_sizes = [lbl_hist[lbl] * data_percent / 100.0 for lbl in lbl_hist.keys()]
+        lbl_sizes = dict([(lbl, lbl_hist[lbl] * data_percent / 100.0) for lbl in lbl_hist.keys()])
         random.shuffle(datums)  # randomizing the relabeling ...
 
         datums_subset = []
@@ -143,7 +143,7 @@ class NECDataset(Dataset):
 
         if self.args.data_subset != 100.0 and args.eval_subdir not in dir:
             dataset_sz = len(self.mentions)
-            print("[SUBSETTING THE DATA] Original dataset size" + str(dataset_sz))
+            print("[SUBSETTING THE DATA] Original dataset size: " + str(dataset_sz))
             print("[SUBSETTING THE DATA] SELECTING " + str(self.args.data_subset) + "% of the data ..")
             # subset_sz = int(dataset_sz * self.args.data_subset / 100.0)
             datums = list(zip(self.mentions, self.contexts, self.labels_str))
