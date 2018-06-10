@@ -284,7 +284,7 @@ class Datautils:
     ## ....
 
     @classmethod
-    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_len, train_labels):
+    def read_re_data_syntax(cls, filename, type, max_entity_len, max_syntax_len, train_labels, subset_labels):
         labels = []
         entities1 = []
         entities2 = []
@@ -292,11 +292,27 @@ class Datautils:
         word_counts = dict()
         oov_label = []
 
+        if subset_labels == '5':
+            labels_set = ['NA', '/people/person/place_lived', '/people/deceased_person/place_of_death', '/people/person/ethnicity', '/people/person/religion']
+
+        elif subset_labels == '10':
+            labels_set = ['NA', '/people/person/nationality', '/location/country/administrative_divisions', '/people/person/place_of_birth', '/people/deceased_person/place_of_death', '/location/us_state/capital', '/business/company/place_founded', '/sports/sports_team/location', '/people/deceased_person/place_of_burial', '/location/br_state/capital']
+
+        elif subset_labels == '20':
+            labels_set = ['NA', '/location/location/contains', '/people/person/nationality', '/people/person/place_lived', '/location/country/administrative_divisions', '/business/person/company', '/people/person/place_of_birth', '/business/company/founders', '/people/deceased_person/place_of_death', '/business/company/major_shareholders', '/location/us_state/capital', '/location/us_county/county_seat', '/business/company/place_founded', '/location/province/capital', '/sports/sports_team/location', '/people/deceased_person/place_of_burial', '/business/company/advisors', '/people/person/religion', '/time/event/locations', '/location/br_state/capital']
+
+        elif subset_labels == 'all':
+            labels_set = ['NA', '/location/location/contains', '/people/person/nationality', '/location/country/capital', '/people/person/place_lived', '/location/country/administrative_divisions', '/location/administrative_division/country', '/business/person/company', '/people/person/place_of_birth', '/people/ethnicity/geographic_distribution', '/business/company/founders', '/people/deceased_person/place_of_death', '/location/neighborhood/neighborhood_of', '/business/company/major_shareholders', '/location/us_state/capital', '/people/person/children', '/location/us_county/county_seat', '/business/company/place_founded', '/people/person/ethnicity', '/location/province/capital', '/sports/sports_team/location', '/people/place_of_interment/interred_here', '/people/deceased_person/place_of_burial', '/business/company_advisor/companies_advised', '/business/company/advisors', '/people/person/religion', '/time/event/locations', '/location/country/languages_spoken', '/location/br_state/capital', '/film/film_location/featured_in_films', '/film/film/featured_film_locations', '/base/locations/countries/states_provinces_within']
+
+
         with open(filename) as f:
             for line_id, line in enumerate(f):
                 vals = line.strip().split('\t')
 
                 label = vals[4]
+                if subset_labels != 'None' and label not in labels_set:
+                    continue
+
                 if type is 'test' and label not in train_labels:
                     oov_label.append(line_id)
                     continue

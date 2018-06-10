@@ -104,6 +104,7 @@ def create_parser():
                         help='maximum number of words in between of two entities, extra words would be truncated')
     parser.add_argument('--ckpt-file', type=str, default='best.ckpt', help='best checkpoint file')
     parser.add_argument('--ckpt-path', type=str, default='', help='path where best checkpoint file locates')
+    parser.add_argument('--subset-labels', type=str, default='None', help='if not \'None\', only datpoints with the specified subset of test labels are considered, for both train/dev/test; currently only implemented for fullyLex and headLex of Riedel')
 
     return parser
 
