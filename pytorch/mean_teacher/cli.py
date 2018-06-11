@@ -88,6 +88,8 @@ def create_parser():
                         help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
     parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
+    parser.add_argument('--random_seed', default=1, type=int,
+                        help='seed to initialize numpy array')
     return parser
 
 
