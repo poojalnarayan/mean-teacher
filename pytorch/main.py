@@ -751,6 +751,8 @@ if __name__ == '__main__':
         torch.manual_seed(args.random_seed)
 
     print('----------------')
-    print("Running mean teacher experiment with args: " + str(args))
+    print("Running mean teacher experiment with args: ")
+    print('----------------')
+    print(args)
     print('----------------')
     main(RunContext(__file__, 0))
