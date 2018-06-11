@@ -21,8 +21,8 @@ def create_parser():
                         help='the subdirectory inside the data directory that contains the training data')
     parser.add_argument('--eval-subdir', type=str, default='val',
                         help='the subdirectory inside the data directory that contains the evaluation data')
-    parser.add_argument('--labels', default=None, type=str, metavar='FILE',
-                        help='list of image labels (default: based on directory structure)')
+    parser.add_argument('--labels', default=None, type=str,  # metavar='FILE',
+                        help='list of image labels (default: based on directory structure) OR \% of labeled data to be used for the NLP task (randomly selected)')
     parser.add_argument('--exclude-unlabeled', default=False, type=str2bool, metavar='BOOL',
                         help='exclude unlabeled examples from the training set')
     parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18',
@@ -87,6 +87,14 @@ def create_parser():
     parser.add_argument('--no-projection', action='store_false', dest='projection')
     parser.add_argument('--train_embed', action='store_false', dest='fix_emb')
     # parser.add_argument('--word_vectors', type=str, default='glove.6B.100d')
+    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
+                        help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--random_seed', default=1, type=int,
+                        help='seed to initialize numpy array')
+    parser.add_argument('--run-name', default='', type=str, metavar='PATH',
+                        help='Name of the run used in storing the results for post-precessing (default: none)')
+    parser.add_argument('--random_seed', default=1, type=int,
+                        help='seed to initialize numpy array')
 
     return parser
 

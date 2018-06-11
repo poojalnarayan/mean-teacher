@@ -163,6 +163,8 @@ def create_data_loaders(train_transformation,
     assert_exactly_one([args.exclude_unlabeled, args.labeled_batch_size])
 
     if args.dataset == 'snli':
+
+
         inputs = torchtextdata.Field(lower=args.lower)
         answers = torchtextdata.Field(sequential=False)
 
@@ -172,6 +174,9 @@ def create_data_loaders(train_transformation,
         inputs.vocab.vectors = torch.load(".vector_cache/input_vectors.pt")
 
         answers.build_vocab(train)
+
+        if args.labels:
+            data.relabel_dataset_snli(train)
 
         if torch.cuda.is_available():
             train_loader, dev_iter, eval_loader = torchtextdata.BucketIterator.splits(
@@ -251,7 +256,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log, args):
     ema_model.train()
 
     end = time.time()
-    print (type(train_loader))
+    print (len(train_loader))
     for i, data_minibatch in enumerate(train_loader):
 
         # measure data loading time

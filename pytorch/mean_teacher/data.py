@@ -3,6 +3,7 @@
 import itertools
 import logging
 import os.path
+import random
 
 from PIL import Image
 import numpy as np
@@ -10,9 +11,7 @@ from torch.utils.data.sampler import Sampler
 
 LOG = logging.getLogger('main')
 NO_LABEL = -1
-
-
-
+NO_LABEL_STR = "no_label"
 
 class RandomTranslateWithReflect:
     """Translate image randomly
@@ -69,6 +68,46 @@ class TransformTwice:
         out1 = self.transform(inp)
         out2 = self.transform(inp)
         return out1, out2
+
+
+def relabel_dataset_snli(dataset, args):
+    unlabeled_idxs = []
+    labeled_idxs = []
+
+    all_labels = [eg.label for eg in dataset.examples]
+
+    if args.labels.isdigit():
+        # NOTE: if it contains whole numbers --> number of labeled datapoints
+        LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
+        num_labels = int(args.labels)
+    else:
+        # NOTE: if it contains a float (remember even xx.00) then it is a percentage ..
+        #       give a float number between 0 and 100 .. indicating percentage
+        LOG.info("[relabel dataset] Choosing " + args.labels + "% OF EXAMPLES randomly as supervision")
+        percent_labels = float(args.labels)
+        num_labels = int(percent_labels * len(all_labels) / 100.0)
+
+    if num_labels == len(all_labels):
+        for i in range(num_labels):
+            labeled_idxs.append(i)
+
+    else:
+        selected_labels = all_labels[np.random.choice(all_labels.shape[0], num_labels, replace=False), :]
+        print("Selected Labels : ")
+        print("------------")
+        print(selected_labels)
+        print("------------")
+        for idx, l in all_labels:
+            if idx in selected_labels[:, 0]:
+                labeled_idxs.append(idx)
+            else:
+                unlabeled_idxs.append(idx)
+                dataset.examples[idx] = NO_LABEL_STR
+
+    LOG.info("[relabel dataset] Number of LABELED examples : " + str(len(labeled_ids)))
+    LOG.info("[relabel dataset] Number of UNLABELED examples : " + str(len(unlabeled_idxs)))
+    LOG.info("[relabel dataset] TOTAL : " + str(len(labeled_ids)+len(unlabeled_idxs)))
+    return labeled_ids, unlabeled_idxs
 
 
 def relabel_dataset(dataset, labels):
