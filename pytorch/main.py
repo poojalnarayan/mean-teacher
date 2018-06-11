@@ -755,4 +755,4 @@ if __name__ == '__main__':
     print('----------------')
     print(args)
     print('----------------')
-    main(RunContext(__file__, 0))
+    main(RunContext(__file__, 0, args.run_name))
