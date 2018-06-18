@@ -74,6 +74,24 @@ def main(context):
 
     dataset_config = datasets.__dict__[args.dataset]()
 
+    if args.dataset != 'riedel':
+        args.subset_labels = 'None'
+        args.labels_set = []
+    else:
+        if args.subset_labels == '5':
+            args.labels_set = ['NA', '/people/person/place_lived', '/people/deceased_person/place_of_death', '/people/person/ethnicity', '/people/person/religion']
+
+        elif args.subset_labels == '10':
+            args.labels_set = ['NA', '/people/person/nationality', '/location/country/administrative_divisions', '/people/person/place_of_birth', '/people/deceased_person/place_of_death', '/location/us_state/capital', '/business/company/place_founded', '/sports/sports_team/location', '/people/deceased_person/place_of_burial', '/location/br_state/capital']
+
+        elif args.subset_labels == '20':
+            args.labels_set = ['NA', '/location/location/contains', '/people/person/nationality', '/people/person/place_lived', '/location/country/administrative_divisions', '/business/person/company', '/people/person/place_of_birth', '/business/company/founders', '/people/deceased_person/place_of_death', '/business/company/major_shareholders', '/location/us_state/capital', '/location/us_county/county_seat', '/business/company/place_founded', '/location/province/capital', '/sports/sports_team/location', '/people/deceased_person/place_of_burial', '/business/company/advisors', '/people/person/religion', '/time/event/locations', '/location/br_state/capital']
+
+        elif args.subset_labels == 'all':
+            args.labels_set = ['NA', '/location/location/contains', '/people/person/nationality', '/location/country/capital', '/people/person/place_lived', '/location/country/administrative_divisions', '/location/administrative_division/country', '/business/person/company', '/people/person/place_of_birth', '/people/ethnicity/geographic_distribution', '/business/company/founders', '/people/deceased_person/place_of_death', '/location/neighborhood/neighborhood_of', '/business/company/major_shareholders', '/location/us_state/capital', '/people/person/children', '/location/us_county/county_seat', '/business/company/place_founded', '/people/person/ethnicity', '/location/province/capital', '/sports/sports_team/location', '/people/place_of_interment/interred_here', '/people/deceased_person/place_of_burial', '/business/company_advisor/companies_advised', '/business/company/advisors', '/people/person/religion', '/time/event/locations', '/location/country/languages_spoken', '/location/br_state/capital', '/film/film_location/featured_in_films', '/film/film/featured_film_locations', '/base/locations/countries/states_provinces_within']
+        elif args.subset_labels == 'None':
+            args.labels_set = []
+
     if args.dataset in ['conll', 'ontonotes', 'riedel', 'gids']:
         train_loader, eval_loader, dataset, dataset_test = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
@@ -1181,7 +1199,6 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
 
     dataset_config = datasets.__dict__[args.dataset]()
     evaldir = os.path.join(dataset_config['datadir'], args.eval_subdir)
-    # traindir = os.path.join(dataset_config['datadir'], args.train_subdir)
     student_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
     teacher_pred_file = evaldir + '/' + args.run_name + '_' + model_type + '_pred.tsv'
 
@@ -1199,7 +1216,10 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
         lines = []
         for line_id, line in enumerate(f):
             if line_id not in oov_label_lineid:
-                lines.append(line)
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if len(args.labels_set) == 0 or true_label in args.labels_set:
+                    lines.append(line)
 
         with open(teacher_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
@@ -1235,7 +1255,10 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
         lines = []
         for line_id, line in enumerate(f):
             if line_id not in oov_label_lineid:
-                lines.append(line)
+                vals = line.split('\t')
+                true_label = vals[4].strip()
+                if len(args.labels_set) == 0 or true_label in args.labels_set:
+                    lines.append(line)
 
         with open(student_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
@@ -1266,13 +1289,9 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
 
     # cannot do the same way for train as test, becasue sentences with too many inbetween words were throw away, so it would not align with original train.txt
     elif model_type == 'train_teacher':
-        # dataset_file = traindir + '/' + args.train_subdir + '.txt'
-        # f = open(dataset_file)
-        # lines = f.readlines()
+
         with open(teacher_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
-                # line_id = int(batch_id * args.batch_size + order_idx[p])
-                # line = lines[line_id].strip()
                 lbl_id = int(pre)
                 if lbl_id >= len(lbl_categories):
                     print('pred_label id'+ str(lbl_id))
@@ -1283,8 +1302,6 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
                 else:
                     target_label = 'removed'
 
-                # vals = line.split('\t')
-                # true_label = vals[4].strip()
                 match = pred_label == target_label
                 if match and target_label != 'NA' and target_label != 'removed':
                     train_teacher_pred_match_noNA += 1.0
@@ -1297,13 +1314,8 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
                 fo.write(line)
 
     elif model_type == 'train_student':
-        # dataset_file = traindir + '/' + args.train_subdir + '.txt'
-        # f = open(dataset_file)
-        # lines = f.readlines()
         with open(student_pred_file, "a") as fo:
             for p, pre in enumerate(prediction):
-                # line_id = int(batch_id * args.batch_size + order_idx[p])
-                # line = lines[line_id].strip()
                 lbl_id = int(pre)
                 if lbl_id >= len(lbl_categories):
                     print('pred_label id'+ str(lbl_id))
@@ -1314,8 +1326,6 @@ def dump_result(batch_id, args, output, target, dataset, perm_idx, model_type='t
                 else:
                     target_label = 'removed'
 
-                # vals = line.split('\t')
-                # true_label = vals[4].strip()
                 match = pred_label == target_label
                 if match and target_label != 'NA' and target_label != 'removed':
                     train_student_pred_match_noNA += 1.0

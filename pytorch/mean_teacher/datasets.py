@@ -355,9 +355,6 @@ class REDataset(Dataset):
         self.max_inbetween_len = args.max_inbetween_len  # 60
         self.pad_len = self.max_inbetween_len + self.max_entity_len*2 #+ max_inbetween_len
 
-        if self.args.dataset != 'riedel':
-            self.args.subset_labels = 'None'
-
         if args.eval_subdir not in dir:
 
             dataset_file = dir + "/" + args.train_subdir + ".txt"
@@ -366,7 +363,7 @@ class REDataset(Dataset):
             if 'fullyLex' in args.train_subdir or 'headLex' in args.train_subdir:
                 self.entities1_words, self.entities2_words, self.labels_str, \
                     self.chunks_inbetween_words, self.word_counts, _ \
-                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len, [], self.args.subset_labels)
+                    = Datautils.read_re_data_syntax(dataset_file, 'train', self.max_entity_len, self.max_inbetween_len, [], self.args.labels_set)
             else:
                 self.entities1_words, self.entities2_words, self.labels_str,\
                     self.chunks_inbetween_words, self.word_counts, _ \
@@ -386,7 +383,7 @@ class REDataset(Dataset):
             self.word_vocab.to_file(vocab_file)
 
             self.categories = sorted(list({l for l in self.labels_str}))
-            print("num of types of labels in train considered =", len(self.categories))
+            print("num of types of labels considered =", len(self.categories))
             label_category_file = dir + '/../label_category_train_' + str(self.args.run_name) + '.txt'
             with io.open(label_category_file, 'w', encoding='utf8') as f:
                 for lbl in self.categories:
@@ -414,7 +411,7 @@ class REDataset(Dataset):
 
             if 'fullyLex' in args.eval_subdir or 'headLex' in args.eval_subdir:
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _, self.oov_label_lineid \
-                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len, self.categories, self.args.subset_labels)
+                    = Datautils.read_re_data_syntax(dataset_file, 'test', self.max_entity_len, self.max_inbetween_len, self.categories, self.args.labels_set)
 
             else:
                 self.entities1_words, self.entities2_words, self.labels_str, self.chunks_inbetween_words, _, self.oov_label_lineid \
@@ -444,10 +441,6 @@ class REDataset(Dataset):
         self.lbl = []
         for l in self.labels_str:
             self.lbl.append(self.categories.index(l))
-            # if l in self.categories:
-            #     self.lbl.append(self.categories.index(l))
-            # else:
-            #     self.lbl.append(len(self.categories) - 1)
 
         self.transform = transform
 
