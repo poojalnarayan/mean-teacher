@@ -12,7 +12,7 @@ __all__ = ['parse_cmd_args', 'parse_dict_args']
 
 def create_parser():
     parser = argparse.ArgumentParser(description='PyTorch Mean-Teacher Training')
-    parser.add_argument('--dataset', metavar='DATASET', default='conll',
+    parser.add_argument('--dataset', metavar='DATASET', default='figer',
                         choices=datasets.__all__,
                         help='dataset: ' +
                             ' | '.join(datasets.__all__) +
