@@ -261,7 +261,7 @@ def create_data_loaders(train_transformation,
     elif args.dataset in ['figer']:
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.NECDataset(traindir, args, train_transformation)
+        dataset = datasets.FETDataset(traindir, args, train_transformation)
         LOG.info("Type of Noise : " + dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : " + str(dataset.NUM_WORDS_TO_REPLACE))
     # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader

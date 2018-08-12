@@ -98,7 +98,7 @@ def figer():
     return {
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
-        'datadir': 'data-local/fet/figer',
+        'datadir': 'data-local/fet/figer/',
         'num_classes': 128
     }
 
@@ -114,7 +114,7 @@ class FETDataset(Dataset):
 
 
     def __init__(self, dir, args, transform=None):
-        dataset_file = dir + "training_data_with_labels_figer.txt"
+        dataset_file = dir + "/training_data_with_labels_figer.txt"
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
@@ -143,6 +143,11 @@ class FETDataset(Dataset):
         self.transform = transform
 
     def sanitise_and_lookup_embedding(self, word_id):
+        print('-----\n')  
+        print(sorted(list(self.word_vocab.values()))[:25])
+        print('-----\n')  
+        print(str(word_id) +"\t")
+        print(self.word_vocab[word_id]+"\n")
         word = Gigaword.sanitiseWord(self.word_vocab[word_id])
 
         if word in self.lookupGiga:
@@ -157,7 +162,7 @@ class FETDataset(Dataset):
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
-        for word_id in range(0, self.word_vocab.size()-1):
+        for word_id in range(0, len(self.word_vocab)):
             word_embed = self.sanitise_and_lookup_embedding(word_id)
             word_vocab_embed.append(word_embed)
 
