@@ -142,13 +142,13 @@ class FETDataset(Dataset):
 
         self.transform = transform
 
-    def sanitise_and_lookup_embedding(self, word_id):
-        print('-----\n')  
+    def sanitise_and_lookup_embedding(self, word):
+        '''print('-----\n')
         print(sorted(list(self.word_vocab.values()))[:25])
         print('-----\n')  
         print(str(word_id) +"\t")
-        print(self.word_vocab[word_id]+"\n")
-        word = Gigaword.sanitiseWord(self.word_vocab[word_id])
+        print(self.word_vocab[word_id]+"\n")'''
+        word = Gigaword.sanitiseWord(word)
 
         if word in self.lookupGiga:
             word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
@@ -162,8 +162,8 @@ class FETDataset(Dataset):
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
-        for word_id in range(0, len(self.word_vocab)):
-            word_embed = self.sanitise_and_lookup_embedding(word_id)
+        for word in self.word_vocab.keys():
+            word_embed = self.sanitise_and_lookup_embedding(word)
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
@@ -202,26 +202,25 @@ class FETDataset(Dataset):
                 assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
                 new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
                                         for w in ctx
-                                        if not self.word_vocab.contains(w)]
+                                        if w not in self.word_vocab]
 
                 # 2. Add word to word vocab (expand vocab)
-                new_replaced_word_ids = [self.word_vocab.add(w, count=1)
-                                         for w in new_replaced_words]
+                for w in new_replaced_words:
+                    self.word_vocab[w] = len(self.word_vocab)
+
 
                 # 3. Add the replaced words to the word_vocab_embed (if using pre-trained embedding)
                 if self.args.pretrained_wordemb:
-                    for word_id in new_replaced_word_ids:
-                        word_embed = self.sanitise_and_lookup_embedding(word_id)
+                    for word in new_replaced_words:
+                        word_embed = self.sanitise_and_lookup_embedding(word)
                         self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
 
                 # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
             context_words_dropout = list()
-            context_words_dropout.append([[self.word_vocab.get_id(w)
-                                            for w in ctx]
+            context_words_dropout.append([self.word_vocab[ctx]
                                            for ctx in context_words_dropout_str[0]])
-            context_words_dropout.append([[self.word_vocab.get_id(w)
-                                            for w in ctx]
+            context_words_dropout.append([self.word_vocab[ctx]
                                            for ctx in context_words_dropout_str[1]])
 
             if len(context_words_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
