@@ -182,7 +182,8 @@ class FETDataset(Dataset):
         return dataitem_padded
 
     def get_num_classes(self):
-        return len(list({l for l in self.lbl}))
+        return len(set(l for lbl_list in self.lbl for l in lbl_list))
+
 
     def get_labels(self):
         return self.lbl
