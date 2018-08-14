@@ -148,7 +148,9 @@ def relabel_dataset_nlp(dataset, args):
     all_labels = list(enumerate(dataset.get_labels()))
     random.shuffle(all_labels) # randomizing the relabeling ...
     num_classes = dataset.get_num_classes()
-
+    for idx, l in all_labels:
+        labeled_ids.append(idx)
+    ''' 
     if args.labels.isdigit():
         # NOTE: if it contains whole numbers --> number of labeled datapoints
         LOG.info("[relabel dataset] Choosing " + args.labels + " NUMBER OF EXAMPLES randomly as supervision")
@@ -180,7 +182,7 @@ def relabel_dataset_nlp(dataset, args):
         else:
             unlabeled_idxs.append(idx)
             dataset.lbl[idx] = NO_LABEL
-
+    '''
     LOG.info("[relabel dataset] Number of LABELED examples : " + str(len(labeled_ids)))
     LOG.info("[relabel dataset] Number of UNLABELED examples : " + str(len(unlabeled_idxs)))
     LOG.info("[relabel dataset] TOTAL : " + str(len(labeled_ids)+len(unlabeled_idxs)))
