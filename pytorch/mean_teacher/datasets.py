@@ -238,7 +238,9 @@ class FETDataset(Dataset):
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
-        label = self.lbl[idx]  # Note: .. no need to create a tensor variable
+        binary_vector =  np.zeros(len(self.label_dict))
+        binary_vector[self.lbl[idx]] = 1
+        label = binary_vector  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
