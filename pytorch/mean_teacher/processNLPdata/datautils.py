@@ -59,16 +59,18 @@ class Datautils:
             for line in f:
                 vals = line.strip().split('\t')
 
-                cur_lbl = vals[0].split(',')
-                lbl_set.update(set(cur_lbl))
-                labels.append(cur_lbl)
-
                 cur_ent = vals[1].split(' ')
+                if len(cur_ent) == 49:  #Ignore that entity in figer dataset, its just a long context like entity
+                    continue
                 word_set.update(set(cur_ent))
                 entities.append(vals[1])
                 if max_entity_len < len(cur_ent):
                     max_entity_len = len(cur_ent)
                     max_entity = vals[1]
+
+                cur_lbl = vals[0].split(',')
+                lbl_set.update(set(cur_lbl))
+                labels.append(cur_lbl)
 
                 cur_context = vals[2].split(' ')
                 word_set.update(set(cur_context))

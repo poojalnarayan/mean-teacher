@@ -60,7 +60,7 @@ def main(context):
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'figer']:
         train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         word_vocab_size = dataset.word_vocab.size()
@@ -346,7 +346,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
     global global_step
 
     # if torch.cuda.is_available():
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    class_criterion = nn.MultiLabelSoftMarginLoss(size_average=False).cuda() # Todo- Removing ignore_index=NO_LABEL, implement yourself
     # else:
     #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
