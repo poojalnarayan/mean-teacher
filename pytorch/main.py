@@ -63,7 +63,10 @@ def main(context):
     if args.dataset in ['conll', 'ontonotes', 'figer']:
         train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
-        word_vocab_size = dataset.word_vocab.size()
+        if args.dataset in ['conll', 'ontonotes']:
+            word_vocab_size = dataset.word_vocab.size()
+        else:  #If Figer dataset
+            word_vocab_size = len(dataset.word_vocab)
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
