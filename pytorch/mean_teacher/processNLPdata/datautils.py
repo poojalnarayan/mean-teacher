@@ -78,7 +78,7 @@ class Datautils:
                 if max_context_len < len(cur_context):
                     max_context_len = len(cur_context)
 
-            word_set.add("@PADDING")
+            word_set.add("@padding")
             word_set.add("</s>")
             #print("max_entity = ", max_entity)
             label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_set))])
