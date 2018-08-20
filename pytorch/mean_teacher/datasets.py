@@ -104,9 +104,9 @@ def figer():
 
 class FETDataset(Dataset):
 
-    PAD = "@PADDING"
+    PAD = "@padding"
     OOV = "</s>"
-    ENTITY = "@Entity"
+    ENTITY = "@entity"
     OOV_ID = 0
     ENTITY_ID = -1
     NUM_WORDS_TO_REPLACE = 1
