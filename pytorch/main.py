@@ -76,7 +76,7 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes', 'figer']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
             model_params['wordemb_size'] = args.wordemb_size
@@ -107,7 +107,7 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    if args.dataset in ['conll', 'ontonotes'] and args.update_pretrained_wordemb is False:
+    if args.dataset in ['conll', 'ontonotes', 'figer'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -210,11 +210,14 @@ def create_data_loaders(train_transformation,
     # else:
     #     pin_memory = False
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'figer']:
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.NECDataset(traindir, args, train_transformation)
+        if args.dataset in ['conll', 'ontonotes']:
+            dataset = datasets.NECDataset(traindir, args, train_transformation)
+        else:  #For figer data
+            dataset = datasets.FETDataset(traindir, args, train_transformation)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
 
@@ -258,46 +261,6 @@ def create_data_loaders(train_transformation,
                                                   pin_memory=True,
                                                   drop_last=False)
 
-    elif args.dataset in ['figer']:
-        LOG.info("traindir : " + traindir)
-        LOG.info("evaldir : " + evaldir)
-        dataset = datasets.FETDataset(traindir, args, train_transformation)
-        LOG.info("Type of Noise : " + dataset.WORD_NOISE_TYPE)
-        LOG.info("Size of Noise : " + str(dataset.NUM_WORDS_TO_REPLACE))
-    # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
-    ## Used for loading the riedel10 arrays into pytorch
-    elif args.dataset in ['riedel10', 'gids']:
-
-        dataset = datasets.RiedelDataset(traindir, train_transformation)
-
-        if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
-        if args.exclude_unlabeled:
-            sampler = SubsetRandomSampler(labeled_idxs)
-            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-        elif args.labeled_batch_size:
-            batch_sampler = data.TwoStreamBatchSampler(
-                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
-        else:
-            assert False, "labeled batch size {}".format(args.labeled_batch_size)
-
-        train_loader = torch.utils.data.DataLoader(dataset,
-                                                   batch_sampler=batch_sampler,
-                                                   num_workers=args.workers,
-                                                   pin_memory=True)
-                                                   # drop_last=False)
-                                                   # batch_size=args.batch_size)
-                                                   # shuffle=True)
-
-        dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
-
-        eval_loader = torch.utils.data.DataLoader(dataset_test,
-                                                  batch_size=args.batch_size,
-                                                  shuffle=False,
-                                                  num_workers=2 * args.workers,
-                                                  pin_memory=True,
-                                                  drop_last=False)
-
     else:
 
         dataset = torchvision.datasets.ImageFolder(traindir, train_transformation)
@@ -329,7 +292,7 @@ def create_data_loaders(train_transformation,
             pin_memory=True,
             drop_last=False)
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'figer']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader
@@ -373,7 +336,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes', 'figer']:
 
             input = datapoint[0]
             ema_input = datapoint[1]
@@ -410,12 +373,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'custom_embed':
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
-        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
         else:
@@ -535,7 +498,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes', 'figer']:
             entity = datapoint[0][0]
             patterns = datapoint[0][1]
             target = datapoint[1]
@@ -565,11 +528,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         # compute output
-        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'custom_embed':
             output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
             if save_custom_embed_condition:
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
-        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
