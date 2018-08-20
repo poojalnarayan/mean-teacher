@@ -251,8 +251,10 @@ def create_data_loaders(train_transformation,
         #     repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
         #     )
         ############################################################################################################
-
-        dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
+        if args.dataset in ['conll', 'ontonotes']:
+            dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
+        else:
+            dataset_test = datasets.FETDataset(evaldir, args, eval_transformation) #Figer test data
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
