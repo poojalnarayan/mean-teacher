@@ -114,7 +114,7 @@ class FETDataset(Dataset):
 
 
     def __init__(self, dir, args, transform=None):
-        dataset_file = dir + "/training_data_with_labels_figer.txt"
+        dataset_file = dir + "/data_with_labels_figer.txt"
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
