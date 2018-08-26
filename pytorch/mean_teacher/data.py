@@ -301,24 +301,22 @@ class RandomPatternWordNoise:
         print ("word: " + str(word_str) + " word replacement: " + str(replacement))
         return replacement
 
-    def __call__(self, datums, entity_token):
+    def __call__(self, datum, entity_token):
+        
+        #LOG.info("Noise datum =  " + str(datum) + " entity token = "+entity_token)
+        dropout_datum = list()
+        to_replace = list(datum)
+        to_replace.remove(entity_token)
+        num_words_to_dropout = min(self.number_words, len(datum) - 1)
+        to_replace = random.sample(to_replace, num_words_to_dropout)
+        for w in datum:
+            if w in to_replace:
+                if self.noise_type == 'drop':  # Dropout .. replace with NIL word
+                    dropout_datum.append(self.replace)
+                else:  # Replace .. find a synonym of the word using wordnet
+                    replaced_synonym = self.replace_with_synonym(w)
+                    dropout_datum.append(replaced_synonym)
+            else:
+                dropout_datum.append(w)
 
-        dropout_datums = list()
-        for datum in datums:
-            dropout_datum = list()
-            to_replace = list(datum)
-            to_replace.remove(entity_token)
-            num_words_to_dropout = min(self.number_words, len(datum) - 1)
-            to_replace = random.sample(to_replace, num_words_to_dropout)
-            for w in datum:
-                if w in to_replace:
-                    if self.noise_type == 'drop':  # Dropout .. replace with NIL word
-                        dropout_datum.append(self.replace)
-                    else:  # Replace .. find a synonym of the word using wordnet
-                        replaced_synonym = self.replace_with_synonym(w)
-                        dropout_datum.append(replaced_synonym)
-                else:
-                    dropout_datum.append(w)
-            dropout_datums.append(dropout_datum)
-
-        return dropout_datums
+        return dropout_datum
