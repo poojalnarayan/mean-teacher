@@ -199,6 +199,7 @@ class FETDataset(Dataset):
             # 1. Replace word with synonym word in Wordnet / NIL (whichever is enabled)
             context_words_dropout_str = self.transform(self.contexts[idx].split(" "), FETDataset.ENTITY)
 
+            #Todo- Fix context_words_dropout_str for list and not list of list
             if FETDataset.WORD_NOISE_TYPE == 'replace':
                 assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
                 new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]

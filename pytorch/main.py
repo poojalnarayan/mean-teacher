@@ -357,13 +357,13 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_input_patterns = ema_input[1]
             ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
             ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
-
         else:
             ((input, ema_input), target) = datapoint
             input_var = torch.autograd.Variable(input).cuda()
             ema_input_var = torch.autograd.Variable(ema_input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         # if torch.cuda.is_available():
+        target =  target.type(torch.cuda.FloatTensor)
         target_var = torch.autograd.Variable(target.cuda(async=True))
         # else:
         #     target_var = torch.autograd.Variable(target.cpu())  # todo: not passing the async=True (as above) .. going along with it now .. to check if this is a problem
