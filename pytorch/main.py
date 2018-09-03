@@ -443,14 +443,14 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)'''
 
         prec, rec, f1 = prec_rec(class_logit.data, target_var.data, 0.2) #Setting the threshold to 0.2 for now
-        meters.update('precision', prec, labeled_minibatch_size)
-        meters.update('recall', rec, labeled_minibatch_size)
-        meters.update('F1 score', f1, labeled_minibatch_size)
+        meters.update('prec', prec, labeled_minibatch_size)
+        meters.update('rec', rec, labeled_minibatch_size)
+        meters.update('f1', f1, labeled_minibatch_size)
 
         ema_prec, ema_rec, ema_f1 = prec_rec(ema_logit.data, target_var.data, 0.2)  # Setting the threshold to 0.2 for now
-        meters.update('ema_precision', ema_prec, labeled_minibatch_size)
-        meters.update('ema_recall', ema_rec, labeled_minibatch_size)
-        meters.update('ema_F1 score', ema_f1, labeled_minibatch_size)
+        meters.update('ema_prec', ema_prec, labeled_minibatch_size)
+        meters.update('ema_rec', ema_rec, labeled_minibatch_size)
+        meters.update('ema_f1', ema_f1, labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -476,7 +476,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             LOG.info(
                 'Epoch: [{0}][{1}/{2}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}'.format(
+                'Precision {meters[prec]:.3f}\t'
+                'Recall {meters[rec]:.3f}\t'
+                'F1 Score {meters[f1]:.3f}\t'
+                'EMA Precision {meters[ema_prec]:.3f}\t'
+                'EMA Recall {meters[ema_rec]:.3f}\t'
+                'EMA F1 Score {meters[ema_f1]:.3f}'.format(
                     epoch, i, len(train_loader), meters=meters))
             log.record(epoch + i / len(train_loader), {
                 'step': global_step,
@@ -488,7 +493,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
 def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, model_type):
     # if torch.cuda.is_available():
-    class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cuda()
+    class_criterion = nn.MultiLabelSoftMarginLoss(size_average=False).cuda() # Todo- Removing ignore_index=NO_LABEL, implement yourself
     # else:
     #     class_criterion = nn.CrossEntropyLoss(size_average=False, ignore_index=NO_LABEL).cpu()
 
@@ -552,6 +557,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
+        
         class_loss = class_criterion(output1, target_var) / minibatch_size
         ''' 
         # measure accuracy and record loss
@@ -564,9 +570,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
         prec, rec, f1 = prec_rec(output1.data, target_var.data, 0.2)  # Setting the threshold to 0.2 for now
         meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
-        meters.update('precision', prec, labeled_minibatch_size)
-        meters.update('recall', rec, labeled_minibatch_size)
-        meters.update('F1 score', f1, labeled_minibatch_size)
+        meters.update('prec', prec, labeled_minibatch_size)
+        meters.update('rec', rec, labeled_minibatch_size)
+        meters.update('f1', f1, labeled_minibatch_size)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
@@ -585,7 +591,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             LOG.info(
                 'Test: [{0}/{1}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
-                'Prec@1 {meters[top1]:.3f}'.format(
+                'Precision {meters[prec]:.3f}\t'
+                'Recall {meters[rec]:.3f}\t'
+                'F1 Score {meters[f1]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
 
     LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
@@ -599,7 +607,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
     if save_custom_embed_condition:
         save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type)
-    return meters['top1'].avg
+    return meters['f1'].avg #Todo- Averaging F1 might not be right
 
 
 def save_custom_embeddings(custom_embeddings_minibatch, dataset, result_dir, model_type):
@@ -713,7 +721,8 @@ def prec_rec(output, target, threshold):
     output_var = torch.autograd.Variable(output.cuda(async=True))
     sf = nn.Softmax(dim=1)
     sf_out = sf(output_var)
-
+    sf_out = sf_out.data #Convert from Variable to FloatTensor
+    
     tp = target.index(sf_out > threshold).sum()  # tp- true positive
     fp = (1 - target).index(sf_out > threshold).sum()  # fp- false positive
     fn = target.index(sf_out <= threshold).sum()  # fn- false negative
