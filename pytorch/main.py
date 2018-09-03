@@ -597,8 +597,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 'F1 Score {meters[f1]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
 
-    LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
-          .format(top1=meters['top1'], class_loss=meters['class_loss']))
+    LOG.info(' * F1 {f1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
+          .format(f1=meters['f1'], class_loss=meters['class_loss']))
     log.record(epoch, {
         'step': global_step,
         **meters.values(),
