@@ -429,7 +429,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         loss = class_loss + consistency_loss + res_loss # NOTE: AJAY - loss is a combination of classification loss and consistency loss (+ residual loss from the 2 outputs of student model fc1 and fc2, see args.logit_distance_cost)
         assert not (np.isnan(loss.data[0]) or loss.data[0] > 1e5), 'Loss explosion: {}'.format(loss.data[0])
         meters.update('loss', loss.data[0])
-
+        ''' 
         prec1, prec5 = accuracy(class_logit.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100. - prec1[0], labeled_minibatch_size)
@@ -440,7 +440,17 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         meters.update('ema_top1', ema_prec1[0], labeled_minibatch_size)
         meters.update('ema_error1', 100. - ema_prec1[0], labeled_minibatch_size)
         meters.update('ema_top5', ema_prec5[0], labeled_minibatch_size)
-        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)
+        meters.update('ema_error5', 100. - ema_prec5[0], labeled_minibatch_size)'''
+
+        prec, rec, f1 = prec_rec(class_logit.data, target_var.data, 0.2) #Setting the threshold to 0.2 for now
+        meters.update('precision', prec, labeled_minibatch_size)
+        meters.update('recall', rec, labeled_minibatch_size)
+        meters.update('F1 score', f1, labeled_minibatch_size)
+
+        ema_prec, ema_rec, ema_f1 = prec_rec(ema_logit.data, target_var.data, 0.2)  # Setting the threshold to 0.2 for now
+        meters.update('ema_precision', ema_prec, labeled_minibatch_size)
+        meters.update('ema_recall', ema_rec, labeled_minibatch_size)
+        meters.update('ema_F1 score', ema_f1, labeled_minibatch_size)
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -543,14 +553,20 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             output1 = model(input_var) ##, output2 = model(input_var)
         #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
         class_loss = class_criterion(output1, target_var) / minibatch_size
-
+        ''' 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
         meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
         meters.update('top1', prec1[0], labeled_minibatch_size)
         meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
         meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
+        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)'''
+
+        prec, rec, f1 = prec_rec(output1.data, target_var.data, 0.2)  # Setting the threshold to 0.2 for now
+        meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
+        meters.update('precision', prec, labeled_minibatch_size)
+        meters.update('recall', rec, labeled_minibatch_size)
+        meters.update('F1 score', f1, labeled_minibatch_size)
 
         # measure elapsed time
         meters.update('batch_time', time.time() - end)
@@ -692,6 +708,31 @@ def get_current_consistency_weight(epoch):
     # Consistency ramp-up from https://arxiv.org/abs/1610.02242
     return args.consistency * ramps.sigmoid_rampup(epoch, args.consistency_rampup)
 
+def prec_rec(output, target, threshold):
+    """ Compute the precision recall for F1"""
+    sf = nn.Softmax(dim=1)
+    sf_out = sf(output)
+
+    tp = target.index(sf_out > threshold).sum()  # tp- true positive
+    fp = (1 - target).index(sf_out > threshold).sum()  # fp- false positive
+    fn = target.index(sf_out <= threshold).sum()  # fn- false negative
+
+    if tp + fp > 0:
+        prec = float(tp)/ float(tp + fp)
+    else:
+        prec = 0.0
+
+    if tp + fn > 0:
+        rec = float(tp)/ float(tp + fn)
+    else:
+        prec = 0.0
+
+    if prec + rec == 0:
+        f1 = 0
+    else:
+        f1 = 2 * prec * rec / (prec + rec)
+
+    return prec, rec, f1
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
