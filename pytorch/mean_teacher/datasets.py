@@ -111,14 +111,18 @@ class FETDataset(Dataset):
     ENTITY_ID = -1
     NUM_WORDS_TO_REPLACE = 1
     WORD_NOISE_TYPE = "drop"
-
+    label_dict = None
 
     def __init__(self, dir, args, transform=None):
         dataset_file = dir + "/data_with_labels_figer.txt"
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
-        self.labels, self.entities, self.contexts, self.label_dict, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_fet_data(dataset_file)
+        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_fet_data(dataset_file)
+
+        if "train" in dataset_file: #If "eval" then use the same dict as the train. Because test label set will be smaller
+            FETDataset.label_dict = label_dictionary
+
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
@@ -138,7 +142,7 @@ class FETDataset(Dataset):
         FETDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
 
         # Takes the lables and the dict and gives corresponding numbers for the labels
-        self.lbl = [[self.label_dict[l] for l in cur_label] for cur_label in self.labels]
+        self.lbl = [[FETDataset.label_dict[l] for l in cur_label] for cur_label in self.labels]
 
         self.transform = transform
 
@@ -238,7 +242,7 @@ class FETDataset(Dataset):
 
         # print ("label : " + self.labels[idx])
         # print ("label id : " + str(self.label_ids_all[idx]))
-        binary_vector =  np.zeros(len(self.label_dict))
+        binary_vector =  np.zeros(len(FETDataset.label_dict))
         binary_vector[self.lbl[idx]] = 1
         label = binary_vector  # Note: .. no need to create a tensor variable
 
