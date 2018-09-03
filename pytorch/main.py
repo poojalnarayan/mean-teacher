@@ -531,6 +531,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             input_var = torch.autograd.Variable(input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
 
         # if torch.cuda.is_available():
+        target = target.type(torch.cuda.FloatTensor)
         target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
         # else:
         #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
