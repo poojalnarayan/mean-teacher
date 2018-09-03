@@ -710,8 +710,9 @@ def get_current_consistency_weight(epoch):
 
 def prec_rec(output, target, threshold):
     """ Compute the precision recall for F1"""
+    output_var = torch.autograd.Variable(output.cuda(async=True))
     sf = nn.Softmax(dim=1)
-    sf_out = sf(output)
+    sf_out = sf(output_var)
 
     tp = target.index(sf_out > threshold).sum()  # tp- true positive
     fp = (1 - target).index(sf_out > threshold).sum()  # fp- false positive
