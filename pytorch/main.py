@@ -213,7 +213,7 @@ def create_data_loaders(train_transformation,
     # else:
     #     pin_memory = False
 
-    if args.dataset in ['conll', 'ontonotes', 'figer']:
+    if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
