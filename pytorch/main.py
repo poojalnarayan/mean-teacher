@@ -60,7 +60,7 @@ def main(context):
     dataset_config = datasets.__dict__[args.dataset]()
     num_classes = dataset_config.pop('num_classes')
 
-    if args.dataset in ['conll', 'ontonotes', 'figer']:
+    if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
         train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
         if args.dataset in ['conll', 'ontonotes']:
@@ -79,7 +79,7 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
 
-        if args.dataset in ['conll', 'ontonotes', 'figer']:
+        if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
             model_params['wordemb_size'] = args.wordemb_size
@@ -110,7 +110,7 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    if args.dataset in ['conll', 'ontonotes', 'figer'] and args.update_pretrained_wordemb is False:
+    if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -219,7 +219,7 @@ def create_data_loaders(train_transformation,
         LOG.info("evaldir : " + evaldir)
         if args.dataset in ['conll', 'ontonotes']:
             dataset = datasets.NECDataset(traindir, args, train_transformation)
-        else:  #For figer data
+        else:  #For figer, medmentions data
             dataset = datasets.FETDataset(traindir, args, train_transformation)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_REPLACE))
@@ -297,7 +297,7 @@ def create_data_loaders(train_transformation,
             pin_memory=True,
             drop_last=False)
 
-    if args.dataset in ['conll', 'ontonotes', 'figer']:
+    if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader
@@ -341,7 +341,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        if args.dataset in ['conll', 'ontonotes', 'figer']:
+        if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
 
             input = datapoint[0]
             ema_input = datapoint[1]
@@ -378,12 +378,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions'] and args.arch == 'custom_embed':
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
-        elif args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
         else:
@@ -518,7 +518,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     for i, datapoint in enumerate(eval_loader):
         meters.update('data_time', time.time() - end)
 
-        if args.dataset in ['conll', 'ontonotes', 'figer']:
+        if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions']:
             entity = datapoint[0][0]
             patterns = datapoint[0][1]
             target = datapoint[1]
@@ -549,11 +549,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         meters.update('labeled_minibatch_size', labeled_minibatch_size)
 
         # compute output
-        if args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions'] and args.arch == 'custom_embed':
             output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
             if save_custom_embed_condition:
                 custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
-        elif args.dataset in ['conll', 'ontonotes', 'figer'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['conll', 'ontonotes', 'figer', 'medmentions'] and args.arch == 'simple_MLP_embed':
             output1 = model(entity_var, patterns_var)
         else:
             output1 = model(input_var) ##, output2 = model(input_var)
