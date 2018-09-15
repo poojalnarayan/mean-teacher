@@ -102,6 +102,21 @@ def figer():
         'num_classes': 128
     }
 
+@export
+def medmentions():
+
+    if FETDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
+        addNoise = data.RandomPatternWordNoise(FETDataset.NUM_WORDS_TO_REPLACE, FETDataset.OOV, FETDataset.WORD_NOISE_TYPE)
+    else:
+        assert False, "Unknown type of noise {}".format(FETDataset.WORD_NOISE_TYPE)
+
+    return {
+        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'eval_transformation': None,
+        'datadir': 'data-local/fet/medmentions/',
+        'num_classes': 127
+    }
+
 class FETDataset(Dataset):
 
     PAD = "@padding"
