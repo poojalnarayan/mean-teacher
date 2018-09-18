@@ -50,7 +50,7 @@ def generate_prediction_minibatch(min_batch_id, mini_batch_outputs, dataset, bat
         dataset_id = (min_batch_id * batch_size) + idx
         mention_str = dataset.entity_vocab.get_word(dataset.mentions[dataset_id])
         gold_label = dataset.labels_str[dataset_id]
-        min_batch_predictions_gold.append((mention_str, gold_label, category_labels[predictionId], max_value, list(scores[idx])))
+        min_batch_predictions_gold.append((mention_str, gold_label, category_labels[predictionId], max_value, list(scores[idx].data)))
 
     return min_batch_predictions_gold
 
@@ -119,7 +119,7 @@ def predict_validate(eval_loader, model, model_type, arch, dataset, batch_size, 
     print("Writing the predictions and the gold labels to the file :=> " + result_filename)
     with open(result_filename, 'w') as rf:
         for item in entity_prediction_gold_list:
-            scores = ", ".join(item[4])
+            scores = ", ".join([str(v) for v in item[4]])
             rf.write(item[0] + "\t" + item[1] + "\t" + item[2] + "\t" + str(item[3]) + "\t" + scores+"\n")
     rf.close()
     print("DONE ..")

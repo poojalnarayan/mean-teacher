@@ -58,3 +58,6 @@ Here are some rules of thumb to get you started:
 * You can use either MSE or KL-divergence as the consistency cost function. For KL-divergence, a good consistency cost weight is often between 1.0 and 10.0. For MSE, it seems to be between the number of classes and the number of classes squared. On small datasets we saw MSE getting better results, but KL always worked pretty well too.
 * It may help to ramp up the consistency cost in the beginning over the first few epochs until the teacher network starts giving good predictions. 
 * An additional trick we used in the PyTorch examples: Have two seperate logit layers at the top level. Use one for classification of labeled examples and one for predicting the teacher output. And then have an additional cost between the logits of these two predictions. The intent is the same as with the consistency cost rampup: in the beginning the teacher output may be wrong, so loosen the link between the classification prediction and the consistency cost. (See the [--logit-distance-cost](https://github.com/CuriousAI/mean-teacher/blob/master/pytorch/mean_teacher/cli.py#L65-L66) argument in the PyTorch implementation.)
+
+----
+## Changes due to coling camera ready .. placeholder for branch ..

@@ -7,6 +7,7 @@ import parser
 import numpy as np
 import torch
 import torch.nn as nn
+import random
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
@@ -773,7 +774,7 @@ if __name__ == '__main__':
         torch.manual_seed(args.random_seed)
 
     print('----------------')
-    print("Running mean teacher experiment with args:")
+    print("Running mean teacher experiment with args: ")
     print('----------------')
     print(args)
     print('----------------')
