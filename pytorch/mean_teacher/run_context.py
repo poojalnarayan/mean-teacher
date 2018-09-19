@@ -24,6 +24,12 @@ class TrainLog:
         self._record(step, {column: value})
 
     def record(self, step, col_val_dict):
+        col_val_dict_np = {}
+        for (k,v) in col_val_dict.items():
+            if str(type(v)) == '<class \'torch.Tensor\'>':
+                col_val_dict_np[k] = col_val_dict[k].cpu().numpy()
+            else:
+                col_val_dict_np[k] = col_val_dict[k]
         self._record(step, col_val_dict)
 
     def save(self):

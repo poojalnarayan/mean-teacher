@@ -76,9 +76,9 @@ class AverageMeter:
 
     def update(self, val, n=1):
         self.val = val
-        self.sum += val * n
+        self.sum += val * float(n)
         self.count += n
-        self.avg = self.sum / self.count
+        self.avg = self.sum / float(self.count)
 
     def __format__(self, format):
         return "{self.val:{format}} ({self.avg:{format}})".format(self=self, format=format)
