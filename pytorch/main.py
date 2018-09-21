@@ -58,7 +58,11 @@ def main(context):
     validation_log = context.create_train_log("validation")
     ema_validation_log = context.create_train_log("ema_validation")
 
-    dataset_config = datasets.__dict__[args.dataset]()
+    if args.dataset in ['conll', 'ontonotes']:
+        dataset_config = datasets.__dict__[args.dataset](args)
+    else:
+        dataset_config = datasets.__dict__[args.dataset]()
+
     num_classes = dataset_config.pop('num_classes')
 
     if args.dataset in ['conll', 'ontonotes']:
