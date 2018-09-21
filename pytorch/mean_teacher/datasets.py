@@ -61,7 +61,10 @@ def ontonotes(args):
 
     type_of_noise, size_of_noise = args.word_noise.split(":")
     NECDataset.WORD_NOISE_TYPE = type_of_noise
-    NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+    if type_of_noise == 'gaussian':
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)   #for guassian std-dev value is a float
+    else:
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
     if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
         addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
@@ -167,8 +170,8 @@ class NECDataset(Dataset):
         # leave last word = "@PADDING"
         for word_id in range(0, self.word_vocab.size()-1):
             word_embed = self.sanitise_and_lookup_embedding(word_id)
-            if noise_type == 'gaussian':  # todo: hard=coding the std-dev params to 1.. make a param
-                gaussian_noise = np.random.normal(scale=1, size=word_embed.shape)
+            if noise_type == 'gaussian':
+                gaussian_noise = np.random.normal(scale=NECDataset.NUM_WORDS_TO_CHANGE, size=word_embed.shape)    #In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev
                 word_embed = word_embed + gaussian_noise
             word_vocab_embed.append(word_embed)
 
