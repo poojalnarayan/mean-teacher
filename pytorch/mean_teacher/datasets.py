@@ -88,7 +88,10 @@ def conll(args):
 
     type_of_noise, size_of_noise = args.word_noise.split(":")
     NECDataset.WORD_NOISE_TYPE = type_of_noise
-    NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+    if type_of_noise == 'gaussian':
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)   #for guassian std-dev value is a float
+    else:
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
     if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
         addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
