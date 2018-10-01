@@ -180,6 +180,12 @@ class NECDataset(Dataset):
 
         # NOTE: adding the embed for @PADDING
         word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
+        #Adding another 10000 more empty(pad) slots in the embed array so that replace can add new words. Its crashes if you add it at runtime 
+        self.word_vocab_embed_tail = len(word_vocab_embed)
+        for i in range(10000):
+            word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
         return np.array(word_vocab_embed).astype('float32')
 
     def build_word_vocabulary(self):
@@ -269,7 +275,9 @@ class NECDataset(Dataset):
                 if self.args.pretrained_wordemb:
                     for word_id in new_replaced_word_ids:
                         word_embed = self.sanitise_and_lookup_embedding(word_id)
-                        self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
+                        #Adding new replaced word to the tail slot(free slot) 
+                        self.word_vocab_embed[self.word_vocab_embed_tail] = word_embed
+                        self.word_vocab_embed_tail = self.word_vocab_embed_tail + 1
 
                 # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
