@@ -99,7 +99,7 @@ def figer():
         'train_transformation': data.TransformTwiceNEC(addNoise),
         'eval_transformation': None,
         'datadir': 'data-local/fet/figer/',
-        'num_classes': 128
+        'num_classes': 127
     }
 
 @export
