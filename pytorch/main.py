@@ -723,10 +723,11 @@ def prec_rec(output, target, threshold):
     sf = nn.Softmax(dim=1)
     sf_out = sf(output_var)
     sf_out = sf_out.data #Convert from Variable to FloatTensor
-    
-    tp = target.index(sf_out > threshold).sum()  # tp- true positive
-    fp = (1 - target).index(sf_out > threshold).sum()  # fp- false positive
-    fn = target.index(sf_out <= threshold).sum()  # fn- false negative
+   
+    #Fixing a warning, added tensor.item() to remove it
+    tp = target[np.where(sf_out > threshold)].sum().item()  # tp- true positive
+    fp = (1 - target)[np.where(sf_out > threshold)].sum().item()  # fp- false positive
+    fn = target[np.where(sf_out <= threshold)].sum().item()  # fn- false negative
 
     if tp + fp > 0:
         prec = float(tp)/ float(tp + fp)
@@ -757,7 +758,7 @@ def accuracy(output, target, topk=(1,)):
     res = []
     for k in topk:
         correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
-        res.append(correct_k.mul_(100.0 / labeled_minibatch_size))
+        res.append(correct_k.mul_(100.0 / float(labeled_minibatch_size)))
     return res
 
 
