@@ -1,3 +1,18 @@
+Please run the script in bash shell. The shell script run.sh is at the root directory of the git repository. It is also attached to d2l hw-3 folder. Just run in clara as :
+./run.sh
+
+##What the script does
+1. It creates a new conda environment with all the required packages 
+2. Activates the environment
+3. Downloads the embedding matrix file and the dataset
+4. Clone the code from git
+5. Runs the command in that new environment
+6. Removes it from conda after it has finished running.
+
+It assumes cuda8.0 and clara machine. Since the data is huge have stored it on the server locally. It also assumes that conda is installed as a
+ software package, since it uses conda to create a new environment for running this experiment.
+
+The rest of the README is from the original Mean Teacher implementation. The Readme for this assignment ends here.
 # Mean teachers are better role models
 
 [Paper](https://arxiv.org/abs/1703.01780) ---- [NIPS 2017 poster](nips_2017_poster.pdf) ---- [NIPS 2017 spotlight slides](nips_2017_slides.pdf) ---- [Blog post](https://thecuriousaicompany.com/mean-teacher/)
