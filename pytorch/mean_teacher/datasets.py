@@ -141,7 +141,7 @@ def figer(args):
 def medmentions():
 
     if FETDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(FETDataset.NUM_WORDS_TO_REPLACE, FETDataset.OOV, FETDataset.WORD_NOISE_TYPE)
+        addNoise = data.RandomPatternWordNoise(FETDataset.NUM_WORDS_TO_CHANGE, FETDataset.OOV, FETDataset.WORD_NOISE_TYPE)
     else:
         assert False, "Unknown type of noise {}".format(FETDataset.WORD_NOISE_TYPE)
 
@@ -159,7 +159,7 @@ class FETDataset(Dataset):
     ENTITY = "@entity"
     OOV_ID = 0
     ENTITY_ID = -1
-    NUM_WORDS_TO_REPLACE = 1
+    NUM_WORDS_TO_CHANGE = 1
     WORD_NOISE_TYPE = "drop"
     label_dict = None
 
@@ -189,7 +189,7 @@ class FETDataset(Dataset):
 
         type_of_noise, size_of_noise = args.word_noise.split(":")
         FETDataset.WORD_NOISE_TYPE = type_of_noise
-        FETDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
+        FETDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
         # Takes the lables and the dict and gives corresponding numbers for the labels
         self.lbl = [[FETDataset.label_dict[l] for l in cur_label] for cur_label in self.labels]
@@ -329,7 +329,7 @@ class NECDataset(Dataset):
     ENTITY = "@ENTITY"
     OOV_ID = 0
     ENTITY_ID = -1
-    NUM_WORDS_TO_REPLACE = 1
+    NUM_WORDS_TO_CHANGE = 1
     WORD_NOISE_TYPE = "drop"
 
     def __init__(self, dir, args, transform=None):
@@ -359,7 +359,7 @@ class NECDataset(Dataset):
 
         type_of_noise, size_of_noise = args.word_noise.split(":")
         NECDataset.WORD_NOISE_TYPE = type_of_noise
-        NECDataset.NUM_WORDS_TO_REPLACE = int(size_of_noise)
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
         categories = sorted(list({l for l in self.labels_str}))
         self.lbl = [categories.index(l) for l in self.labels_str]
