@@ -57,10 +57,21 @@ def cifar10():
     }
 
 @export
-def ontonotes():
+def ontonotes(args):
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    type_of_noise, size_of_noise = args.word_noise.split(":")
+    NECDataset.WORD_NOISE_TYPE = type_of_noise
+    if type_of_noise == 'gaussian':
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)  # for guassian std-dev value is a float
+    else:
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+
+    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    elif NECDataset.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
+    elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
     else:
         assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
 
@@ -73,10 +84,22 @@ def ontonotes():
 
 
 @export
-def conll():
+def conll(args):
 
-    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_REPLACE, NECDataset.OOV, NECDataset.WORD_NOISE_TYPE)
+    type_of_noise, size_of_noise = args.word_noise.split(":")
+    NECDataset.WORD_NOISE_TYPE = type_of_noise
+    if type_of_noise == 'gaussian':
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)  # for guassian std-dev value is a float
+    else:
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+
+    if NECDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDataset.NUM_WORDS_TO_CHANGE, NECDataset.OOV,
+                                               NECDataset.WORD_NOISE_TYPE)
+    elif NECDataset.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
+    elif NECDataset.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
     else:
         assert False, "Unknown type of noise {}".format(NECDataset.WORD_NOISE_TYPE)
 
@@ -88,10 +111,22 @@ def conll():
     }
 
 @export
-def figer():
+def figer(args):
 
-    if FETDataset.WORD_NOISE_TYPE in ['drop', 'replace']:
-        addNoise = data.RandomPatternWordNoise(FETDataset.NUM_WORDS_TO_REPLACE, FETDataset.OOV, FETDataset.WORD_NOISE_TYPE)
+    type_of_noise, size_of_noise = args.word_noise.split(":")
+    FETDataset.WORD_NOISE_TYPE = type_of_noise
+    if type_of_noise == 'gaussian':
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)  # for guassian std-dev value is a float
+    else:
+        NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+
+    if FETDataset.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(FETDataset.NUM_WORDS_TO_CHANGE, FETDataset.OOV,
+                                               FETDataset.WORD_NOISE_TYPE)
+    elif FETDataset.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
+    elif FETDataset.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
     else:
         assert False, "Unknown type of noise {}".format(FETDataset.WORD_NOISE_TYPE)
 
@@ -141,7 +176,7 @@ class FETDataset(Dataset):
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
-                self.word_vocab_embed = self.create_word_vocab_embed()
+                self.word_vocab_embed = self.create_word_vocab_embed(self.WORD_NOISE_TYPE)
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -176,17 +211,28 @@ class FETDataset(Dataset):
 
         return word_embed
 
-    def create_word_vocab_embed(self):
+    def create_word_vocab_embed(self, noise_type):
 
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
         for word in self.word_vocab.keys():
             word_embed = self.sanitise_and_lookup_embedding(word)
+            if noise_type == 'gaussian':
+                gaussian_noise = np.random.normal(scale=NECDataset.NUM_WORDS_TO_CHANGE,
+                                                  size=word_embed.shape)  # In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev
+                word_embed = word_embed + gaussian_noise
+
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
         word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
+        # Adding another 20000 more empty(pad) slots in the embed array so that replace can add new words. It crashes if you add it at runtime
+        self.word_vocab_embed_tail = len(word_vocab_embed)
+        for i in range(20000):
+            word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
         return np.array(word_vocab_embed).astype('float32')
 
     def __len__(self):
@@ -234,7 +280,10 @@ class FETDataset(Dataset):
                 if self.args.pretrained_wordemb:
                     for word in new_replaced_words:
                         word_embed = self.sanitise_and_lookup_embedding(word)
-                        self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
+                        # Adding new replaced word to the tail slot(free slot)
+                        self.word_vocab_embed[self.word_vocab_embed_tail] = word_embed
+                        self.word_vocab_embed_tail = self.word_vocab_embed_tail + 1
+
 
                 # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
@@ -297,7 +346,7 @@ class NECDataset(Dataset):
         if args.pretrained_wordemb:
             if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
                 self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
-                self.word_vocab_embed = self.create_word_vocab_embed()
+                self.word_vocab_embed = self.create_word_vocab_embed(self.WORD_NOISE_TYPE)
         else:
             print("Not loading the pretrained embeddings ... ")
             assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
@@ -327,17 +376,28 @@ class NECDataset(Dataset):
 
         return word_embed
 
-    def create_word_vocab_embed(self):
+    def create_word_vocab_embed(self, noise_type):
 
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
         for word_id in range(0, self.word_vocab.size()-1):
             word_embed = self.sanitise_and_lookup_embedding(word_id)
+            if noise_type == 'gaussian':
+                gaussian_noise = np.random.normal(scale=NECDataset.NUM_WORDS_TO_CHANGE,
+                                                  size=word_embed.shape)  # In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev
+                word_embed = word_embed + gaussian_noise
+
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
         word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
+        # Adding another 20000 more empty(pad) slots in the embed array so that replace can add new words. It crashes if you add it at runtime
+        self.word_vocab_embed_tail = len(word_vocab_embed)
+        for i in range(20000):
+            word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
         return np.array(word_vocab_embed).astype('float32')
 
     def build_word_vocabulary(self):
@@ -427,7 +487,9 @@ class NECDataset(Dataset):
                 if self.args.pretrained_wordemb:
                     for word_id in new_replaced_word_ids:
                         word_embed = self.sanitise_and_lookup_embedding(word_id)
-                        self.word_vocab_embed = np.vstack([self.word_vocab_embed, word_embed])
+                        # Adding new replaced word to the tail slot(free slot)
+                        self.word_vocab_embed[self.word_vocab_embed_tail] = word_embed
+                        self.word_vocab_embed_tail = self.word_vocab_embed_tail + 1
 
                 # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
 
