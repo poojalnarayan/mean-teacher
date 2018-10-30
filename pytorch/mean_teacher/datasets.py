@@ -187,10 +187,6 @@ class FETDataset(Dataset):
         FETDataset.OOV_ID = self.word_vocab[FETDataset.OOV]
         FETDataset.ENTITY_ID = self.word_vocab[FETDataset.ENTITY]
 
-        type_of_noise, size_of_noise = args.word_noise.split(":")
-        FETDataset.WORD_NOISE_TYPE = type_of_noise
-        FETDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
-
         # Takes the lables and the dict and gives corresponding numbers for the labels
         self.lbl = [[FETDataset.label_dict[l] for l in cur_label] for cur_label in self.labels]
 

@@ -273,6 +273,10 @@ class TransformTwiceNEC:
         self.transform = transform
 
     def __call__(self, inp, entity_token):
+
+        if self.transform is None:  # Note: not adding any noise, just return the input as is, with 2 copies
+            return inp, inp
+
         out1 = self.transform(inp, entity_token)
         out2 = self.transform(inp, entity_token)
         return out1, out2
