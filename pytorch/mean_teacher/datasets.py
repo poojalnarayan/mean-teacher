@@ -181,9 +181,9 @@ class NECDataset(Dataset):
         # NOTE: adding the embed for @PADDING
         word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
 
-        #Adding another 10000 more empty(pad) slots in the embed array so that replace can add new words. Its crashes if you add it at runtime 
+        #Adding another 18000 more empty(pad) slots in the embed array so that replace can add new words. Its crashes if you add it at runtime 
         self.word_vocab_embed_tail = len(word_vocab_embed)
-        for i in range(10000):
+        for i in range(18000):
             word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
 
         return np.array(word_vocab_embed).astype('float32')

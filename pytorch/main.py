@@ -387,8 +387,10 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
             ema_input_entity = ema_input[0]
             ema_input_patterns = ema_input[1]
-            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
-            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
+            with torch.no_grad():
+                ema_entity_var = torch.autograd.Variable(ema_input_entity).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+                ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_patterns, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+
 
         else:
             ((input, ema_input), target) = datapoint
@@ -537,73 +539,80 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         # eval_loader.batch_size = 1
         # LOG.info("NOTE: Setting the eval_loader's batch_size=1 .. to dump all the entity and pattern embeddings ....")
 
-    for i, datapoint in enumerate(eval_loader):
-        meters.update('data_time', time.time() - end)
+    with torch.no_grad():
+        for i, datapoint in enumerate(eval_loader):
+            meters.update('data_time', time.time() - end)
+    
+            if args.dataset in ['conll', 'ontonotes']:
+                entity = datapoint[0][0]
+                patterns = datapoint[0][1]
+                target = datapoint[1]
+                
+                #LOG.info("entity = " + str(entity) + " patterns = "+ str(patterns)+ " target = "+ str(target))
+                #LOG.handlers[0].flush()
+                #[h_weak_ref().flush() for h_weak_ref in LOG._handlerList]
+                with torch.no_grad():
+                    entity_var = torch.autograd.Variable(entity).cuda() #torch.autograd.Variable(entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+                    patterns_var = torch.autograd.Variable(patterns).cuda() # torch.autograd.Variable(patterns, volatile=True).cuda()  #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+    
+    
+            else:
+                (input, target) = datapoint
+                input_var = torch.autograd.Variable(input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+    
+            # if torch.cuda.is_available():
+            with torch.no_grad():
+                target_var = torch.autograd.Variable(target.cuda(async=True)) 
+            # else:
+            #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
+    
+            minibatch_size = len(target_var)
+            labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
+            ############## NOTE: AJAY -- changing this piece of code to make sure evaluation does not
+            ############## thrown exception when the minibatch consists of only NAs. Skip the batch
+            ############## TODO: AJAY -- To remove this later
+            # assert labeled_minibatch_size > 0
+            if labeled_minibatch_size == 0:
+                print ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%AJAY: Labeled_minibatch_size == 0 ....%%%%%%%%%%%%%%%%%%%%%%%")
+                continue
+            ###################################################
+            meters.update('labeled_minibatch_size', labeled_minibatch_size)
+    
+            # compute output
+            if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
+                if save_custom_embed_condition:
+                    custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
+            elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
+                output1 = model(entity_var, patterns_var)
+            else:
+                output1 = model(input_var) ##, output2 = model(input_var)
+            #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
+            class_loss = class_criterion(output1, target_var) / minibatch_size
+    
+            # measure accuracy and record loss
+            prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
+            meters.update('top1', prec1[0], labeled_minibatch_size)
+            meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
+            meters.update('top5', prec5[0], labeled_minibatch_size)
+            meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
+    
+            # measure elapsed time
+            meters.update('batch_time', time.time() - end)
+            end = time.time()
 
-        if args.dataset in ['conll', 'ontonotes']:
-            entity = datapoint[0][0]
-            patterns = datapoint[0][1]
-            target = datapoint[1]
-
-            entity_var = torch.autograd.Variable(entity, volatile=True).cuda()
-            patterns_var = torch.autograd.Variable(patterns, volatile=True).cuda()
-
-        else:
-            (input, target) = datapoint
-            input_var = torch.autograd.Variable(input, volatile=True).cuda() ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
-
-        # if torch.cuda.is_available():
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
-        # else:
-        #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
-
-        minibatch_size = len(target_var)
-        labeled_minibatch_size = target_var.data.ne(NO_LABEL).sum()
-        ############## NOTE: AJAY -- changing this piece of code to make sure evaluation does not
-        ############## thrown exception when the minibatch consists of only NAs. Skip the batch
-        ############## TODO: AJAY -- To remove this later
-        # assert labeled_minibatch_size > 0
-        if labeled_minibatch_size == 0:
-            print ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%AJAY: Labeled_minibatch_size == 0 ....%%%%%%%%%%%%%%%%%%%%%%%")
-            continue
-        ###################################################
-        meters.update('labeled_minibatch_size', labeled_minibatch_size)
-
-        # compute output
-        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
-            output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
-            if save_custom_embed_condition:
-                custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
-        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
-            output1 = model(entity_var, patterns_var)
-        else:
-            output1 = model(input_var) ##, output2 = model(input_var)
-        #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
-        class_loss = class_criterion(output1, target_var) / minibatch_size
-
-        # measure accuracy and record loss
-        prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
-        meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
-        meters.update('top1', prec1[0], labeled_minibatch_size)
-        meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
-        meters.update('top5', prec5[0], labeled_minibatch_size)
-        meters.update('error5', 100.0 - prec5[0], labeled_minibatch_size)
-
-        # measure elapsed time
-        meters.update('batch_time', time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            # LOG.info(
-            #     'Test: [{0}/{1}]\t'
-            #     'Time {meters[batch_time]:.3f}\t'
-            #     'Data {meters[data_time]:.3f}\t'
-            #     'Class {meters[class_loss]:.4f}\t'
-            #     'Prec@1 {meters[top1]:.3f}\t'
-            #     'Prec@5 {meters[top5]:.3f}'.format(
-            #         i, len(eval_loader), meters=meters))
-
-            LOG.info(
+            if i % args.print_freq == 0:
+                # LOG.info(
+                #     'Test: [{0}/{1}]\t'
+                #     'Time {meters[batch_time]:.3f}\t'
+                #     'Data {meters[data_time]:.3f}\t'
+                #     'Class {meters[class_loss]:.4f}\t'
+                #     'Prec@1 {meters[top1]:.3f}\t'
+                #     'Prec@5 {meters[top5]:.3f}'.format(
+                #         i, len(eval_loader), meters=meters))
+    
+                LOG.info(
                 'Test: [{0}/{1}]\t'
                 'ClassLoss {meters[class_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}'.format(
