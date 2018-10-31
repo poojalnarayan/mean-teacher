@@ -359,8 +359,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
             ema_input_entity = ema_input[0]
             ema_input_patterns = ema_input[1]
-            ema_entity_var = torch.autograd.Variable(ema_input_entity, volatile=True).cuda()
-            ema_patterns_var = torch.autograd.Variable(ema_input_patterns, volatile=True).cuda()
+            with torch.no_grad():
+                ema_entity_var = torch.autograd.Variable(ema_input_entity).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+                ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
         else:
             ((input, ema_input), target) = datapoint
             input_var = torch.autograd.Variable(input).cuda()
@@ -527,8 +528,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             patterns = datapoint[0][1]
             target = datapoint[1]
 
-            entity_var = torch.autograd.Variable(entity, volatile=True).cuda()
-            patterns_var = torch.autograd.Variable(patterns, volatile=True).cuda()
+            with torch.no_grad():
+                entity_var = torch.autograd.Variable(entity).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+                patterns_var = torch.autograd.Variable(patterns).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
 
         else:
             (input, target) = datapoint
@@ -536,7 +538,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
         # if torch.cuda.is_available():
         target = target.type(torch.cuda.FloatTensor)
-        target_var = torch.autograd.Variable(target.cuda(async=True), volatile=True) ## NOTE: AJAY - volatile: Boolean indicating that the Variable should be used in inference mode,
+        with torch.no_grad():
+            target_var = torch.autograd.Variable(target.cuda(async=True))
         # else:
         #     target_var = torch.autograd.Variable(target.cpu(), volatile=True)
 
