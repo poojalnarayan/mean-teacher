@@ -40,6 +40,49 @@ class Datautils:
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
         return entities, contexts, labels
 
+    @classmethod
+    def read_nec_ctx_data(cls, filename):
+        labels = []
+        entities = []
+        contexts = []
+
+        lbl_set = set()
+        word_set = set()
+
+        max_entity_len = 0
+        max_context_len = 0
+
+        max_entity = ""
+
+        with open(filename) as f:
+            # word_counts = dict()
+            for line in f:
+                vals = line.strip().split('\t')
+
+                cur_ent = vals[1].split(' ')
+                word_set.update(set(cur_ent))
+                entities.append(vals[1])
+                if max_entity_len < len(cur_ent):
+                    max_entity_len = len(cur_ent)
+                    max_entity = vals[1]
+
+                lbl_set.update(set(vals[0]))
+                labels.append(vals[0])
+
+                cur_context = vals[2].split(' ')
+                word_set.update(set(cur_context))
+                contexts.append(vals[2])
+                if max_context_len < len(cur_context):
+                    max_context_len = len(cur_context)
+
+            word_set.add("@PADDING")
+            word_set.add("</s>")
+            #print("max_entity = ", max_entity)
+            label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_set))])
+            entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_set))])
+        # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
+        return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len
+
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...
     ## ==>

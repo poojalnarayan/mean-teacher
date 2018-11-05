@@ -307,28 +307,25 @@ class RandomPatternWordNoise:
         # print("--------------------------------------")
         return replacement
 
-    def __call__(self, datums, entity_token):
+    def __call__(self, datum, entity_token):
 
-        dropout_datums = list()
-        for datum in datums:
-            dropout_datum = list()
-            to_replace = list(datum)
-            to_replace.remove(entity_token)
-            num_words_to_dropout = min(self.number_words, len(datum) - 1)
-            to_replace = random.sample(to_replace, num_words_to_dropout)
-            for w in datum:
-                if w in to_replace:
-                    if self.noise_type == 'drop':  # Dropout .. replace with NIL word
-                        dropout_datum.append(self.replace)
-                    elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
-                        replaced_synonym = self.replace_with_synonym(w, self.replace)
-                        dropout_datum.append(replaced_synonym)
-                    elif self.noise_type == 'add':
-                        pass  # todo: do soemthing here
-                    else:
-                        assert False, "Unknown noise type : " + self.noise_type
+        dropout_datum = list()
+        to_replace = list(datum)
+        to_replace.remove(entity_token)
+        num_words_to_dropout = min(self.number_words, len(datum) - 1)
+        to_replace = random.sample(to_replace, num_words_to_dropout)
+        for w in datum:
+            if w in to_replace:
+                if self.noise_type == 'drop':  # Dropout .. replace with NIL word
+                    dropout_datum.append(self.replace)
+                elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
+                    replaced_synonym = self.replace_with_synonym(w, self.replace)
+                    dropout_datum.append(replaced_synonym)
+                elif self.noise_type == 'add':
+                    pass  # todo: do soemthing here
                 else:
-                    dropout_datum.append(w)
-            dropout_datums.append(dropout_datum)
+                    assert False, "Unknown noise type : " + self.noise_type
+            else:
+                dropout_datum.append(w)
 
-        return dropout_datums
+        return dropout_datum

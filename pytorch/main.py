@@ -58,17 +58,20 @@ def main(context):
     validation_log = context.create_train_log("validation")
     ema_validation_log = context.create_train_log("ema_validation")
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
         dataset_config = datasets.__dict__[args.dataset](args)
     else:
         dataset_config = datasets.__dict__[args.dataset]()
 
     num_classes = dataset_config.pop('num_classes')
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
         train_loader, eval_loader, dataset = create_data_loaders(**dataset_config, args=args)
         word_vocab_embed = dataset.word_vocab_embed
-        word_vocab_size = dataset.word_vocab.size()
+        if args.dataset in ['conll', 'ontonotes']:
+            word_vocab_size = dataset.word_vocab.size()
+        else:  #If ontonotes_ctx dataset
+            word_vocab_size = len(dataset.word_vocab)
     else:
         train_loader, eval_loader = create_data_loaders(**dataset_config, args=args)
 
@@ -81,7 +84,7 @@ def main(context):
         model_factory = architectures.__dict__[args.arch]
         model_params = dict(pretrained=args.pretrained, num_classes=num_classes)
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
             model_params['word_vocab_embed'] = word_vocab_embed
             model_params['word_vocab_size'] = word_vocab_size
             model_params['wordemb_size'] = args.wordemb_size
@@ -113,7 +116,7 @@ def main(context):
 
     LOG.info(parameters_string(model))
 
-    if args.dataset in ['conll', 'ontonotes'] and args.update_pretrained_wordemb is False:
+    if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.update_pretrained_wordemb is False:
         ## Note: removing the parameters of embeddings as they are not updated
         # https://discuss.pytorch.org/t/freeze-the-learnable-parameters-of-resnet-and-attach-it-to-a-new-network/949/9
         filtered_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -216,11 +219,14 @@ def create_data_loaders(train_transformation,
     # else:
     #     pin_memory = False
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
 
         LOG.info("traindir : " + traindir)
         LOG.info("evaldir : " + evaldir)
-        dataset = datasets.NECDataset(traindir, args, train_transformation)
+        if args.dataset in ['conll', 'ontonotes']:
+            dataset = datasets.NECDataset(traindir, args, train_transformation)
+        else:  #For 'ontonotes_ctx' data
+            dataset = datasets.NECDatasetCTX(traindir, args, train_transformation)
         LOG.info("Type of Noise : "+ dataset.WORD_NOISE_TYPE)
         LOG.info("Size of Noise : "+ str(dataset.NUM_WORDS_TO_CHANGE))
 
@@ -254,42 +260,10 @@ def create_data_loaders(train_transformation,
         #     repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
         #     )
         ############################################################################################################
-
-        dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
-
-        eval_loader = torch.utils.data.DataLoader(dataset_test,
-                                                  batch_size=args.batch_size,
-                                                  shuffle=False,
-                                                  num_workers=2 * args.workers,
-                                                  pin_memory=True,
-                                                  drop_last=False)
-
-    # https://stackoverflow.com/questions/44429199/how-to-load-a-list-of-numpy-arrays-to-pytorch-dataset-loader
-    ## Used for loading the riedel10 arrays into pytorch
-    elif args.dataset in ['riedel10', 'gids']:
-
-        dataset = datasets.RiedelDataset(traindir, train_transformation)
-
-        if args.labels:
-            labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
-        if args.exclude_unlabeled:
-            sampler = SubsetRandomSampler(labeled_idxs)
-            batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
-        elif args.labeled_batch_size:
-            batch_sampler = data.TwoStreamBatchSampler(
-                unlabeled_idxs, labeled_idxs, args.batch_size, args.labeled_batch_size)
-        else:
-            assert False, "labeled batch size {}".format(args.labeled_batch_size)
-
-        train_loader = torch.utils.data.DataLoader(dataset,
-                                                   batch_sampler=batch_sampler,
-                                                   num_workers=args.workers,
-                                                   pin_memory=True)
-                                                   # drop_last=False)
-                                                   # batch_size=args.batch_size)
-                                                   # shuffle=True)
-
-        dataset_test = datasets.RiedelDataset(evaldir, eval_transformation)
+		if args.dataset in ['conll', 'ontonotes']:
+            dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
+        else:	# If 'ontonotes_ctx'
+            dataset_test = datasets.NECDatasetCTX(evaldir, args, eval_transformation) 
 
         eval_loader = torch.utils.data.DataLoader(dataset_test,
                                                   batch_size=args.batch_size,
@@ -329,7 +303,7 @@ def create_data_loaders(train_transformation,
             pin_memory=True,
             drop_last=False)
 
-    if args.dataset in ['conll', 'ontonotes']:
+    if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
         return train_loader, eval_loader, dataset
     else:
         return train_loader, eval_loader
@@ -373,7 +347,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         adjust_learning_rate(optimizer, epoch, i, len(train_loader))
         meters.update('lr', optimizer.param_groups[0]['lr'])
 
-        if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
 
             input = datapoint[0]
             ema_input = datapoint[1]
@@ -390,7 +364,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             with torch.no_grad():
                 ema_entity_var = torch.autograd.Variable(ema_input_entity).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
                 ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_patterns, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
-
 
         else:
             ((input, ema_input), target) = datapoint
@@ -412,12 +385,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'custom_embed':
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
-        elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
+        elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
         else:
@@ -543,7 +516,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
         for i, datapoint in enumerate(eval_loader):
             meters.update('data_time', time.time() - end)
     
-            if args.dataset in ['conll', 'ontonotes']:
+            if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
                 target = datapoint[1]
@@ -753,23 +726,6 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / float(labeled_minibatch_size)))
     return res
-
-
-def prec_rec(output, target, NA_label, topk=(1,)):
-
-    maxk = max(topk)
-    assert maxk == 1, "Right now only computing P/R/F for topk=1"
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-
-    tp = pred.index(pred.eq(target.view(1,-1).expand_as(pred))).ne(NA_label).sum() # number of cases where pred matches with target and that is not NA label
-    tp_fp = pred.ne(NA_label).sum() # number of non NA labels in pred
-    tp_fn = target.ne(NA_label).sum() # number of non NA labels in target
-
-    prec = float(tp) / tp_fp
-    rec = float(tp) / tp_fn
-
-    return prec, rec
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

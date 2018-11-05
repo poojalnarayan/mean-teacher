@@ -62,7 +62,7 @@ def ontonotes(args):
     type_of_noise, size_of_noise = args.word_noise.split(":")
     NECDataset.WORD_NOISE_TYPE = type_of_noise
     if type_of_noise == 'gaussian':
-        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)   #for guassian std-dev value is a float
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)  #for guassian std-dev value is a float
     else:
         NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
@@ -89,7 +89,7 @@ def conll(args):
     type_of_noise, size_of_noise = args.word_noise.split(":")
     NECDataset.WORD_NOISE_TYPE = type_of_noise
     if type_of_noise == 'gaussian':
-        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)   #for guassian std-dev value is a float
+        NECDataset.NUM_WORDS_TO_CHANGE = float(size_of_noise)  #for guassian std-dev value is a float
     else:
         NECDataset.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
@@ -108,6 +108,188 @@ def conll(args):
         'datadir': 'data-local/nec/conll',
         'num_classes': 4
     }
+
+@export
+def ontonotes_ctx(args):
+
+    type_of_noise, size_of_noise = args.word_noise.split(":")
+    NECDatasetCTX.WORD_NOISE_TYPE = type_of_noise
+    if type_of_noise == 'gaussian':
+        NECDatasetCTX.NUM_WORDS_TO_CHANGE = float(size_of_noise)  #for guassian std-dev value is a float
+    else:
+        NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+
+    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
+    elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
+    elif NECDatasetCTX.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
+    else:
+        assert False, "Unknown type of noise {}".format(NECDatasetCTX.WORD_NOISE_TYPE)
+
+    return {
+        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'eval_transformation': None,
+        'datadir': 'data-local/nec/ontonotes_ctx/',
+        'num_classes': 11
+    }
+
+
+class NECDatasetCTX(Dataset):
+
+    PAD = "@PADDING"
+    OOV = "</s>"
+    ENTITY = "@ENTITY"
+    OOV_ID = 0
+    ENTITY_ID = -1
+    NUM_WORDS_TO_CHANGE = 1
+    WORD_NOISE_TYPE = "drop"
+    label_dict = None
+
+    def __init__(self, dir, args, transform=None):
+        dataset_file = dir + "/data_with_labels_figer.txt"  #Its also used for medmentions, so change name accordingly
+        w2vfile = dir + "/../../vectors.goldbergdeps.txt"
+
+        self.args = args
+        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_nec_ctx_data(dataset_file)
+
+        if "train" in dataset_file: #If "eval" then use the same dict as the train. Because test label set will be smaller
+            NECDatasetCTX.label_dict = label_dictionary
+
+        if args.pretrained_wordemb:
+            if args.eval_subdir not in dir:  # do not load the word embeddings again in eval
+                self.gigaW2vEmbed, self.lookupGiga = Gigaword.load_pretrained_embeddings(w2vfile)
+                self.word_vocab_embed = self.create_word_vocab_embed(self.WORD_NOISE_TYPE)
+        else:
+            print("Not loading the pretrained embeddings ... ")
+            assert args.update_pretrained_wordemb, "Pretrained embeddings should be updated but " \
+                                                   "--update-pretrained-wordemb = {}".format(args.update_pretrained_wordemb)
+            self.word_vocab_embed = None
+
+        # NOTE: Setting some class variables
+        NECDatasetCTX.OOV_ID = self.word_vocab[NECDatasetCTX.OOV]
+        NECDatasetCTX.ENTITY_ID = self.word_vocab[NECDatasetCTX.ENTITY]
+
+        # Takes the lables and the dict and gives corresponding numbers for the labels
+		self.lbl = [NECDatasetCTX.label_dict[cur_label] for cur_label in self.labels]
+        
+		self.transform = transform
+
+    def sanitise_and_lookup_embedding(self, word):
+        '''print('-----\n')
+        print(sorted(list(self.word_vocab.values()))[:25])
+        print('-----\n')  
+        print(str(word_id) +"\t")
+        print(self.word_vocab[word_id]+"\n")'''
+        word = Gigaword.sanitiseWord(word)
+
+        if word in self.lookupGiga:
+            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga[word]])
+        else:
+            word_embed = Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<unk>"]])
+
+        return word_embed
+
+    def create_word_vocab_embed(self, noise_type):
+
+        word_vocab_embed = list()
+
+        # leave last word = "@PADDING"
+        for word in self.word_vocab.keys():
+            word_embed = self.sanitise_and_lookup_embedding(word)
+            if noise_type == 'gaussian':
+                gaussian_noise = np.random.normal(scale=NECDatasetCTX.NUM_WORDS_TO_CHANGE,
+                                                  size=word_embed.shape)  # In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev
+                word_embed = word_embed + gaussian_noise
+
+            word_vocab_embed.append(word_embed)
+
+        # NOTE: adding the embed for @PADDING
+        word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
+        # Adding another 20000 more empty(pad) slots in the embed array so that replace can add new words. It crashes if you add it at runtime
+        self.word_vocab_embed_tail = len(word_vocab_embed)
+        for i in range(20000):
+            word_vocab_embed.append(Gigaword.norm(self.gigaW2vEmbed[self.lookupGiga["<pad>"]]))
+
+        return np.array(word_vocab_embed).astype('float32')
+
+    def __len__(self):
+        return len(self.entities)
+
+    def pad_item(self, dataitem, isPattern=True):
+        if isPattern:
+            dataitem_padded = dataitem + [self.word_vocab[NECDatasetCTX.PAD]] * (self.max_context_len - len(dataitem))
+        else:  # Note: padding an entity (consisting of a seq of tokens)
+            dataitem_padded = dataitem + [self.word_vocab[NECDatasetCTX.PAD]] * (self.max_entity_len - len(dataitem))
+
+        return dataitem_padded
+
+    def get_num_classes(self):
+        return len(list({l for l in self.lbl}))
+
+
+    def get_labels(self):
+        return self.lbl
+
+    def __getitem__(self, idx):
+        entity_words = [self.word_vocab[w] for w in self.entities[idx].split(" ")]
+        entity_words_padded = self.pad_item(entity_words, isPattern=False)
+        entity_datum = torch.LongTensor(entity_words_padded)
+
+        context_words = [self.word_vocab[w] for w in self.contexts[idx].split(" ")]
+
+        if self.transform is not None:
+            # 1. Replace word with synonym word in Wordnet / NIL (whichever is enabled)
+            context_words_dropout_str = self.transform(self.contexts[idx].split(" "), NECDatasetCTX.ENTITY)
+
+            if NECDatasetCTX.WORD_NOISE_TYPE == 'replace':
+                assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
+                new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
+                                        for w in ctx
+                                        if w not in self.word_vocab]
+
+                # 2. Add word to word vocab (expand vocab)
+                for w in new_replaced_words:
+                    self.word_vocab[w] = len(self.word_vocab)
+
+
+                # 3. Add the replaced words to the word_vocab_embed (if using pre-trained embedding)
+                if self.args.pretrained_wordemb:
+                    for word in new_replaced_words:
+                        word_embed = self.sanitise_and_lookup_embedding(word)
+                        # Adding new replaced word to the tail slot(free slot)
+                        self.word_vocab_embed[self.word_vocab_embed_tail] = word_embed
+                        self.word_vocab_embed_tail = self.word_vocab_embed_tail + 1
+
+
+                # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
+
+            context_words_dropout = list()
+            context_words_dropout.append([self.word_vocab[w]
+                                           for w in context_words_dropout_str[0]])
+            context_words_dropout.append([self.word_vocab[w]
+                                           for w in context_words_dropout_str[1]])
+
+            if len(context_words_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
+                context_words_padded_0 = self.pad_item(context_words_dropout[0])
+                context_words_padded_1 = self.pad_item(context_words_dropout[1])
+                context_datums = (torch.LongTensor(context_words_padded_0), torch.LongTensor(context_words_padded_1))
+            else: # todo: change this to an assert (if we are always using the student and teacher networks)
+                context_words_padded = self.pad_item(context_words_dropout)
+                context_datums = torch.LongTensor(context_words_padded)
+        else:
+            context_words_padded = self.pad_item(context_words)
+            context_datums = torch.LongTensor(context_words_padded)
+
+        # print ("label : " + self.labels[idx])
+		label = self.lbl[idx]  # Note: .. no need to create a tensor variable
+
+        if self.transform is not None:
+            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
+        else:
+            return (entity_datum, context_datums), label
 
 ##### USING Torchtext ... now reverting to using custom code
 # def simple_tokenizer(datapoint):
