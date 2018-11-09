@@ -1,6 +1,8 @@
 # Temporary directories
 results
 data
+data-local
+nec
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

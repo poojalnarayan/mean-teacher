@@ -66,7 +66,7 @@ class Datautils:
                     max_entity_len = len(cur_ent)
                     max_entity = vals[1]
 
-                lbl_set.update(set(vals[0]))
+                lbl_set.add(vals[0])
                 labels.append(vals[0])
 
                 cur_context = vals[2].split(' ')

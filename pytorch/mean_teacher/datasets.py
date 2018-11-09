@@ -148,7 +148,7 @@ class NECDatasetCTX(Dataset):
     label_dict = None
 
     def __init__(self, dir, args, transform=None):
-        dataset_file = dir + "/data_with_labels_figer.txt"  #Its also used for medmentions, so change name accordingly
+        dataset_file = dir + "/data_with_labels.txt"  #Its also used for medmentions, so change name accordingly
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
@@ -172,9 +172,9 @@ class NECDatasetCTX(Dataset):
         NECDatasetCTX.ENTITY_ID = self.word_vocab[NECDatasetCTX.ENTITY]
 
         # Takes the lables and the dict and gives corresponding numbers for the labels
-		self.lbl = [NECDatasetCTX.label_dict[cur_label] for cur_label in self.labels]
+        self.lbl = [NECDatasetCTX.label_dict[cur_label] for cur_label in self.labels]
         
-		self.transform = transform
+        self.transform = transform
 
     def sanitise_and_lookup_embedding(self, word):
         '''print('-----\n')
@@ -284,7 +284,7 @@ class NECDatasetCTX(Dataset):
             context_datums = torch.LongTensor(context_words_padded)
 
         # print ("label : " + self.labels[idx])
-		label = self.lbl[idx]  # Note: .. no need to create a tensor variable
+        label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label

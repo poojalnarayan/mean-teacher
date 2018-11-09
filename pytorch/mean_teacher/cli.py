@@ -86,7 +86,7 @@ def create_parser():
                         help='Update the pre-trained word embeddings during training, if True; else keep them fixed (default: False)')
     parser.add_argument('--word-noise', default='drop:1', type=str,
                         help='What type of noise should be added to the input (NLP) and how much; format= [(drop|replace|add|no-noise|gaussian):X], where replace=replace a random word with a wordnet synonym, drop=random word dropout, X=number of words (default: drop:1) ')
-    parser.add_argument('--save-custom-embedding', default=True, type=str2bool, metavar='BOOL',
+    parser.add_argument('--save-custom-embedding', default=False, type=str2bool, metavar='BOOL',
                         help='Save the custom embedding generated from the LSTM-based custom_embed model (default: True)')
     parser.add_argument('--run-name', default='', type=str, metavar='PATH',
                         help='Name of the run used in storing the results for post-precessing (default: none)')

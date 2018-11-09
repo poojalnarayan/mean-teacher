@@ -260,7 +260,7 @@ def create_data_loaders(train_transformation,
         #     repeat=False # we pass repeat=False because we want to wrap this Iterator layer.
         #     )
         ############################################################################################################
-		if args.dataset in ['conll', 'ontonotes']:
+        if args.dataset in ['conll', 'ontonotes']:
             dataset_test = datasets.NECDataset(evaldir, args, eval_transformation) ## NOTE: test data is the same as train data
         else:	# If 'ontonotes_ctx'
             dataset_test = datasets.NECDatasetCTX(evaldir, args, eval_transformation) 
@@ -552,11 +552,11 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             meters.update('labeled_minibatch_size', labeled_minibatch_size)
     
             # compute output
-            if args.dataset in ['conll', 'ontonotes'] and args.arch == 'custom_embed':
+            if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and args.arch == 'custom_embed':
                 output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
                 if save_custom_embed_condition:
                     custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
-            elif args.dataset in ['conll', 'ontonotes'] and args.arch == 'simple_MLP_embed':
+            elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
                 output1 = model(entity_var, patterns_var)
             else:
                 output1 = model(input_var) ##, output2 = model(input_var)
