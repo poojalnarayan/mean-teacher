@@ -6,6 +6,7 @@ from . import data
 from .utils import export
 
 from .processNLPdata.processNECdata import *
+import collections
 
 @export
 def imagenet():
@@ -196,8 +197,10 @@ class NECDatasetCTX(Dataset):
         word_vocab_embed = list()
 
         # leave last word = "@PADDING"
-        for word in self.word_vocab.keys():
-            word_embed = self.sanitise_and_lookup_embedding(word)
+        rev_vocab = {v:k for k,v in self.word_vocab.items()}
+        id_word_vocab = collections.OrderedDict(sorted(rev_vocab.items()))
+        for word_id in range(0, len(id_word_vocab) - 1):
+            word_embed = self.sanitise_and_lookup_embedding(id_word_vocab[word_id])
             if noise_type == 'gaussian':
                 gaussian_noise = np.random.normal(scale=NECDatasetCTX.NUM_WORDS_TO_CHANGE,
                                                   size=word_embed.shape)  # In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev

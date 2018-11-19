@@ -75,11 +75,16 @@ class Datautils:
                 if max_context_len < len(cur_context):
                     max_context_len = len(cur_context)
 
-            word_set.add("@PADDING")
             word_set.add("</s>")
+            word_list = list(sorted(word_set))
+            lbl_list = list(sorted(lbl_set))
+
+            #Add padding to the end because in create_word_vocab_embed() we add it last
+            word_list.append("@PADDING")
+
             #print("max_entity = ", max_entity)
-            label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_set))])
-            entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_set))])
+            label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_list))])
+            entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_list))])
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
         return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len
 
