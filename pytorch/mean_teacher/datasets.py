@@ -249,8 +249,7 @@ class NECDatasetCTX(Dataset):
 
             if NECDatasetCTX.WORD_NOISE_TYPE == 'replace':
                 assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
-                new_replaced_words = [w for ctx in context_words_dropout_str[0] + context_words_dropout_str[1]
-                                        for w in ctx
+                new_replaced_words = [w for w in context_words_dropout_str[0] + context_words_dropout_str[1]
                                         if w not in self.word_vocab]
 
                 # 2. Add word to word vocab (expand vocab)
