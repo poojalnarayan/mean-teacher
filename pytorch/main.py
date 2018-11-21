@@ -233,7 +233,8 @@ def create_data_loaders(train_transformation,
         if args.labels:
             labeled_idxs, unlabeled_idxs = data.relabel_dataset_nlp(dataset, args)
 
-        if args.exclude_unlabeled:
+        #If len(unlabeled_idxs) is zero means we are using all 100% of data labels hence no need of having labeled_batch_size
+        if args.exclude_unlabeled or len(unlabeled_idxs) == 0:
             sampler = SubsetRandomSampler(labeled_idxs)
             batch_sampler = BatchSampler(sampler, args.batch_size, drop_last=True)
         elif args.labeled_batch_size:
