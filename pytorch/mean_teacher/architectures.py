@@ -75,10 +75,7 @@ class SeqModelCustomEmbed(nn.Module):
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
     def forward(self, entity, pattern):
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        pattern_split = torch.unbind(pattern, dim=1)  # split the 2D list of list of set of patterns into individual patterns of words
-        pattern_word_embed_list = [self.pat_word_embeddings(p).permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
-                                  for p in pattern_split] # list of pattern word embeddings (one for each pattern of words)
-
+        pattern_word_embed = self.pat_word_embeddings(pattern).permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
         ###############################################
         # bi-LSTM computation here
 
@@ -89,17 +86,11 @@ class SeqModelCustomEmbed(nn.Module):
         _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
         entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
 
-        pattern_lstm_out_list = list()
-        for pattern_embed in pattern_word_embed_list:
-            _, (pattern_lstm_out, _) = self.lstm_patterns(pattern_embed)  # hidden state is initialized to 0 if not provided
-            pattern_lstm_out_list.append(torch.unsqueeze(torch.cat([pattern_lstm_out[0], pattern_lstm_out[1]], 1), 0)) # roll out the 2 tuple output each of the LSTMs and add to the list
-        pattern_lstm_out = torch.cat(pattern_lstm_out_list, 0)
+        _, (pattern_lstm_out, _) = self.lstm_patterns(pattern_word_embed)  # bi-LSTM over pattern, hidden state is initialized to 0 if not provided
+        pattern_lstm_out = torch.cat([pattern_lstm_out[0], pattern_lstm_out[1]], 1)  # roll out the 2 tuple output each of the LSTMs
 
-        # compute the average of all the pattern lstms outputs
-        pattern_lstm_out_avg = torch.mean(pattern_lstm_out, 0)
-
-        # concatenate the entity_lstm and avgeraged pattern_lstm representations
-        entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out_avg], dim=1)
+        # concatenate the entity_lstm and pattern_lstm representations
+        entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out], dim=1)
 
         ###############################################
         # print("###############################################")
