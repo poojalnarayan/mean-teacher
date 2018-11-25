@@ -129,16 +129,16 @@ class SeqModelCustomEmbed(nn.Module):
 ##### Simple architecture where the entity and pattern embeddings are computed by an average
 ##############################################
 @export
-def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False, use_dropout=False):
+def simple_MLP_embed(pretrained=True, num_classes=4, word_vocab_embed=None, word_vocab_size=7970, wordemb_size=300, hidden_size=50, update_pretrained_wordemb=False, use_dropout=False, word_noise_type=None):
 
     # Note: custom embeddings sz in Emboot was 15 (used in conjunction of gigaword init embeddings as features in the classifier). This is similar to ladder networks
 
-    model = FeedForwardMLPEmbed(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)
+    model = FeedForwardMLPEmbed(word_vocab_size, wordemb_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout, word_noise_type)
     return model
 
 
 class FeedForwardMLPEmbed(nn.Module):
-    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed, update_pretrained_wordemb, use_dropout):
+    def __init__(self, word_vocab_size, embedding_size, hidden_sz, output_sz, word_vocab_embed, update_pretrained_wordemb, use_dropout, word_noise_type):
         super().__init__()
         self.embedding_size = embedding_size
         self.entity_embeddings = nn.Embedding(word_vocab_size, embedding_size)
@@ -168,11 +168,23 @@ class FeedForwardMLPEmbed(nn.Module):
         # self.softmax = nn.Softmax(dim=1) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
 
         self.use_dropout = use_dropout
+        self.word_noise_type = word_noise_type
         self.dropout_layer = nn.Dropout(p=0.2)
 
-    def forward(self, entity, pattern):
-        entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
-        pattern_embed = torch.mean(self.pat_embeddings(pattern), 1)            # Note: Average the pattern-embeddings 
+    def forward(self, entity, pattern, gaussian_indexes_list=[]):               #The gaussian_indexes_list is same length as the pattern
+        pattern_embeddings = self.pat_embeddings(pattern)
+
+        #When gaussian_indexes_list is 1 then purturb that embedding only
+        if self.word_noise_type == 'gaussian':
+            for index in range(len(pattern_embeddings)):
+                if gaussian_indexes_list[index]:
+                    gaussian_noise = np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)    #Hardcoding the std-dev value
+                    pattern_embeddings[index] = pattern_embeddings[index] + gaussian_noise
+
+
+        entity_embed = torch.mean(self.entity_embeddings(entity), 1)  # Note: Average the word-embeddings
+        pattern_embed = torch.mean(pattern_embeddings, 1)  # Note: Average the pattern-embeddings
+
         # print (entity_embed.size())
         # print (pattern_embed.size())
         concatenated = torch.cat([entity_embed, pattern_embed], 1)

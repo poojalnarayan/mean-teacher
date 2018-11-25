@@ -324,18 +324,22 @@ class RandomPatternWordNoise:
         to_replace.remove(entity_token)
         num_words_to_dropout = min(self.number_words, len(datum) - 1)
         to_replace = random.sample(to_replace, num_words_to_dropout)
-        for w in datum:
-            if w in to_replace:
-                if self.noise_type == 'drop':  # Dropout .. replace with NIL word
-                    dropout_datum.append(self.replace)
-                elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
-                    replaced_synonym = self.replace_with_synonym(w, self.replace)
-                    dropout_datum.append(replaced_synonym)
-                elif self.noise_type == 'add':
-                    pass  # todo: do soemthing here
+        # NOTE: Handling gaussian noise separately
+        if self.noise_type == 'gaussian':
+            dropout_datum = [1 if w in to_replace else 0 for w in datum]
+        else:
+            for w in datum:
+                if w in to_replace:
+                    if self.noise_type == 'drop':  # Dropout .. replace with NIL word
+                        dropout_datum.append(self.replace)
+                    elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
+                        replaced_synonym = self.replace_with_synonym(w, self.replace)
+                        dropout_datum.append(replaced_synonym)
+                    elif self.noise_type == 'add':
+                        pass  # todo: do soemthing here
+                    else:
+                        assert False, "Unknown noise type : " + self.noise_type
                 else:
-                    assert False, "Unknown noise type : " + self.noise_type
-            else:
-                dropout_datum.append(w)
+                    dropout_datum.append(w)
 
         return dropout_datum

@@ -91,6 +91,7 @@ def main(context):
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
             model_params['use_dropout'] = args.use_dropout
+            model_params['word_noise_type'] = args.word_noise.split(":")[0]
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
@@ -392,8 +393,12 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
         elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
-            ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
-            model_out = model(entity_var, patterns_var)
+            if args.word_noise.split(":")[0] == 'gaussian':
+                ema_model_out = ema_model(ema_entity_var, ema_patterns_var, datapoint[3][1])
+                model_out = model(entity_var, patterns_var, datapoint[3][0])
+            else:
+                ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
+                model_out = model(entity_var, patterns_var)
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)

@@ -115,15 +115,12 @@ def ontonotes_ctx(args):
 
     type_of_noise, size_of_noise = args.word_noise.split(":")
     NECDatasetCTX.WORD_NOISE_TYPE = type_of_noise
-    if type_of_noise == 'gaussian':
-        NECDatasetCTX.NUM_WORDS_TO_CHANGE = float(size_of_noise)  #for guassian std-dev value is a float
-    else:
-        NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+    NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
     if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
     elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
-        addNoise = None  # Note: No transformation here .. but will add the gaussian noise to the loaded pretrained-word embeddings (which are used in the embedding layer later)
+        addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, None, NECDatasetCTX.WORD_NOISE_TYPE)
     elif NECDatasetCTX.WORD_NOISE_TYPE == 'no-noise':
         addNoise = None
     else:
@@ -201,11 +198,6 @@ class NECDatasetCTX(Dataset):
         id_word_vocab = collections.OrderedDict(sorted(rev_vocab.items()))
         for word_id in range(0, len(id_word_vocab) - 1):
             word_embed = self.sanitise_and_lookup_embedding(id_word_vocab[word_id])
-            if noise_type == 'gaussian':
-                gaussian_noise = np.random.normal(scale=NECDatasetCTX.NUM_WORDS_TO_CHANGE,
-                                                  size=word_embed.shape)  # In gaussian case, NUM_WORDS_TO_CHANGE  has std-dev
-                word_embed = word_embed + gaussian_noise
-
             word_vocab_embed.append(word_embed)
 
         # NOTE: adding the embed for @PADDING
@@ -267,6 +259,15 @@ class NECDatasetCTX(Dataset):
 
 
                 # print("Added " + str(len(new_replaced_words)) + " words to the word_vocab... New Size: " + str(self.word_vocab.size()))
+
+            # In gaussian case context_words_dropout_str has indexes that need to be purturbed and not the actual strings
+            elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
+                context_words_gaussian = list()
+                context_words_gaussian.append([self.word_vocab[w]
+                                              for w in self.contexts[idx].split(" ")])
+                context_datum = self.pad_item(context_words_gaussian)
+                label = self.lbl[idx]
+                return (entity_datum, context_datum), (entity_datum, context_datum), label, context_words_dropout_str
 
             context_words_dropout = list()
             context_words_dropout.append([self.word_vocab[w]
