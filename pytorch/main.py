@@ -361,7 +361,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_input_patterns = ema_input[1]
             with torch.no_grad():
                 ema_entity_var = torch.autograd.Variable(ema_input_entity).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
-                ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
+                ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_patterns, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
         else:
             ((input, ema_input), target) = datapoint
             input_var = torch.autograd.Variable(input).cuda()
