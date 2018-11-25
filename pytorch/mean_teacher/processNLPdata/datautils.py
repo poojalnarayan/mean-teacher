@@ -82,7 +82,7 @@ class Datautils:
             word_list = list(sorted(word_set))
             lbl_list = list(sorted(lbl_set))
             # Add padding to the end because in create_word_vocab_embed() we add it last
-            word_list.append("@PADDING")
+            word_list.append("@padding")
 
             #print("max_entity = ", max_entity)
             label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_list))])
