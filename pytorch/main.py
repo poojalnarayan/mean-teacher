@@ -21,7 +21,7 @@ from mean_teacher import architectures, datasets, data, losses, ramps, cli
 from mean_teacher.run_context import RunContext
 from mean_teacher.data import NO_LABEL
 from mean_teacher.utils import *
-
+from sklearn.metrics import confusion_matrix
 
 LOG = logging.getLogger('main')
 
@@ -497,6 +497,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
 
     meters = AverageMeterSet()
 
+    #all_predictions = list()
+    #all_true_labels = list()
+
     # switch to evaluate mode
     model.eval() ### From the documentation (nn.module,py) : i) Sets the module in evaluation mode. (ii) This has any effect only on modules such as Dropout or BatchNorm. (iii) Returns: Module: self
 
@@ -521,6 +524,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
                 target = datapoint[1]
+                #LOG.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                #LOG.info("TARGET")
+                #LOG.info(target)
+                #LOG.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
                 
                 #LOG.info("entity = " + str(entity) + " patterns = "+ str(patterns)+ " target = "+ str(target))
                 #LOG.handlers[0].flush()
@@ -566,6 +573,10 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     
             # measure accuracy and record loss
             prec1, prec5 = accuracy(output1.data, target_var.data, topk=(1, 2)) #Note: Ajay changing this to 2 .. since there are only 4 labels in CoNLL dataset
+            #_, pred_indxs = output1.data.topk(1, 1, True, True)
+            #all_predictions.append(pred_indxs.data.cpu().numpy())
+            #all_true_labels.append(target_var.data.cpu().numpy())
+
             meters.update('class_loss', class_loss.data[0], labeled_minibatch_size)
             meters.update('top1', prec1[0], labeled_minibatch_size)
             meters.update('error1', 100.0 - prec1[0], labeled_minibatch_size)
@@ -591,6 +602,22 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 'ClassLoss {meters[class_loss]:.4f}\t'
                 'Prec@1 {meters[top1]:.3f}'.format(
                     i, len(eval_loader), meters=meters))
+
+    #all_predictions = [item for batch in all_predictions for item in batch]
+    #all_true_labels = [item for batch in all_true_labels for item in batch]
+    #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+    #print(confusion_matrix (all_true_labels, all_predictions))
+    #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
+#    LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+#    LOG.info(len(all_predictions))
+#    LOG.info("%%%%")
+#    LOG.info(type(all_predictions))
+#    LOG.info("%%%%")
+#    LOG.info(len(all_true_labels))
+#    LOG.info("%%%%")
+#    LOG.info(type(all_true_labels))
+#    LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
     LOG.info(' * Prec@1 {top1.avg:.3f}\tClassLoss {class_loss.avg:.3f}'
           .format(top1=meters['top1'], class_loss=meters['class_loss']))
