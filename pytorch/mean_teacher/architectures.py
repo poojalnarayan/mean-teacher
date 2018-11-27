@@ -26,6 +26,109 @@ from .utils import export, parameter_count
 
 
 ##############################################
+###### Model with Positional Embeddings (1 - left of entity, 2 - right of entity) .. concatenated with embeddings to improve lstm
+##############################################
+@export
+def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, entity_token_id=-1):
+
+    #TODO:NOTE INTITIALIZE THE PROPER 'entity_token_id'
+    lstm_hidden_size = 100
+    model = SeqModelCustomEmbedWithPos(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, entity_token_id)
+    return model
+
+
+# todo: Is padding the way done here ok ?
+class SeqModelCustomEmbedWithPos(nn.Module):
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb, entity_token_id): #todo: add lstm parameters
+        super().__init__()
+        self.embedding_size = word_embedding_size
+        self.entity_token_id = entity_token_id
+        print("Entity Token ID : " + str(self.entity_token_id))
+        self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+
+        if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
+            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
+            if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
+                print("NOT UPDATING the word embeddings ....")
+                self.entity_word_embeddings.weight.detach_()
+                self.pat_word_embeddings.weight.detach_()
+            else:
+                print("UPDATING the word embeddings ....")
+
+        # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
+        self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+
+        # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
+        #  in this case `entity_lstm_out` and `pattern_lstm_out`
+        # Note: saving these representations, so that when they are computed during forward, we can use these variables
+        # to dump the custom entity and pattern embeddings
+        # self.entity_lstm_out = None
+        # self.pattern_lstm_out = None
+
+        # Note: Size of linear layer = [(lstm_hidden_size * 2) bi-LSTM ] * 2 --> concat of entity and context lstm out
+        self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size, bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
+        self.activation = nn.ReLU()  # non-linear activation
+        self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
+
+    # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
+    def forward(self, entity, pattern):
+        entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        pattern_word_embed = self.pat_word_embeddings(pattern) # NOTE: doing the permute after appending the position tensor ... .permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
+
+        # 1. NOTE find position of entity token -- entity_idx
+        entity_idx = (pattern == self.entity_token_id).nonzero()[0]
+        print("[In Arch] Entity_idx  = " + str(entity_idx))
+
+        # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
+        position_seq = torch.LongTensor([1 if idx < entity_idx else 2 for idx, token in enumerate(pattern)]) # NOTE: to check this ...
+        print("[In Arch] Position Seq : " + str(position_seq))
+
+        # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) TODO: Can be a single operation ....
+        print("[In Arch] size before .. " + str(pattern_word_embed.size()))
+        pattern_word_embed = torch.cat([pattern_word_embed, position_seq], dim=0)
+        print("[In Arch] size after concat .. " + str(pattern_word_embed.size()))
+        pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
+        print("[In Arch] size permute ... .. " + str(pattern_word_embed.size()))
+        ###############################################
+        # bi-LSTM computation here
+
+        # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
+        self.lstm_entities.flatten_parameters()
+        self.lstm_patterns.flatten_parameters()
+
+        _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1) # roll out the 2 tuple output each of the LSTMs
+
+        _, (pattern_lstm_out, _) = self.lstm_patterns(pattern_word_embed)  # bi-LSTM over pattern, hidden state is initialized to 0 if not provided
+        pattern_lstm_out = torch.cat([pattern_lstm_out[0], pattern_lstm_out[1]], 1)  # roll out the 2 tuple output each of the LSTMs
+
+        # concatenate the entity_lstm and pattern_lstm representations
+        entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out], dim=1)
+
+        ###############################################
+        # print("###############################################")
+        # print("entity_word_embed = " + str(entity_word_embed.size()))
+        # print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        # print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
+        # print("entity_lstm_out = " + str(entity_lstm_out.size()))
+        # print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        # print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
+        # print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        # print("###############################################")
+
+        ###############################################
+
+        res = self.layer1(entity_and_pattern_lstm_out)
+        res = self.activation(res)
+        res = self.layer2(res)
+        return res, entity_lstm_out, pattern_lstm_out
+
+##############################################
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
