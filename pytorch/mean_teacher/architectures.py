@@ -84,18 +84,21 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 
         # 1. NOTE find position of entity token -- entity_idx
         entity_idx = (pattern == self.entity_token_id).nonzero()
+        assert entity_idx.size()[0] == pattern.size()[0], "Something wrong .. more than one entity id present in patterns {} - {}".format(entity_idx.size(), pattern.size())
         LOG.info(" Entity token ID " + str(self.entity_token_id))
         LOG.info("Entity_idx  = " + str(entity_idx.size()))
         LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
         LOG.info(" pattern  - " + str(pattern.size()))
-        position_seq = torch.LongTensor([1 if idx < entity_idx else 2 for idx, token in enumerate(pattern)]) # NOTE: to check this ...
+        position_seq = torch.Tensor([[1 if idx < entity_idx[pat_idx][1]
+                               else 2 if idx > entity_idx[pat_idx][1]
+                               else 0 for idx, token in enumerate(pat)] for pat_idx, pat in enumerate(pattern)])
         LOG.info("Position Seq : " + str(position_seq))
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) TODO: Can be a single operation ....
         LOG.info("size before .. " + str(pattern_word_embed.size()))
-        pattern_word_embed = torch.cat([pattern_word_embed, position_seq], dim=0)
+        pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2)
         LOG.info("size after concat .. " + str(pattern_word_embed.size()))
         pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
         LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
