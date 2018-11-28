@@ -387,7 +387,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'custom_embed':
+        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)

@@ -8,6 +8,8 @@ from torch.nn import functional as F
 from torch.autograd import Variable, Function
 
 from .utils import export, parameter_count
+import logging
+LOG = logging.getLogger("arch")
 ###############
 # https://stackoverflow.com/questions/34240703/whats-the-difference-between-softmax-and-softmax-cross-entropy-with-logits
 
@@ -29,7 +31,7 @@ from .utils import export, parameter_count
 ###### Model with Positional Embeddings (1 - left of entity, 2 - right of entity) .. concatenated with embeddings to improve lstm
 ##############################################
 @export
-def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, entity_token_id=-1):
+def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, entity_token_id=-1):
 
     #TODO:NOTE INTITIALIZE THE PROPER 'entity_token_id'
     lstm_hidden_size = 100
@@ -43,21 +45,21 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         super().__init__()
         self.embedding_size = word_embedding_size
         self.entity_token_id = entity_token_id
-        print("Entity Token ID : " + str(self.entity_token_id))
+        LOG.info("Entity Token ID : " + str(self.entity_token_id))
         self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
         self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
 
         if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
-            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            LOG.info("Using a pre-initialized word-embedding vector .. loaded from disk")
             self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
-                print("NOT UPDATING the word embeddings ....")
+                LOG.info("NOT UPDATING the word embeddings ....")
                 self.entity_word_embeddings.weight.detach_()
                 self.pat_word_embeddings.weight.detach_()
             else:
-                print("UPDATING the word embeddings ....")
+                LOG.info("UPDATING the word embeddings ....")
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
@@ -81,19 +83,22 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         pattern_word_embed = self.pat_word_embeddings(pattern) # NOTE: doing the permute after appending the position tensor ... .permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
 
         # 1. NOTE find position of entity token -- entity_idx
-        entity_idx = (pattern == self.entity_token_id).nonzero()[0]
-        print("[In Arch] Entity_idx  = " + str(entity_idx))
+        entity_idx = (pattern == self.entity_token_id).nonzero()
+        LOG.info(" Entity token ID " + str(self.entity_token_id))
+        LOG.info("Entity_idx  = " + str(entity_idx.size()))
+        LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
+        LOG.info(" pattern  - " + str(pattern.size()))
         position_seq = torch.LongTensor([1 if idx < entity_idx else 2 for idx, token in enumerate(pattern)]) # NOTE: to check this ...
-        print("[In Arch] Position Seq : " + str(position_seq))
+        LOG.info("Position Seq : " + str(position_seq))
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) TODO: Can be a single operation ....
-        print("[In Arch] size before .. " + str(pattern_word_embed.size()))
+        LOG.info("size before .. " + str(pattern_word_embed.size()))
         pattern_word_embed = torch.cat([pattern_word_embed, position_seq], dim=0)
-        print("[In Arch] size after concat .. " + str(pattern_word_embed.size()))
+        LOG.info("size after concat .. " + str(pattern_word_embed.size()))
         pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
-        print("[In Arch] size permute ... .. " + str(pattern_word_embed.size()))
+        LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
         ###############################################
         # bi-LSTM computation here
 
@@ -111,15 +116,15 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out], dim=1)
 
         ###############################################
-        # print("###############################################")
-        # print("entity_word_embed = " + str(entity_word_embed.size()))
-        # print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
-        # print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
-        # print("entity_lstm_out = " + str(entity_lstm_out.size()))
-        # print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
-        # print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
-        # print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
-        # print("###############################################")
+        # LOG.info("###############################################")
+        # LOG.info("entity_word_embed = " + str(entity_word_embed.size()))
+        # LOG.info("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        # LOG.info("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
+        # LOG.info("entity_lstm_out = " + str(entity_lstm_out.size()))
+        # LOG.info("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        # LOG.info("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
+        # LOG.info("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        # LOG.info("###############################################")
 
         ###############################################
 
@@ -148,16 +153,16 @@ class SeqModelCustomEmbed(nn.Module):
         self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
 
         if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
-            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            LOG.info("Using a pre-initialized word-embedding vector .. loaded from disk")
             self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
-                print("NOT UPDATING the word embeddings ....")
+                LOG.info("NOT UPDATING the word embeddings ....")
                 self.entity_word_embeddings.weight.detach_()
                 self.pat_word_embeddings.weight.detach_()
             else:
-                print("UPDATING the word embeddings ....")
+                LOG.info("UPDATING the word embeddings ....")
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
@@ -201,15 +206,15 @@ class SeqModelCustomEmbed(nn.Module):
         entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_out], dim=1)
 
         ###############################################
-        # print("###############################################")
-        # print("entity_word_embed = " + str(entity_word_embed.size()))
-        # print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
-        # print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
-        # print("entity_lstm_out = " + str(entity_lstm_out.size()))
-        # print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
-        # print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
-        # print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
-        # print("###############################################")
+        # LOG.info("###############################################")
+        # LOG.info("entity_word_embed = " + str(entity_word_embed.size()))
+        # LOG.info("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        # LOG.info("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
+        # LOG.info("entity_lstm_out = " + str(entity_lstm_out.size()))
+        # LOG.info("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        # LOG.info("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
+        # LOG.info("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        # LOG.info("###############################################")
 
         ###############################################
 
@@ -249,18 +254,18 @@ class FeedForwardMLPEmbed(nn.Module):
 
         # https://discuss.pytorch.org/t/can-we-use-pre-trained-word-embeddings-for-weight-initialization-in-nn-embedding/1222
         if word_vocab_embed is not None: # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
-            print("Using a pre-initialized word-embedding vector .. loaded from disk")
+            LOG.info("Using a pre-initialized word-embedding vector .. loaded from disk")
             self.entity_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
             self.pat_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
 
             if update_pretrained_wordemb is False:
                 # NOTE: do not update the emebddings
                 # https://discuss.pytorch.org/t/how-to-exclude-embedding-layer-from-model-parameters/1283
-                print ("NOT UPDATING the word embeddings ....")
+                LOG.info ("NOT UPDATING the word embeddings ....")
                 self.entity_embeddings.weight.detach_()
                 self.pat_embeddings.weight.detach_()
             else:
-                print("UPDATING the word embeddings ....")
+                LOG.info("UPDATING the word embeddings ....")
 
         ## Intialize the embeddings if pre-init enabled ? -- or in the fwd pass ?
         ## create : layer1 + ReLU
@@ -276,16 +281,16 @@ class FeedForwardMLPEmbed(nn.Module):
     def forward(self, entity, pattern):
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)             # Note: Average the word-embeddings
         pattern_embed = torch.mean(self.pat_embeddings(pattern), 1)            # Note: Average the pattern-embeddings 
-        # print (entity_embed.size())
-        # print (pattern_embed.size())
+        # LOG.info (entity_embed.size())
+        # LOG.info (pattern_embed.size())
         concatenated = torch.cat([entity_embed, pattern_embed], 1)
         res = self.layer1(concatenated)
         res = self.activation(res)
         res = self.layer2(res)
-        # print (res)
-        # print (res.shape)
+        # LOG.info (res)
+        # LOG.info (res.shape)
         # res = self.softmax(res) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
-        # print ("After softmax : " + str(res))
+        # LOG.info ("After softmax : " + str(res))
 
         if self.use_dropout:
             res = self.dropout_layer(res)
