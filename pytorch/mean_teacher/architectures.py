@@ -63,7 +63,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
-        self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm_patterns = nn.LSTM(word_embedding_size+1, lstm_hidden_size, num_layers=1, bidirectional=True) ##NOTE:+1 due to position embedding value ...
 
         # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
         #  in this case `entity_lstm_out` and `pattern_lstm_out`
@@ -85,23 +85,27 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         # 1. NOTE find position of entity token -- entity_idx
         entity_idx = (pattern == self.entity_token_id).nonzero()
         assert entity_idx.size()[0] == pattern.size()[0], "Something wrong .. more than one entity id present in patterns {} - {}".format(entity_idx.size(), pattern.size())
-        LOG.info(" Entity token ID " + str(self.entity_token_id))
-        LOG.info("Entity_idx  = " + str(entity_idx.size()))
-        LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
+        #LOG.info(" Entity token ID " + str(self.entity_token_id))
+        #LOG.info("Entity_idx  = " + str(entity_idx.size()))
+        #LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
+        #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        #LOG.info(" pattern size " + str(pattern.size()))
+        #LOG.info(" pattern embed size " + str(pattern_word_embed.size()))
+        #LOG.info(" entity idx size " + str(entity_idx.size()))
+        #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
-        LOG.info(" pattern  - " + str(pattern.size()))
-        position_seq = torch.Tensor([[1 if idx < entity_idx[pat_idx][1]
+        position_seq = torch.cuda.FloatTensor([[1 if idx < entity_idx[pat_idx][1]
                                else 2 if idx > entity_idx[pat_idx][1]
                                else 0 for idx, token in enumerate(pat)] for pat_idx, pat in enumerate(pattern)])
-        LOG.info("Position Seq : " + str(position_seq))
+        #LOG.info("Position Seq : " + str(position_seq))
 
-        # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) TODO: Can be a single operation ....
-        LOG.info("size before .. " + str(pattern_word_embed.size()))
-        pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2)
-        LOG.info("size after concat .. " + str(pattern_word_embed.size()))
-        pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
-        LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
+        # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) : Can be a single operation .... DONE
+        #LOG.info("size before .. " + str(pattern_word_embed.size()))
+        pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2).permute(1, 0, 2) #DONE: permute in the same operation .. retaining and commenting the following lines ///
+        #LOG.info("size after concat .. " + str(pattern_word_embed.size()))
+        #pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
+        #LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
         ###############################################
         # bi-LSTM computation here
 
@@ -140,7 +144,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False):
+def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, entity_token_id=-1):
 
     lstm_hidden_size = 100
     model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)
