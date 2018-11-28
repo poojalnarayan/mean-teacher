@@ -153,7 +153,7 @@ class NECDatasetCTX(Dataset):
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
-        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_nec_ctx_data(dataset_file)
+        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len, self.pos_info_array = Datautils.read_nec_ctx_data(dataset_file)
 
         if "train" in dataset_file: #If "eval" then use the same dict as the train. Because test label set will be smaller
             NECDatasetCTX.label_dict = label_dictionary
@@ -289,9 +289,9 @@ class NECDatasetCTX(Dataset):
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
-            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
+            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label, self.pos_info_array[idx]
         else:
-            return (entity_datum, context_datums), label
+            return (entity_datum, context_datums), label, self.pos_info_array[idx]
 
 ##### USING Torchtext ... now reverting to using custom code
 # def simple_tokenizer(datapoint):

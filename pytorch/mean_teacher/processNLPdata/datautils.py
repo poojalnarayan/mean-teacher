@@ -45,6 +45,7 @@ class Datautils:
         labels = []
         entities = []
         contexts = []
+        pos_info_array = []
 
         lbl_set = set()
         word_set = set()
@@ -70,6 +71,11 @@ class Datautils:
                 labels.append(vals[0])
 
                 cur_context = vals[2].split(' ')
+                entity_idx = cur_context.index("@entity")
+                pos_info =  [1 if idx < entity_idx
+                               else 2 if idx > entity_idx
+                               else 0 for idx, word in enumerate(cur_context)]
+                pos_info_array.append(pos_info)
                 word_set.update(set(cur_context))
                 contexts.append(vals[2])
                 if max_context_len < len(cur_context):
@@ -86,7 +92,7 @@ class Datautils:
             label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_list))])
             entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_list))])
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
-        return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len
+        return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len, pos_info_array
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context
     ## Entity_Mention_1  -- context_mention_1, context_mention_2, ...

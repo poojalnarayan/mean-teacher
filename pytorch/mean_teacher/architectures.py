@@ -78,7 +78,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
-    def forward(self, entity, pattern):
+    def forward(self, entity, pattern, pos_info):
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
         pattern_word_embed = self.pat_word_embeddings(pattern) # NOTE: doing the permute after appending the position tensor ... .permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
 
@@ -95,15 +95,13 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
-        position_seq = torch.cuda.FloatTensor([[1 if idx < entity_idx[pat_idx][1]
-                               else 2 if idx > entity_idx[pat_idx][1]
-                               else 0 for idx, token in enumerate(pat)] for pat_idx, pat in enumerate(pattern)])
-        #LOG.info("Position Seq : " + str(position_seq))
+        position_seq = torch.cuda.FloatTensor(pos_info)
+        LOG.info("Position Seq : " + str(position_seq))
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) : Can be a single operation .... DONE
-        #LOG.info("size before .. " + str(pattern_word_embed.size()))
+        LOG.info("size before .. " + str(pattern_word_embed.size()))
         pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2).permute(1, 0, 2) #DONE: permute in the same operation .. retaining and commenting the following lines ///
-        #LOG.info("size after concat .. " + str(pattern_word_embed.size()))
+        LOG.info("size after concat and permute.. " + str(pattern_word_embed.size()))
         #pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
         #LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
         ###############################################

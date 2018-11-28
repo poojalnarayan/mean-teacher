@@ -354,6 +354,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             input = datapoint[0]
             ema_input = datapoint[1]
             target = datapoint[2]
+            pos_info = datapoint[3]
 
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
@@ -390,8 +391,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
-            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
-            model_out, _, _ = model(entity_var, patterns_var)
+            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var, pos_info)
+            model_out, _, _ = model(entity_var, patterns_var, pos_info)
         elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
