@@ -353,8 +353,19 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
             input = datapoint[0]
             ema_input = datapoint[1]
-            target = datapoint[2]
-            pos_info = datapoint[3]
+            pos_info = datapoint[2]
+            target = datapoint[3]
+
+            LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            LOG.info(pos_info)
+            LOG.info(len(pos_info))
+            LOG.info(len(datapoint))
+            LOG.info(str(type(datapoint[0])) + "\t" + str(len(datapoint[0])))
+            LOG.info(str(type(datapoint[1])) + "\t" + str(len(datapoint[1])))
+            LOG.info(str(type(datapoint[2][0])) + "\t" + str(datapoint[2][0].size()))
+            LOG.info(str(type(datapoint[2][1])) + "\t" + str(datapoint[2][1].size()))
+            LOG.info(str(type(datapoint[3])) + "\t" + str(len(datapoint[3])))
+            LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
@@ -526,6 +537,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
                 target = datapoint[1]
+                pos_array = datapoint[2]
                 #LOG.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
                 #LOG.info("TARGET")
                 #LOG.info(target)

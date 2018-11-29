@@ -33,7 +33,7 @@ LOG = logging.getLogger("arch")
 @export
 def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, entity_token_id=-1):
 
-    #TODO:NOTE INTITIALIZE THE PROPER 'entity_token_id'
+    #TODO:NOTE Remove entity_token_id ... 
     lstm_hidden_size = 100
     model = SeqModelCustomEmbedWithPos(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, entity_token_id)
     return model
@@ -83,18 +83,20 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         pattern_word_embed = self.pat_word_embeddings(pattern) # NOTE: doing the permute after appending the position tensor ... .permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
 
         # 1. NOTE find position of entity token -- entity_idx
-        entity_idx = (pattern == self.entity_token_id).nonzero()
-        assert entity_idx.size()[0] == pattern.size()[0], "Something wrong .. more than one entity id present in patterns {} - {}".format(entity_idx.size(), pattern.size())
+        #entity_idx = (pattern == self.entity_token_id).nonzero()
+        #assert entity_idx.size()[0] == pattern.size()[0], "Something wrong .. more than one entity id present in patterns {} - {}".format(entity_idx.size(), pattern.size())
         #LOG.info(" Entity token ID " + str(self.entity_token_id))
         #LOG.info("Entity_idx  = " + str(entity_idx.size()))
         #LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
         #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        #LOG.info(" pattern size " + str(pattern.size()))
-        #LOG.info(" pattern embed size " + str(pattern_word_embed.size()))
+        LOG.info(" pattern size " + str(pattern.size()))
+        LOG.info(" pattern embed size " + str(pattern_word_embed.size()))
         #LOG.info(" entity idx size " + str(entity_idx.size()))
         #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
+        LOG.info("Position Info len(): " + str(len(pos_info)))
+        LOG.info("pos_info[0] len() " + str(len(pos_info[0])))
         position_seq = torch.cuda.FloatTensor(pos_info)
         LOG.info("Position Seq : " + str(position_seq))
 

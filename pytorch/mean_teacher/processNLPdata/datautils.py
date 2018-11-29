@@ -71,7 +71,7 @@ class Datautils:
                 labels.append(vals[0])
 
                 cur_context = vals[2].split(' ')
-                entity_idx = cur_context.index("@entity")
+                entity_idx = cur_context.index("@ENTITY")
                 pos_info =  [1 if idx < entity_idx
                                else 2 if idx > entity_idx
                                else 0 for idx, word in enumerate(cur_context)]
