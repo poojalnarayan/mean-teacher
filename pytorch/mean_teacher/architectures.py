@@ -31,21 +31,18 @@ LOG = logging.getLogger("arch")
 ###### Model with Positional Embeddings (1 - left of entity, 2 - right of entity) .. concatenated with embeddings to improve lstm
 ##############################################
 @export
-def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, entity_token_id=-1):
+def custom_embed_w_pos(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False):
 
-    #TODO:NOTE Remove entity_token_id ... 
     lstm_hidden_size = 100
-    model = SeqModelCustomEmbedWithPos(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, entity_token_id)
+    model = SeqModelCustomEmbedWithPos(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb)
     return model
 
 
 # todo: Is padding the way done here ok ?
 class SeqModelCustomEmbedWithPos(nn.Module):
-    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb, entity_token_id): #todo: add lstm parameters
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb): #todo: add lstm parameters
         super().__init__()
         self.embedding_size = word_embedding_size
-        self.entity_token_id = entity_token_id
-        LOG.info("Entity Token ID : " + str(self.entity_token_id))
         self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
         self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
 
@@ -144,7 +141,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, entity_token_id=-1):
+def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False):
 
     lstm_hidden_size = 100
     model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)

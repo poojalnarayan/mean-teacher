@@ -91,7 +91,6 @@ def main(context):
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
             model_params['use_dropout'] = args.use_dropout
-            model_params['entity_token_id'] = dataset.ENTITY_ID
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
@@ -205,6 +204,24 @@ def parse_dict_args(**kwargs):
     cmdline_args = list(sum(kwargs_pairs, ()))
     args = parser.parse_args(cmdline_args)
 
+
+def my_collate(batch):
+    LOG.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+    LOG.info(str(len(batch)))
+    LOG.info(batch[0])
+    LOG.info("&&&&&&&")
+    LOG.info(batch[1])
+    LOG.info("&&&&&&&")
+    LOG.info(batch[2])
+    LOG.info("&&&&&&&")
+    LOG.info(batch[3])
+    LOG.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+    data = [item[0] for item in batch]  # just form a list of tensor
+    target = [item[1] for item in batch]
+    target = torch.LongTensor(target)
+    return [data, target]
+
+
 def create_data_loaders(train_transformation,
                         eval_transformation,
                         datadir,
@@ -247,7 +264,8 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                   batch_sampler=batch_sampler,
                                                   num_workers=args.workers,
-                                                  pin_memory=True)
+                                                  pin_memory=True,
+                                                  collate_fn=my_collate)
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
