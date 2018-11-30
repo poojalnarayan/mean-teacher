@@ -206,18 +206,8 @@ def parse_dict_args(**kwargs):
 
 
 def my_collate(batch):
-    LOG.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-    LOG.info(str(len(batch)))
-    LOG.info(batch[0])
-    LOG.info("&&&&&&&")
-    LOG.info(batch[1])
-    LOG.info("&&&&&&&")
-    LOG.info(batch[2])
-    LOG.info("&&&&&&&")
-    LOG.info(batch[3])
-    LOG.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-    data = [item[0] for item in batch]  # just form a list of tensor
-    target = [item[1] for item in batch]
+    data = [(item[0], item[1], item[2]) for item in batch]  # just form a list of tensor
+    target = [item[3] for item in batch]
     target = torch.LongTensor(target)
     return [data, target]
 
