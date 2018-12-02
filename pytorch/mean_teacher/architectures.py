@@ -100,7 +100,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) : Can be a single operation .... DONE
         #LOG.info("size before .. " + str(pattern_word_embed.size()))
-        pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2).permute(1, 0, 2) #DONE: permute in the same operation .. retaining and commenting the following lines ///
+        pattern_word_embed = torch.cat([pattern_word_embed, position_seq], dim=2).permute(1, 0, 2) #DONE: permute in the same operation .. retaining and commenting the following lines ///
         #LOG.info("size after concat and permute.. " + str(pattern_word_embed.size()))
         #pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
         #LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
