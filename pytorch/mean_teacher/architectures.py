@@ -86,21 +86,21 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         #LOG.info("Entity_idx  = " + str(entity_idx.size()))
         #LOG.info("Entity_idx  = " + str(entity_idx.data.cpu().numpy()))
         #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        LOG.info(" pattern size " + str(pattern.size()))
-        LOG.info(" pattern embed size " + str(pattern_word_embed.size()))
+        #LOG.info(" pattern size " + str(pattern.size()))
+        #LOG.info(" pattern embed size " + str(pattern_word_embed.size()))
         #LOG.info(" entity idx size " + str(entity_idx.size()))
         #LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
         # 2. NOTE in a simple for loop if token_id < entity_idx --> 1 (left) else if token_id > entity_idx --> 2 (right)
-        LOG.info("Position Info len(): " + str(len(pos_info)))
-        LOG.info("pos_info[0] len() " + str(len(pos_info[0])))
+        #LOG.info("Position Info len(): " + str(len(pos_info)))
+        #LOG.info("pos_info[0] len() " + str(len(pos_info[0])))
         position_seq = torch.cuda.FloatTensor(pos_info)
-        LOG.info("Position Seq : " + str(position_seq))
+        #LOG.info("Position Seq : " + str(position_seq))
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) : Can be a single operation .... DONE
-        LOG.info("size before .. " + str(pattern_word_embed.size()))
+        #LOG.info("size before .. " + str(pattern_word_embed.size()))
         pattern_word_embed = torch.cat([pattern_word_embed, position_seq.unsqueeze(2)], dim=2).permute(1, 0, 2) #DONE: permute in the same operation .. retaining and commenting the following lines ///
-        LOG.info("size after concat and permute.. " + str(pattern_word_embed.size()))
+        #LOG.info("size after concat and permute.. " + str(pattern_word_embed.size()))
         #pattern_word_embed = pattern_word_embed.permute(1, 0, 2)
         #LOG.info("size permute ... .. " + str(pattern_word_embed.size()))
         ###############################################
