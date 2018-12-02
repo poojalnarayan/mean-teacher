@@ -91,6 +91,7 @@ class Datautils:
             #print("max_entity = ", max_entity)
             label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_list))])
             entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_list))])
+            pos_info_array = [pos_info + [-1]*(max_context_len - len(pos_info)) for pos_info in pos_info_array]
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
         return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len, pos_info_array
 
