@@ -206,27 +206,47 @@ def parse_dict_args(**kwargs):
 
 
 def my_collate(batch):
-    ent_student = [item[0][0]  for item in batch]  # just form a list of tensor
-    pat_student = [item[0][1]  for item in batch]  # just form a list of tensor
-    ent_student = torch.stack(ent_student)
-    pat_student = torch.stack(pat_student)
-    ent_pat_student = (ent_student, pat_student)
-
-    ent_teacher = [item[1][0]  for item in batch]  # just form a list of tensor
-    pat_teacher = [item[1][1]  for item in batch]  # just form a list of tensor
-    ent_teacher = torch.stack(ent_teacher)
-    pat_teacher = torch.stack(pat_teacher)
-    ent_pat_teacher = (ent_teacher, pat_teacher)
-
-    pos_info = [item[2] for item in batch]  # just form a list of tensor
-
-    labels = [item[3] for item in batch]
-    labels = torch.LongTensor(labels)
+    if len(batch[0]) == 4: #train
+        #LOG.info("((((((((((TRAIN)))))))))))))))))))))")
+        ent_student = [item[0][0]  for item in batch]  # just form a list of tensor
+        pat_student = [item[0][1]  for item in batch]  # just form a list of tensor
+        ent_student = torch.stack(ent_student)
+        pat_student = torch.stack(pat_student)
+        ent_pat_student = (ent_student, pat_student)
     
-    #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    #LOG.info(data)
-    #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    return [ent_pat_student, ent_pat_teacher, pos_info, labels]
+        ent_teacher = [item[1][0]  for item in batch]  # just form a list of tensor
+        pat_teacher = [item[1][1]  for item in batch]  # just form a list of tensor
+        ent_teacher = torch.stack(ent_teacher)
+        pat_teacher = torch.stack(pat_teacher)
+        ent_pat_teacher = (ent_teacher, pat_teacher)
+    
+        pos_info = [item[2] for item in batch]  # just form a list of tensor
+    
+        labels = [item[3] for item in batch]
+        labels = torch.LongTensor(labels)
+        
+        #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        #LOG.info(data)
+        #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        return [ent_pat_student, ent_pat_teacher, pos_info, labels]
+
+    else: # test
+        #LOG.info("((((((((((VALIDATE)))))))))))))))))))))")
+        ent = [item[0][0]  for item in batch]  # just form a list of tensor
+        pat = [item[0][1]  for item in batch]  # just form a list of tensor
+        ent = torch.stack(ent)
+        pat = torch.stack(pat)
+        ent_pat = (ent, pat)
+    
+        pos_info = [item[1] for item in batch]  # just form a list of tensor
+    
+        labels = [item[2] for item in batch]
+        labels = torch.LongTensor(labels)
+        
+        #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        #LOG.info(data)
+        #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        return [ent_pat, pos_info, labels]
 
 
 def create_data_loaders(train_transformation,
@@ -297,7 +317,8 @@ def create_data_loaders(train_transformation,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
                                                   pin_memory=True,
-                                                  drop_last=False)
+                                                  drop_last=False,
+                                                  collate_fn=my_collate)
 
     else:
 
@@ -550,8 +571,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
-                target = datapoint[1]
-                pos_array = datapoint[2]
+                pos_array = datapoint[1]
+                target = datapoint[2]
                 #LOG.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
                 #LOG.info("TARGET")
                 #LOG.info(target)
@@ -588,8 +609,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             meters.update('labeled_minibatch_size', labeled_minibatch_size)
     
             # compute output
-            if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and args.arch == 'custom_embed':
-                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
+            if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
+                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var, pos_array)
                 if save_custom_embed_condition:
                     custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
             elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
