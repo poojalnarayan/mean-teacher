@@ -292,7 +292,9 @@ class NECDatasetCTX(Dataset):
             context_words_padded = self.pad_item(context_words)
             context_datums = torch.LongTensor(context_words_padded)
 
-        # print ("label : " + self.labels[idx])
+        #LOG.info ("label : " + str(self.labels[idx]))
+        #LOG.info ("pos_info : " + str(self.pos_info_array[idx]))
+        #LOG.info ("context : " + str(self.contexts[idx]))
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
         pos_info = self.pos_info_array[idx]
 

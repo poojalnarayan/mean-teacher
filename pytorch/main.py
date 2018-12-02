@@ -206,10 +206,27 @@ def parse_dict_args(**kwargs):
 
 
 def my_collate(batch):
-    data = [(item[0], item[1], item[2]) for item in batch]  # just form a list of tensor
-    target = [item[3] for item in batch]
-    target = torch.LongTensor(target)
-    return [data, target]
+    ent_student = [item[0][0]  for item in batch]  # just form a list of tensor
+    pat_student = [item[0][1]  for item in batch]  # just form a list of tensor
+    ent_student = torch.stack(ent_student)
+    pat_student = torch.stack(pat_student)
+    ent_pat_student = (ent_student, pat_student)
+
+    ent_teacher = [item[1][0]  for item in batch]  # just form a list of tensor
+    pat_teacher = [item[1][1]  for item in batch]  # just form a list of tensor
+    ent_teacher = torch.stack(ent_teacher)
+    pat_teacher = torch.stack(pat_teacher)
+    ent_pat_teacher = (ent_teacher, pat_teacher)
+
+    pos_info = [item[2] for item in batch]  # just form a list of tensor
+
+    labels = [item[3] for item in batch]
+    labels = torch.LongTensor(labels)
+    
+    #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    #LOG.info(data)
+    #LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    return [ent_pat_student, ent_pat_teacher, pos_info, labels]
 
 
 def create_data_loaders(train_transformation,
@@ -363,17 +380,6 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_input = datapoint[1]
             pos_info = datapoint[2]
             target = datapoint[3]
-
-            LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            LOG.info(pos_info)
-            LOG.info(len(pos_info))
-            LOG.info(len(datapoint))
-            LOG.info(str(type(datapoint[0])) + "\t" + str(len(datapoint[0])))
-            LOG.info(str(type(datapoint[1])) + "\t" + str(len(datapoint[1])))
-            LOG.info(str(type(datapoint[2][0])) + "\t" + str(datapoint[2][0].size()))
-            LOG.info(str(type(datapoint[2][1])) + "\t" + str(datapoint[2][1].size()))
-            LOG.info(str(type(datapoint[3])) + "\t" + str(len(datapoint[3])))
-            LOG.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
