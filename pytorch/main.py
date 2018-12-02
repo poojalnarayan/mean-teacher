@@ -91,6 +91,7 @@ def main(context):
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
             model_params['use_dropout'] = args.use_dropout
+            model_params['context_len'] = dataset.max_context_len
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
@@ -238,7 +239,7 @@ def my_collate(batch):
         pat = torch.stack(pat)
         ent_pat = (ent, pat)
     
-        pos_info = [item[1] for item in batch]  # just form a list of tensor
+        pos_info = torch.stack([item[1] for item in batch])  # just form a list of tensor
     
         labels = [item[2] for item in batch]
         labels = torch.LongTensor(labels)

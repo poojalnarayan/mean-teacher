@@ -296,7 +296,7 @@ class NECDatasetCTX(Dataset):
         #LOG.info ("pos_info : " + str(self.pos_info_array[idx]))
         #LOG.info ("context : " + str(self.contexts[idx]))
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
-        pos_info = self.pos_info_array[idx]
+        pos_info = torch.LongTensor(self.pos_info_array[idx])
 
         if self.transform is not None:
             return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), pos_info, label
