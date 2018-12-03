@@ -91,7 +91,7 @@ def main(context):
             model_params['hidden_size'] = args.hidden_size
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
             model_params['use_dropout'] = args.use_dropout
-            model_params['context_len'] = dataset.max_context_len
+            model_params['max_context_len'] = dataset.max_context_len
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
@@ -221,7 +221,7 @@ def my_collate(batch):
         pat_teacher = torch.stack(pat_teacher)
         ent_pat_teacher = (ent_teacher, pat_teacher)
     
-        pos_info = [item[2] for item in batch]  # just form a list of tensor
+        pos_info = torch.stack([item[2] for item in batch])  # just form a list of tensor
     
         labels = [item[3] for item in batch]
         labels = torch.LongTensor(labels)
@@ -411,6 +411,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
             ema_input_entity = ema_input[0]
             ema_input_patterns = ema_input[1]
+
+            pos_info_var = torch.autograd.Variable(pos_info).cuda()
             with torch.no_grad():
                 ema_entity_var = torch.autograd.Variable(ema_input_entity).cuda() #torch.autograd.Variable(ema_input_entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
                 ema_patterns_var = torch.autograd.Variable(ema_input_patterns).cuda() #torch.autograd.Variable(ema_input_patterns, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
@@ -438,8 +440,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
-            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var, pos_info)
-            model_out, _, _ = model(entity_var, patterns_var, pos_info)
+            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var, pos_info_var)
+            model_out, _, _ = model(entity_var, patterns_var, pos_info_var)
         elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
             model_out = model(entity_var, patterns_var)
@@ -572,7 +574,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx']:
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
-                pos_array = datapoint[1]
+                pos_info = datapoint[1]
                 target = datapoint[2]
                 #LOG.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
                 #LOG.info("TARGET")
@@ -582,6 +584,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 #LOG.info("entity = " + str(entity) + " patterns = "+ str(patterns)+ " target = "+ str(target))
                 #LOG.handlers[0].flush()
                 #[h_weak_ref().flush() for h_weak_ref in LOG._handlerList]
+                pos_info_var = torch.autograd.Variable(pos_info).cuda()
                 with torch.no_grad():
                     entity_var = torch.autograd.Variable(entity).cuda() #torch.autograd.Variable(entity, volatile=True).cuda() #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
                     patterns_var = torch.autograd.Variable(patterns).cuda() # torch.autograd.Variable(patterns, volatile=True).cuda()  #NOTE: Compatibility with PyTorch==0.4.1 See: https://discuss.pytorch.org/t/training-fails-by-out-of-memory-error-on-pytorch-0-4-but-runs-fine-on-0-3-1/20510
@@ -611,7 +614,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     
             # compute output
             if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
-                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var, pos_array)
+                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var, pos_info_var)
                 if save_custom_embed_condition:
                     custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
             elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':

@@ -45,7 +45,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         self.embedding_size = word_embedding_size
         self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
         self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
-        self.pos_embeddings = nn.Embedding(max_context_len, word_embedding_size/6) #make it 50d embedding
+        self.pos_embeddings = nn.Embedding(max_context_len, int(word_embedding_size/6)) #make it 50d embedding
 
         if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
             LOG.info("Using a pre-initialized word-embedding vector .. loaded from disk")
@@ -61,7 +61,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 
         # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
         self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
-        self.lstm_patterns = nn.LSTM(word_embedding_size+1, lstm_hidden_size, num_layers=1, bidirectional=True) ##NOTE:+1 due to position embedding value ...
+        self.lstm_patterns = nn.LSTM(word_embedding_size+int(word_embedding_size/6), lstm_hidden_size, num_layers=1, bidirectional=True) ##NOTE:+int(word_embedding_size/6) .. due to position embedding values ...
 
         # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
         #  in this case `entity_lstm_out` and `pattern_lstm_out`
@@ -96,7 +96,7 @@ class SeqModelCustomEmbedWithPos(nn.Module):
         #LOG.info("Position Info len(): " + str(len(pos_info)))
         #LOG.info("pos_info[0] len() " + str(len(pos_info[0])))
         position_seq = self.pos_embeddings(pos_info)
-        #LOG.info("Position Seq : " + str(position_seq))
+        #LOG.info("Position Seq : " + str(position_seq.size()))
 
         # 3. NOTE create torch tensor and append to pattern_word_embed (note the permute step while appending) : Can be a single operation .... DONE
         #LOG.info("size before .. " + str(pattern_word_embed.size()))
