@@ -319,27 +319,27 @@ class RandomPatternWordNoise:
 
     def __call__(self, datum, entity_token):
 
-        dropout_datum = list()
-        to_replace = list(datum)
-        to_replace.remove(entity_token)
-        num_words_to_dropout = min(self.number_words, len(datum) - 1)
-        to_replace = random.sample(to_replace, num_words_to_dropout)
+        modified_datum = [w for w in datum]
+        indexes = list(range(len(datum)))
+        indexes.remove(datum.index(entity_token))
+        num_words_to_modify = min(self.number_words, len(datum) - 1)
+        modify_indexes = random.sample(indexes, num_words_to_modify)
+
         # NOTE: Handling gaussian noise separately
         if self.noise_type == 'gaussian':
-            dropout_datum = [1 if w in to_replace else 0 for w in datum]
+            modified_datum = [0] * len(datum)
+            for idx in modify_indexes:
+                modified_datum[idx] = 1
         else:
-            for w in datum:
-                if w in to_replace:
-                    if self.noise_type == 'drop':  # Dropout .. replace with NIL word
-                        dropout_datum.append(self.replace)
-                    elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
-                        replaced_synonym = self.replace_with_synonym(w, self.replace)
-                        dropout_datum.append(replaced_synonym)
-                    elif self.noise_type == 'add':
-                        pass  # todo: do soemthing here
-                    else:
-                        assert False, "Unknown noise type : " + self.noise_type
+            for indx in modify_indexes:
+                if self.noise_type == 'drop':  # Dropout .. replace with NIL word
+                    modified_datum[indx] = self.replace
+                elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
+                    replaced_synonym = self.replace_with_synonym(datum[indx], self.replace)
+                    modified_datum[indx] = replaced_synonym
+                elif self.noise_type == 'add':
+                    pass  # todo: do soemthing here
                 else:
-                    dropout_datum.append(w)
+                    assert False, "Unknown noise type : " + self.noise_type
 
-        return dropout_datum
+        return modified_datum
