@@ -31,16 +31,16 @@ from .utils import export, parameter_count
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
-def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False):
+def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, word_noise_type=None):
 
     lstm_hidden_size = 100
-    model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout)
+    model = SeqModelCustomEmbed(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes, word_vocab_embed, update_pretrained_wordemb, use_dropout, word_noise_type)
     return model
 
 
 # todo: Is padding the way done here ok ?
 class SeqModelCustomEmbed(nn.Module):
-    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb, use_dropout):
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size, word_vocab_embed, update_pretrained_wordemb, use_dropout, word_noise_type):
         super().__init__()
         self.embedding_size = word_embedding_size
         self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
@@ -78,9 +78,21 @@ class SeqModelCustomEmbed(nn.Module):
         self.dropout_layer = nn.Dropout(p=0.2)
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
-    def forward(self, entity, pattern):
+    def forward(self, entity, pattern, gaussian_indexes_list=[]):               #The gaussian_indexes_list has only those indexes that need to be purturbed
+        pattern_embeddings = self.pat_word_embeddings(pattern)
+
+        #purturb all embedding in gaussian_indexes_list
+        if self.word_noise_type == 'gaussian' and gaussian_indexes_list[0] is not None: # either everything is not None (train case) or everything is None (eval case)
+            gaussian_noise_tensor = torch.zeros(pattern_embeddings.size(), dtype=torch.float).cuda()
+            for batch_num, batch_idxs in enumerate(gaussian_indexes_list):
+                for idx in batch_idxs:
+                    gaussian_noise = torch.FloatTensor(np.random.normal(scale=0.05, size=pattern_embeddings.size()[2])).cuda()    #Hardcoding the std-dev value
+                    gaussian_noise_tensor[batch_num][idx] = gaussian_noise
+
+            pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
+
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
-        pattern_word_embed = self.pat_word_embeddings(pattern).permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
+        pattern_word_embed = pattern_embeddings.permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
 
         ###############################################
         # bi-LSTM computation here
@@ -173,7 +185,7 @@ class FeedForwardMLPEmbed(nn.Module):
         self.word_noise_type = word_noise_type
         self.dropout_layer = nn.Dropout(p=0.2)
 
-    def forward(self, entity, pattern, gaussian_indexes_list=[]):               #The gaussian_indexes_list is same length as the pattern
+    def forward(self, entity, pattern, gaussian_indexes_list=[]):               #The gaussian_indexes_list has only those indexes that need to be purturbed
         pattern_embeddings = self.pat_embeddings(pattern)
 
         #purturb all embedding in gaussian_indexes_list

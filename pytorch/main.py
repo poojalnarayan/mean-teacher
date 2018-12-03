@@ -440,8 +440,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'custom_embed':
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
-            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
-            model_out, _, _ = model(entity_var, patterns_var)
+            ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var, gaussian_list_teacher)
+            model_out, _, _ = model(entity_var, patterns_var, gaussian_list_student)
         elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
             ema_model_out = ema_model(ema_entity_var, ema_patterns_var, gaussian_list_teacher)
             model_out = model(entity_var, patterns_var, gaussian_list_student)
@@ -609,7 +609,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and args.arch == 'custom_embed':
                 output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
                 if save_custom_embed_condition:
-                    custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
+                    custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed, gaussian_list))  # , minibatch_size))
             elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
                 # NOTE: This gaussian_list will be a batch of 'None's .. as no transformation in eval
                 output1 = model(entity_var, patterns_var, gaussian_list)
