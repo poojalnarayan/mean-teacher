@@ -7,6 +7,8 @@ from .utils import export
 
 from .processNLPdata.processNECdata import *
 import collections
+import logging
+LOG = logging.getLogger('datasets')
 
 @export
 def imagenet():
@@ -262,10 +264,9 @@ class NECDatasetCTX(Dataset):
 
             # In gaussian case context_words_dropout_str has indexes that need to be purturbed and not the actual strings
             elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
-                context_words_gaussian = list()
-                context_words_gaussian.append([self.word_vocab[w]
-                                              for w in self.contexts[idx].split(" ")])
-                context_datum = self.pad_item(context_words_gaussian)
+                context_words_gaussian = [self.word_vocab[w]
+                                              for w in self.contexts[idx].split(" ")]
+                context_datum = torch.LongTensor(self.pad_item(context_words_gaussian))
                 label = self.lbl[idx]
                 return (entity_datum, context_datum), (entity_datum, context_datum), label, context_words_dropout_str
 
@@ -274,7 +275,7 @@ class NECDatasetCTX(Dataset):
                                            for w in context_words_dropout_str[0]])
             context_words_dropout.append([self.word_vocab[w]
                                            for w in context_words_dropout_str[1]])
-
+            
             if len(context_words_dropout) == 2:  # transform twice (1. student 2. teacher): DONE
                 context_words_padded_0 = self.pad_item(context_words_dropout[0])
                 context_words_padded_1 = self.pad_item(context_words_dropout[1])

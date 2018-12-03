@@ -342,7 +342,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
 
     end = time.time()
     for i, datapoint in enumerate(train_loader):
-
+        
         # measure data loading time
         meters.update('data_time', time.time() - end)
 
