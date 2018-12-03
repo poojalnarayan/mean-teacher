@@ -11,7 +11,7 @@ import torch
 import random
 from nltk.corpus import wordnet as wn
 
-LOG = logging.getLogger('main')
+LOG = logging.getLogger('data')
 NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
 
 ##################################################

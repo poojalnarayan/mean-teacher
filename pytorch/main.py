@@ -226,7 +226,7 @@ def my_collate(batch):
 
         gaussian_list_student = [item[3] for item in batch]  # just form a list of tensor
         gaussian_list_teacher = [item[4] for item in batch]
-
+        
         # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         # LOG.info(data)
         # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")

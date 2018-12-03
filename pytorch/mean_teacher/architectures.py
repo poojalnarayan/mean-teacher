@@ -7,6 +7,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Variable, Function
 import logging
+import numpy as np
 LOG= logging.getLogger('arch')
 from .utils import export, parameter_count
 ###############
@@ -178,10 +179,9 @@ class FeedForwardMLPEmbed(nn.Module):
         #When gaussian_indexes_list is 1 then purturb that embedding only
         if self.word_noise_type == 'gaussian' and gaussian_indexes_list[0] is not None: # either everything is not None (train case) or everything is None (eval case)
             for index in range(len(gaussian_indexes_list)):
-                if gaussian_indexes_list[index] == 1:
-                    gaussian_noise = np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)    #Hardcoding the std-dev value
+                if gaussian_indexes_list[index]:
+                    gaussian_noise = torch.FloatTensor(np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)).cuda()    #Hardcoding the std-dev value
                     pattern_embeddings[index] = pattern_embeddings[index] + gaussian_noise
-
 
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)  # Note: Average the word-embeddings
         pattern_embed = torch.mean(pattern_embeddings, 1)  # Note: Average the pattern-embeddings
