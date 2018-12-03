@@ -176,7 +176,7 @@ class FeedForwardMLPEmbed(nn.Module):
         pattern_embeddings = self.pat_embeddings(pattern)
 
         #When gaussian_indexes_list is 1 then purturb that embedding only
-        if self.word_noise_type == 'gaussian':
+        if self.word_noise_type == 'gaussian' and gaussian_indexes_list[0] is not None: # either everything is not None (train case) or everything is None (eval case)
             for index in range(len(gaussian_indexes_list)):
                 if gaussian_indexes_list[index] == 1:
                     gaussian_noise = np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)    #Hardcoding the std-dev value

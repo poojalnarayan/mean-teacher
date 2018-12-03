@@ -268,7 +268,7 @@ class NECDatasetCTX(Dataset):
                                               for w in self.contexts[idx].split(" ")]
                 context_datum = torch.LongTensor(self.pad_item(context_words_gaussian))
                 label = self.lbl[idx]
-                return (entity_datum, context_datum), (entity_datum, context_datum), label, context_words_dropout_str
+                return (entity_datum, context_datum), (entity_datum, context_datum), label, context_words_dropout_str[0], context_words_dropout_str[1]
 
             context_words_dropout = list()
             context_words_dropout.append([self.word_vocab[w]
@@ -291,9 +291,9 @@ class NECDatasetCTX(Dataset):
         label = self.lbl[idx]  # Note: .. no need to create a tensor variable
 
         if self.transform is not None:
-            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label
+            return (entity_datum, context_datums[0]), (entity_datum, context_datums[1]), label, None, None
         else:
-            return (entity_datum, context_datums), label
+            return (entity_datum, context_datums), label, None
 
 ##### USING Torchtext ... now reverting to using custom code
 # def simple_tokenizer(datapoint):

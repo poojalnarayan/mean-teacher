@@ -205,6 +205,52 @@ def parse_dict_args(**kwargs):
     cmdline_args = list(sum(kwargs_pairs, ()))
     args = parser.parse_args(cmdline_args)
 
+
+def my_collate(batch):
+    if len(batch[0]) == 5:  # train
+        # LOG.info("((((((((((TRAIN)))))))))))))))))))))")
+        ent_student = [item[0][0] for item in batch]  # just form a list of tensor
+        pat_student = [item[0][1] for item in batch]  # just form a list of tensor
+        ent_student = torch.stack(ent_student)
+        pat_student = torch.stack(pat_student)
+        ent_pat_student = (ent_student, pat_student)
+
+        ent_teacher = [item[1][0] for item in batch]  # just form a list of tensor
+        pat_teacher = [item[1][1] for item in batch]  # just form a list of tensor
+        ent_teacher = torch.stack(ent_teacher)
+        pat_teacher = torch.stack(pat_teacher)
+        ent_pat_teacher = (ent_teacher, pat_teacher)
+
+        labels = [item[2] for item in batch]
+        labels = torch.LongTensor(labels)
+
+        gaussian_list_student = [item[3] for item in batch]  # just form a list of tensor
+        gaussian_list_teacher = [item[4] for item in batch]
+
+        # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        # LOG.info(data)
+        # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        return [ent_pat_student, ent_pat_teacher, labels, gaussian_list_student, gaussian_list_teacher]
+
+    else:  # test
+        # LOG.info("((((((((((VALIDATE)))))))))))))))))))))")
+        ent = [item[0][0] for item in batch]  # just form a list of tensor
+        pat = [item[0][1] for item in batch]  # just form a list of tensor
+        ent = torch.stack(ent)
+        pat = torch.stack(pat)
+        ent_pat = (ent, pat)
+
+        labels = [item[1] for item in batch]
+        labels = torch.LongTensor(labels)
+
+        gaussian_list = [item[2] for item in batch]  # just form a list of tensor
+
+
+        # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        # LOG.info(data)
+        # LOG.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        return [ent_pat, labels, gaussian_list]
+
 def create_data_loaders(train_transformation,
                         eval_transformation,
                         datadir,
@@ -247,7 +293,8 @@ def create_data_loaders(train_transformation,
         train_loader = torch.utils.data.DataLoader(dataset,
                                                   batch_sampler=batch_sampler,
                                                   num_workers=args.workers,
-                                                  pin_memory=True)
+                                                  pin_memory=True,
+                                                  collate_fn=my_collate)
                                                   # drop_last=False)
                                                   # batch_size=args.batch_size,
                                                   # shuffle=False)
@@ -272,7 +319,8 @@ def create_data_loaders(train_transformation,
                                                   shuffle=False,
                                                   num_workers=2 * args.workers,
                                                   pin_memory=True,
-                                                  drop_last=False)
+                                                  drop_last=False,
+                                                  collate_fn=my_collate)
 
     else:
 
@@ -354,6 +402,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             input = datapoint[0]
             ema_input = datapoint[1]
             target = datapoint[2]
+            gaussian_list_student = datapoint[3]
+            gaussian_list_teacher = datapoint[4]
 
             ## Input consists of tuple (entity_id, pattern_ids)
             input_entity = input[0]
@@ -393,12 +443,9 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var)
             model_out, _, _ = model(entity_var, patterns_var)
         elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
-            if args.word_noise.split(":")[0] == 'gaussian':
-                ema_model_out = ema_model(ema_entity_var, ema_patterns_var, datapoint[3][1])
-                model_out = model(entity_var, patterns_var, datapoint[3][0])
-            else:
-                ema_model_out = ema_model(ema_entity_var, ema_patterns_var)
-                model_out = model(entity_var, patterns_var)
+            ema_model_out = ema_model(ema_entity_var, ema_patterns_var, gaussian_list_teacher)
+            model_out = model(entity_var, patterns_var, gaussian_list_student)
+
         else:
             ema_model_out = ema_model(ema_input_var)
             model_out = model(input_var)
@@ -526,6 +573,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 entity = datapoint[0][0]
                 patterns = datapoint[0][1]
                 target = datapoint[1]
+                gaussian_list = datapoint[2]
                 
                 #LOG.info("entity = " + str(entity) + " patterns = "+ str(patterns)+ " target = "+ str(target))
                 #LOG.handlers[0].flush()
@@ -563,7 +611,8 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
                 if save_custom_embed_condition:
                     custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
             elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and args.arch == 'simple_MLP_embed':
-                output1 = model(entity_var, patterns_var)
+                # NOTE: This gaussian_list will be a batch of 'None's .. as no transformation in eval
+                output1 = model(entity_var, patterns_var, gaussian_list)
             else:
                 output1 = model(input_var) ##, output2 = model(input_var)
             #softmax1, softmax2 = F.softmax(output1, dim=1), F.softmax(output2, dim=1)
