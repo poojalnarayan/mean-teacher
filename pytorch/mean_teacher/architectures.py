@@ -176,12 +176,11 @@ class FeedForwardMLPEmbed(nn.Module):
     def forward(self, entity, pattern, gaussian_indexes_list=[]):               #The gaussian_indexes_list is same length as the pattern
         pattern_embeddings = self.pat_embeddings(pattern)
 
-        #When gaussian_indexes_list is 1 then purturb that embedding only
+        #purturb all embedding in gaussian_indexes_list
         if self.word_noise_type == 'gaussian' and gaussian_indexes_list[0] is not None: # either everything is not None (train case) or everything is None (eval case)
-            for index in range(len(gaussian_indexes_list)):
-                if gaussian_indexes_list[index]:
-                    gaussian_noise = torch.FloatTensor(np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)).cuda()    #Hardcoding the std-dev value
-                    pattern_embeddings[index] = pattern_embeddings[index] + gaussian_noise
+            for index in gaussian_indexes_list:
+                gaussian_noise = torch.FloatTensor(np.random.normal(scale=0.05, size=pattern_embeddings[index].shape)).cuda()    #Hardcoding the std-dev value
+                pattern_embeddings[index] = pattern_embeddings[index] + gaussian_noise
 
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)  # Note: Average the word-embeddings
         pattern_embed = torch.mean(pattern_embeddings, 1)  # Note: Average the pattern-embeddings

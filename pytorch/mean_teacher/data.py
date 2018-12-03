@@ -327,9 +327,7 @@ class RandomPatternWordNoise:
 
         # NOTE: Handling gaussian noise separately
         if self.noise_type == 'gaussian':
-            modified_datum = [0] * len(datum)
-            for idx in modify_indexes:
-                modified_datum[idx] = 1
+            modified_datum = modify_indexes
         else:
             for indx in modify_indexes:
                 if self.noise_type == 'drop':  # Dropout .. replace with NIL word
