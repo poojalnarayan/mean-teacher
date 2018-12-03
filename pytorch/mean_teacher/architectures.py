@@ -75,6 +75,7 @@ class SeqModelCustomEmbed(nn.Module):
         self.layer2 = nn.Linear(hidden_size, output_size, bias=True) # second linear layer from hidden layer to the output logits
 
         self.use_dropout = use_dropout
+        self.word_noise_type = word_noise_type
         self.dropout_layer = nn.Dropout(p=0.2)
 
     # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
