@@ -135,6 +135,29 @@ def ontonotes_ctx(args):
         'num_classes': 11
     }
 
+@export
+def conll_ctx(args):
+
+    type_of_noise, size_of_noise = args.word_noise.split(":")
+    NECDatasetCTX.WORD_NOISE_TYPE = type_of_noise
+    NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
+
+    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+        addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
+    elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
+        addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, None, NECDatasetCTX.WORD_NOISE_TYPE)
+    elif NECDatasetCTX.WORD_NOISE_TYPE == 'no-noise':
+        addNoise = None
+    else:
+        assert False, "Unknown type of noise {}".format(NECDatasetCTX.WORD_NOISE_TYPE)
+
+    return {
+        'train_transformation': data.TransformTwiceNEC(addNoise),
+        'eval_transformation': None,
+        'datadir': 'data-local/nec/conll_ctx/',
+        'num_classes': 4
+    }
+
 
 class NECDatasetCTX(Dataset):
 
