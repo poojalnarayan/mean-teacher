@@ -607,9 +607,9 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
     
             # compute output
             if args.dataset in ['conll', 'ontonotes','ontonotes_ctx', 'conll_ctx'] and args.arch == 'custom_embed':
-                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var)
+                output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var, gaussian_list)
                 if save_custom_embed_condition:
-                    custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed, gaussian_list))  # , minibatch_size))
+                    custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
             elif args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx', 'conll_ctx'] and args.arch == 'simple_MLP_embed':
                 # NOTE: This gaussian_list will be a batch of 'None's .. as no transformation in eval
                 output1 = model(entity_var, patterns_var, gaussian_list)
