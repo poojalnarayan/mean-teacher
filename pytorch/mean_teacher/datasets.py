@@ -119,7 +119,7 @@ def ontonotes_ctx(args):
     NECDatasetCTX.WORD_NOISE_TYPE = type_of_noise
     NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
-    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add', 'replace_idf', 'drop_idf']:
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
     elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, None, NECDatasetCTX.WORD_NOISE_TYPE)
@@ -142,7 +142,7 @@ def conll_ctx(args):
     NECDatasetCTX.WORD_NOISE_TYPE = type_of_noise
     NECDatasetCTX.NUM_WORDS_TO_CHANGE = int(size_of_noise)
 
-    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add']:
+    if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add', 'replace_idf', 'drop_idf']:
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
     elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, None, NECDatasetCTX.WORD_NOISE_TYPE)
@@ -264,7 +264,7 @@ class NECDatasetCTX(Dataset):
             # 1. Replace word with synonym word in Wordnet / NIL (whichever is enabled)
             context_words_dropout_str = self.transform(self.contexts[idx].split(" "), NECDatasetCTX.ENTITY)
 
-            if NECDatasetCTX.WORD_NOISE_TYPE == 'replace':
+            if NECDatasetCTX.WORD_NOISE_TYPE == 'replace' or NECDatasetCTX.WORD_NOISE_TYPE == 'replace_idf':
                 assert len(context_words_dropout_str) == 2, "There is some issue with TransformTwice ... " #todo: what if we do not want to use the teacher ?
                 new_replaced_words = [w for w in context_words_dropout_str[0] + context_words_dropout_str[1]
                                         if w not in self.word_vocab]
