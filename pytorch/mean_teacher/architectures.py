@@ -142,6 +142,124 @@ class SeqModelCustomEmbedWithPos(nn.Module):
 ##### More advanced architecture where the entity and pattern embeddings are computed by a Sequence model (like a biLSTM) and then concatenated together
 ##############################################
 @export
+def custom_embed_attn(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4,
+                 word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, max_context_len=-1):
+    lstm_hidden_size = 100
+    model = SeqModelCustomEmbedAttn(word_vocab_size, wordemb_size, lstm_hidden_size, hidden_size, num_classes,
+                                word_vocab_embed, update_pretrained_wordemb, use_dropout)
+    return model
+
+
+# todo: Is padding the way done here ok ?
+class SeqModelCustomEmbedAttn(nn.Module):
+    def __init__(self, word_vocab_size, word_embedding_size, lstm_hidden_size, hidden_size, output_size,
+                 word_vocab_embed, update_pretrained_wordemb, use_dropout):
+        super().__init__()
+        self.embedding_size = word_embedding_size
+        self.entity_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+        self.pat_word_embeddings = nn.Embedding(word_vocab_size, word_embedding_size)
+
+        if word_vocab_embed is not None:  # Pre-initalize the embedding layer from a vector loaded from word2vec/glove/or such
+            LOG.info("Using a pre-initialized word-embedding vector .. loaded from disk")
+            self.entity_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+            self.pat_word_embeddings.weight = nn.Parameter(torch.from_numpy(word_vocab_embed))
+
+            if update_pretrained_wordemb is False:  # NOTE: do not update the embeddings
+                LOG.info("NOT UPDATING the word embeddings ....")
+                self.entity_word_embeddings.weight.detach_()
+                self.pat_word_embeddings.weight.detach_()
+            else:
+                LOG.info("UPDATING the word embeddings ....")
+
+        # todo: keeping the hidden sizes of the LSTMs of entities and patterns to be same. To change later ?
+        self.lstm_entities = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True)
+        self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True, batch_first=True)
+
+        ### ATTENTION LAYER ON THE 'lstm_patterns' ### (from github/open_type/model_utils/SelfAttentiveSum)
+        self.key_maker = nn.Linear(lstm_hidden_size*2, hidden_size, bias=False) ## TODO: check these params
+        self.key_relu = nn.ReLU()
+        self.key_output = nn.Linear(hidden_size, 1, bias=False)
+        self.key_softmax = nn.Softmax(dim=1)
+        ################################################
+
+        # UPDATE: NOT NECASSARY .. we can directly return from forward method the values that we want,
+        #  in this case `entity_lstm_out` and `pattern_lstm_out`
+        # Note: saving these representations, so that when they are computed during forward, we can use these variables
+        # to dump the custom entity and pattern embeddings
+        # self.entity_lstm_out = None
+        # self.pattern_lstm_out = None
+
+        # Note: Size of linear layer = [(lstm_hidden_size * 2) bi-LSTM ] * 2 --> concat of entity and context lstm out
+        self.layer1 = nn.Linear(lstm_hidden_size * 2 * 2, hidden_size,
+                                bias=True)  # concatenate entity and pattern embeddings and followed by a linear layer;
+        self.activation = nn.ReLU()  # non-linear activation
+        self.layer2 = nn.Linear(hidden_size, output_size,
+                                bias=True)  # second linear layer from hidden layer to the output logits
+
+        self.use_dropout = use_dropout
+        self.dropout_layer = nn.Dropout(p=0.2)
+
+    # todo: Is padding the way done here ok ? should I explicitly tell what the pad value is ?
+    def forward(self, entity, pattern, pos_info):
+        entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
+        pattern_word_embed = self.pat_word_embeddings(pattern) # Note: using `batch_first=True`, so no permute step
+
+        ###############################################
+        # bi-LSTM computation here
+
+        # https://discuss.pytorch.org/t/rnn-module-weights-are-not-part-of-single-contiguous-chunk-of-memory/6011/13
+        self.lstm_entities.flatten_parameters()
+        self.lstm_patterns.flatten_parameters()
+
+        _, (entity_lstm_out, _) = self.lstm_entities(entity_word_embed)  # bi-LSTM over entities, hidden state is initialized to 0 if not provided
+        entity_lstm_out = torch.cat([entity_lstm_out[0], entity_lstm_out[1]], 1)  # roll out the 2 tuple output each of the LSTMs
+
+        pattern_lstm_out, _ = self.lstm_patterns(pattern_word_embed)  # bi-LSTM over pattern, hidden state is initialized to 0 if not provided
+
+        ### ATTENTION LAYER ON THE 'lstm_patterns' ### (from github/open_type/model_utils/SelfAttentiveSum)
+        pattern_lstm_out = pattern_lstm_out.contiguous()
+        pattern_lstm_out_squeezed = pattern_lstm_out.view(-1, pattern_lstm_out.size()[2])
+        k_d = self.key_maker(pattern_lstm_out_squeezed)
+        k_d = self.key_relu(k_d)
+        k = self.key_output(k_d).view(pattern_lstm_out.size()[0], -1)  # (batch_size, seq_length)
+        weighted_keys = self.key_softmax(k).view(pattern_lstm_out.size()[0], -1, 1) #-- NOTE: attention weights
+        pattern_lstm_weighted_values = torch.sum(weighted_keys * pattern_lstm_out, 1)  # batch_size, lstm_hidden_size*2  #--new pattern embedding -- that has attended
+        ################################################
+
+
+        # concatenate the entity_lstm and avgeraged pattern_lstm representations
+        entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_weighted_values], dim=1)
+
+        ###############################################
+        # LOG.info("###############################################")
+        # LOG.info("entity_word_embed = " + str(entity_word_embed.size()))
+        # LOG.info("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        # LOG.info("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
+        # LOG.info("entity_lstm_out = " + str(entity_lstm_out.size()))
+        # LOG.info("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        # LOG.info("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
+        # LOG.info("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        # LOG.info("###############################################")
+
+        ###############################################
+
+        if self.use_dropout:  # dropout after the lstm layer
+            entity_and_pattern_lstm_out = self.dropout_layer(entity_and_pattern_lstm_out)
+
+        res = self.layer1(entity_and_pattern_lstm_out)
+
+        if self.use_dropout:  # dropout in the hidden layer
+            res = self.dropout_layer(res)
+
+        res = self.activation(res)
+        res = self.layer2(res)
+
+        # NOTE: no dropout in the output layer
+
+        return res, entity_lstm_out, pattern_lstm_out
+
+
+@export
 def custom_embed(pretrained=True, word_vocab_size=7970, wordemb_size=300, hidden_size=300, num_classes=4, word_vocab_embed=None, update_pretrained_wordemb=False, use_dropout=False, max_context_len=-1):
 
     lstm_hidden_size = 100

@@ -437,7 +437,7 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # num_labeled = minibatch_size - num_unlabeled
         # LOG.info("[Batch " + str(i) + "] NumLabeled="+str(num_labeled)+ "; NumUnlabeled="+str(num_unlabeled))
 
-        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
+        if args.dataset in ['conll', 'ontonotes', 'ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos' or args.arch == 'custom_embed_attn'):
             # print("entity_var = " + str(entity_var.size()))
             # print("patterns_var = " + str(patterns_var.size()))
             ema_model_out, _, _ = ema_model(ema_entity_var, ema_patterns_var, pos_info_var)
@@ -613,7 +613,7 @@ def validate(eval_loader, model, log, global_step, epoch, dataset, result_dir, m
             meters.update('labeled_minibatch_size', labeled_minibatch_size)
     
             # compute output
-            if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos'):
+            if args.dataset in ['conll', 'ontonotes','ontonotes_ctx'] and (args.arch == 'custom_embed' or args.arch == 'custom_embed_w_pos' or args.arch == 'custom_embed_attn'):
                 output1, entity_custom_embed, pattern_custom_embed = model(entity_var, patterns_var, pos_info_var)
                 if save_custom_embed_condition:
                     custom_embeddings_minibatch.append((entity_custom_embed, pattern_custom_embed))  # , minibatch_size))
