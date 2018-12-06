@@ -218,18 +218,26 @@ class SeqModelCustomEmbedAttn(nn.Module):
 
         ### ATTENTION LAYER ON THE 'lstm_patterns' ### (from github/open_type/model_utils/SelfAttentiveSum)
         pattern_lstm_out = pattern_lstm_out.contiguous()
+        #LOG.info("pattern_lstm_out = " + str(pattern_lstm_out.size()))
         pattern_lstm_out_squeezed = pattern_lstm_out.view(-1, pattern_lstm_out.size()[2])
+        #LOG.info("pattern_lstm_out_squeezed = " + str(pattern_lstm_out_squeezed.size()))
         k_d = self.key_maker(pattern_lstm_out_squeezed)
+        #LOG.info("k_d = " + str(k_d.size()))
         k_d = self.key_relu(k_d)
         k = self.key_output(k_d).view(pattern_lstm_out.size()[0], -1)  # (batch_size, seq_length)
+        #LOG.info("k = " + str(k.size()))
         weighted_keys = self.key_softmax(k).view(pattern_lstm_out.size()[0], -1, 1) #-- NOTE: attention weights
+        #LOG.info("weighted_keys = " + str(weighted_keys.size()))
         pattern_lstm_weighted_values = torch.sum(weighted_keys * pattern_lstm_out, 1)  # batch_size, lstm_hidden_size*2  #--new pattern embedding -- that has attended
+        #LOG.info("pattern_lstm_weighted_values = " + str(pattern_lstm_weighted_values.size()))
         ################################################
 
 
         # concatenate the entity_lstm and avgeraged pattern_lstm representations
         entity_and_pattern_lstm_out = torch.cat([entity_lstm_out, pattern_lstm_weighted_values], dim=1)
 
+        #LOG.info("entity_lstm_out = " + str(entity_lstm_out.size()))
+        #LOG.info("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
         ###############################################
         # LOG.info("###############################################")
         # LOG.info("entity_word_embed = " + str(entity_word_embed.size()))
