@@ -2,6 +2,21 @@
 
 import numpy as np
 from collections import defaultdict
+import math
+
+
+def create_idf_dict(idf_filename, dataset_words):
+    with open(idf_filename) as fh:
+        word_freq = []
+        for line in fh:
+            word_freq.append(line.rstrip('\n').split('\t'))
+
+    word_freq_dict = dict([(w, int(f)) for w, f in word_freq])
+
+    # Computing idf --> log(10^8 / doc_freq)
+    idf_dict = dict([(w, math.log(float(10 ** 8) / word_freq_dict[w.lower()])) for w in dataset_words if w.lower() in word_freq_dict])
+    return idf_dict
+
 
 class Datautils:
 
@@ -40,6 +55,7 @@ class Datautils:
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
         return entities, contexts, labels
 
+    idf_dict = None
     @classmethod
     def read_nec_ctx_data(cls, filename):
         labels = []
@@ -86,6 +102,8 @@ class Datautils:
             label_dict = dict([(t[1], t[0]) for t in list(enumerate(lbl_list))])
             entity_pattern_dict = dict([(t[1], t[0]) for t in list(enumerate(word_list))])
         # return np.array(entities), np.array([np.array(c) for c in contexts]), np.array(labels)
+        idf_count_file = "/data/nlp/corpora/gigaword/docfreq/gigawordDocFreq.sorted.freq.txt"
+        cls.idf_dict = create_idf_dict(idf_count_file, list(entity_pattern_dict.keys()))
         return labels, entities, contexts, label_dict, entity_pattern_dict, max_entity_len, max_context_len
 
     ## Takes as input an array of entity mentions(ids) along with their contexts(ids) and converts them to individual pairs of entity and context

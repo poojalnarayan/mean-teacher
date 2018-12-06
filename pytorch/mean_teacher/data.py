@@ -10,6 +10,7 @@ from torch.utils.data.sampler import Sampler
 import torch
 import random
 from nltk.corpus import wordnet as wn
+from .processNLPdata.processNECdata import *
 
 LOG = logging.getLogger('data')
 NO_LABEL = -1 # 55 #### TODO: AJAY NOTE: To remove this .. only created to exclude NA  #
@@ -328,6 +329,17 @@ class RandomPatternWordNoise:
         # NOTE: Handling gaussian noise separately
         if self.noise_type == 'gaussian':
             modified_datum = modify_indexes
+        elif self.noise_type == 'replace_idf' or self.noise_type == 'drop_idf':
+            datum_idf = [Datautils.idf_dict[w] if w in Datautils.idf_dict else 0 for w in datum]
+            datum_idf_total = np.sum(datum_idf)
+            datum_idf_prob = [idf / datum_idf_total for idf in datum_idf]
+            modify_idxs = np.random.choice(len(datum), size=num_words_to_modify, replace=False, p=datum_idf_prob) # @entity will not be picked as its prob will be 0
+            for indx in modify_idxs:
+                if self.noise_type == 'replace_idf':
+                    replaced_synonym = self.replace_with_synonym(datum[indx], self.replace)
+                    modified_datum[indx] = replaced_synonym
+                elif self.noise_type == 'drop_idf':
+                    modified_datum[indx] = self.replace
         else:
             for indx in modify_indexes:
                 if self.noise_type == 'drop':  # Dropout .. replace with NIL word
