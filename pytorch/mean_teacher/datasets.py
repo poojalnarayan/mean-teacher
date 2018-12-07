@@ -175,7 +175,23 @@ class NECDatasetCTX(Dataset):
         w2vfile = dir + "/../../vectors.goldbergdeps.txt"
 
         self.args = args
-        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_nec_ctx_data(dataset_file)
+
+        ### Filtering both onto and conll dataset --> SEE `https://docs.google.com/spreadsheets/d/1xglKut0P2D5nnlhdOR4JJSZZY_P07VvzyYtcRizZ4HU/edit#gid=2073812806` to check how these numbers were obtained ..
+
+        if args.dataset == 'ontonotes_ctx':
+            ############# ONTONOTES ################
+            MAX_ENTITY_LEN = 5
+            MIN_CONTEXT_LEN = 5
+            MAX_CONTEXT_LEN = 59
+            ################################################
+        else:  # args.dataset == 'conll_ctx':
+            ############# CONLL ################
+            MAX_ENTITY_LEN = 4
+            MIN_CONTEXT_LEN = 3
+            MAX_CONTEXT_LEN = 40
+            ################################################
+
+        self.labels, self.entities, self.contexts, label_dictionary, self.word_vocab, self.max_entity_len, self.max_context_len = Datautils.read_nec_ctx_data(dataset_file, MAX_ENTITY_LEN, MIN_CONTEXT_LEN, MAX_CONTEXT_LEN)
 
         if "train" in dataset_file: #If "eval" then use the same dict as the train. Because test label set will be smaller
             NECDatasetCTX.label_dict = label_dictionary

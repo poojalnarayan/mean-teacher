@@ -58,19 +58,7 @@ class Datautils:
     idf_dict = None
 
     @classmethod
-    def read_nec_ctx_data(cls, filename):
-
-        ############# ONTONOTES ################
-        MAX_ENTITY_LEN = 5
-        MIN_CONTEXT_LEN = 5
-        MAX_CONTEXT_LEN = 59
-        ################################################
-
-        ############# CONLL ################
-        # MAX_ENTITY_LEN  =
-        # MIN_CONTEXT_LEN =
-        # MAX_CONTEXT_LEN =
-        ################################################
+    def read_nec_ctx_data(cls, filename, MAX_ENTITY_LEN, MIN_CONTEXT_LEN, MAX_CONTEXT_LEN):
 
         labels = []
         entities = []
