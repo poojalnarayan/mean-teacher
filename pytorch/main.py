@@ -510,6 +510,8 @@ def train(train_loader, model, ema_model, optimizer, epoch, log):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191, https://github.com/pytorch/examples/blob/master/word_language_model/main.py#L84-L91
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.25) ## NOTE: This can be tuned .. taking this value from 2nd link
         optimizer.step()
         global_step += 1
         update_ema_variables(model, ema_model, args.ema_decay, global_step)
