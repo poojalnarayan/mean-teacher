@@ -56,8 +56,22 @@ class Datautils:
         return entities, contexts, labels
 
     idf_dict = None
+
     @classmethod
     def read_nec_ctx_data(cls, filename):
+
+        ############# ONTONOTES ################
+        MAX_ENTITY_LEN = 5
+        MIN_CONTEXT_LEN = 5
+        MAX_CONTEXT_LEN = 59
+        ################################################
+
+        ############# CONLL ################
+        # MAX_ENTITY_LEN  =
+        # MIN_CONTEXT_LEN =
+        # MAX_CONTEXT_LEN =
+        ################################################
+
         labels = []
         entities = []
         contexts = []
@@ -76,6 +90,14 @@ class Datautils:
                 vals = line.strip().split('\t')
 
                 cur_ent = vals[1].split(' ')
+                cur_context = vals[2].split(' ')
+
+                if len(cur_context) < MIN_CONTEXT_LEN or len(cur_context) > MAX_CONTEXT_LEN:
+                    continue
+
+                if len(cur_ent) > MAX_ENTITY_LEN:
+                    continue
+
                 word_set.update(set(cur_ent))
                 entities.append(vals[1])
                 if max_entity_len < len(cur_ent):
@@ -85,7 +107,6 @@ class Datautils:
                 lbl_set.add(vals[0])
                 labels.append(vals[0])
 
-                cur_context = vals[2].split(' ')
                 word_set.update(set(cur_context))
                 contexts.append(vals[2])
                 if max_context_len < len(cur_context):
