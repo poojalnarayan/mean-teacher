@@ -62,9 +62,9 @@ class SeqModelCustomEmbedAttn(nn.Module):
         self.lstm_patterns = nn.LSTM(word_embedding_size, lstm_hidden_size, num_layers=1, bidirectional=True, batch_first=True)
 
         ### ATTENTION LAYER ON THE 'lstm_patterns' ### (from github/open_type/model_utils/SelfAttentiveSum)
-        self.key_maker = nn.Linear(lstm_hidden_size*2, hidden_size, bias=False) ## TODO: check these params
+        self.key_maker = nn.Linear(lstm_hidden_size*2, 100, bias=False) ## TODO: hardcoding the hidden dim of attention (from ultra fine ET paper .. can be tuned ... ) 
         self.key_relu = nn.ReLU()
-        self.key_output = nn.Linear(hidden_size, 1, bias=False)
+        self.key_output = nn.Linear(100, 1, bias=False)
         self.key_softmax = nn.Softmax(dim=1)
         ################################################
 
@@ -253,13 +253,13 @@ class SeqModelCustomEmbed(nn.Module):
 
         ###############################################
         # print("###############################################")
-        # print("entity_word_embed = " + str(entity_word_embed.size()))
-        # print("pattern_word_embed_list = " + str(len(pattern_word_embed_list)))
+        #LOG.info("entity_word_embed = " + str(entity_word_embed.size()))
+        #LOG.info("pattern_word_embed = " + str(pattern_word_embed.size()))
         # print("pattern_word_embed_list[i] = " + str(pattern_word_embed_list[0].size()))
-        # print("entity_lstm_out = " + str(entity_lstm_out.size()))
-        # print("pattern_lstm_out = " + str(pattern_lstm_out.size()))
+        #LOG.info("entity_lstm_out = " + str(entity_lstm_out.size()))
+        #LOG.info("pattern_lstm_out = " + str(pattern_lstm_out.size()))
         # print("pattern_lstm_out_avg = " + str(pattern_lstm_out_avg.size()))
-        # print("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
+        #LOG.info("entity_and_pattern_lstm_out = " + str(entity_and_pattern_lstm_out.size()))
         # print("###############################################")
 
         ###############################################
