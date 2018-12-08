@@ -92,10 +92,10 @@ class SeqModelCustomEmbedAttn(nn.Module):
 
         #purturb all embedding in gaussian_indexes_list
         if self.word_noise_type == 'gaussian' and gaussian_indexes_list[0] is not None: # either everything is not None (train case) or everything is None (eval case)
-            gaussian_noise_tensor = torch.zeros(pattern_embeddings.size(), dtype=torch.float).cuda()
+            gaussian_noise_tensor = torch.zeros(pattern_word_embed.size(), dtype=torch.float).cuda()
             for batch_num, batch_idxs in enumerate(gaussian_indexes_list):
                 for idx in batch_idxs:
-                    gaussian_noise = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size()[2])).cuda()    #Hardcoding the std-dev value
+                    gaussian_noise = torch.FloatTensor(np.random.normal(scale=4, size=pattern_word_embed.size()[2])).cuda()    #Hardcoding the std-dev value
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
