@@ -333,7 +333,11 @@ class RandomPatternWordNoise:
             datum_idf = [Datautils.idf_dict[w] if w in Datautils.idf_dict else 0 for w in datum]
             datum_idf_total = np.sum(datum_idf)
             datum_idf_prob = [idf / datum_idf_total for idf in datum_idf]
-            modify_idxs = np.random.choice(len(datum), size=num_words_to_modify, replace=False, p=datum_idf_prob) # @entity will not be picked as its prob will be 0
+            num_zeros = np.sum([1 for idf in datum_idf if idf == 0])
+            if len(datum_idf) - num_zeros < num_words_to_modify:
+                modify_idxs = modify_indexes # taking from random sample above
+            else:
+                modify_idxs = np.random.choice(len(datum), size=num_words_to_modify, replace=False, p=datum_idf_prob) # @entity will not be picked as its prob will be 0
             for indx in modify_idxs:
                 if self.noise_type == 'replace_idf':
                     replaced_synonym = self.replace_with_synonym(datum[indx], self.replace)
