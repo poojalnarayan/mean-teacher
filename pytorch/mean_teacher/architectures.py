@@ -343,7 +343,15 @@ class FeedForwardMLPEmbed(nn.Module):
         # print (entity_embed.size())
         # print (pattern_embed.size())
         concatenated = torch.cat([entity_embed, pattern_embed], 1)
+
+        if self.use_dropout:
+            concatenated = self.dropout_layer(concatenated)
+
         res = self.layer1(concatenated)
+
+        if self.use_dropout:# dropout in the hidden layer
+            res = self.dropout_layer(res)
+
         res = self.activation(res)
         res = self.layer2(res)
         # print (res)
@@ -351,8 +359,7 @@ class FeedForwardMLPEmbed(nn.Module):
         # res = self.softmax(res) ## IMPT NOTE: Removing the softmax from here as it is done in the loss function
         # print ("After softmax : " + str(res))
 
-        if self.use_dropout:
-            res = self.dropout_layer(res)
+        # NOTE: No dropout in output layer
 
         return res
 
