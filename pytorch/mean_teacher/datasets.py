@@ -308,6 +308,12 @@ class NECDatasetCTX(Dataset):
                 context_datum = torch.LongTensor(self.pad_item(context_words_gaussian))
                 label = self.lbl[idx]
                 return (entity_datum, context_datum), (entity_datum, context_datum), label, context_words_dropout_str[0], context_words_dropout_str[1]
+            elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian_all':
+                context_words_gaussian = [self.word_vocab[w]
+                                          for w in self.contexts[idx].split(" ")]
+                context_datum = torch.LongTensor(self.pad_item(context_words_gaussian))
+                label = self.lbl[idx]
+                return (entity_datum, context_datum), (entity_datum, context_datum), label, None, None
 
             context_words_dropout = list()
             context_words_dropout.append([self.word_vocab[w]
