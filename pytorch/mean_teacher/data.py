@@ -334,7 +334,7 @@ class RandomPatternWordNoise:
         elif self.noise_type == 'replace_idf' or self.noise_type == 'drop_idf' or self.noise_type == 'replace_idf_rev' or self.noise_type == 'drop_idf_rev':
             datum_idf = [Datautils.idf_dict[w] if w in Datautils.idf_dict else 0 for w in datum]
             if self.noise_type == 'replace_idf_rev' or self.noise_type == 'drop_idf_rev':
-                datum_idf = [(float(1) / d) for d in datum_idf] # NOTE: computing rev_idf .. e.g.: [20, 30, 40] --> [1/20, 1/30, 1/40]  -- smaller idf gets higher weights
+                datum_idf = [(float(1) / d) if d != 0 else 0 for d in datum_idf] # NOTE: computing rev_idf .. e.g.: [20, 30, 40] --> [1/20, 1/30, 1/40]  -- smaller idf gets higher weights
             datum_idf_total = np.sum(datum_idf)
             datum_idf_prob = [idf / datum_idf_total for idf in datum_idf]
             num_zeros = np.sum([1 for idf in datum_idf if idf == 0])
