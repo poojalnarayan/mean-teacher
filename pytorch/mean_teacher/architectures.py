@@ -100,7 +100,7 @@ class SeqModelCustomEmbedAttn(nn.Module):
 
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
         elif self.word_noise_type == 'gaussian_all':
-            gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
+            gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_word_embed.size())).cuda()
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
 
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
