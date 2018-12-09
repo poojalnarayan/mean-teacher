@@ -299,6 +299,27 @@ class RandomPatternWordNoise:
         self.noise_type = noise_type
 
     @staticmethod
+    def replace_with_antonym(word_str, replace):
+        wordnet_synsets = wn.synsets(word_str)
+
+        # Generate antonyms using wordnet .. adversarial noise!?
+        alternate_words = [ant.name() for ss in wordnet_synsets for lemmas in ss.lemmas() if lemmas.antonyms() for ant in lemmas.antonyms()]
+        # print("--------------------------------------")
+        # print("alternate words :-")
+        # print(alternate_words)
+        # print("--------------------------------------")
+        if len(alternate_words) > 0:
+            replacement_id = np.random.randint(len(alternate_words))
+            replacement = alternate_words[replacement_id]
+        else:  # If there are no other alternate words .. just drop the word (replace with OOV)
+            replacement = replace
+
+        # print("--------------------------------------")
+        # print("word: " + str(word_str) + "; word replacement: " + str(replacement))
+        # print("--------------------------------------")
+        return replacement
+
+    @staticmethod
     def replace_with_synonym(word_str, replace):
         wordnet_synsets = wn.synsets(word_str)
 
@@ -355,6 +376,9 @@ class RandomPatternWordNoise:
                 elif self.noise_type == 'replace':  # Replace .. find a synonym of the word using wordnet
                     replaced_synonym = self.replace_with_synonym(datum[indx], self.replace)
                     modified_datum[indx] = replaced_synonym
+                elif self.noise_type == 'replace_ant':  # Replace .. find an antonym of the word using wordnet -- adversarial noise!?
+                    replaced_antonym = self.replace_with_antonym(datum[indx], self.replace)
+                    modified_datum[indx] = replaced_antonym
                 elif self.noise_type == 'add':
                     pass  # todo: do soemthing here
                 else:
