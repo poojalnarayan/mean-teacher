@@ -329,6 +329,8 @@ class RandomPatternWordNoise:
         # NOTE: Handling gaussian noise separately
         if self.noise_type == 'gaussian':
             modified_datum = modify_indexes
+        elif self.noise_type == 'gaussian_all':
+            return None
         elif self.noise_type == 'replace_idf' or self.noise_type == 'drop_idf':
             datum_idf = [Datautils.idf_dict[w] if w in Datautils.idf_dict else 0 for w in datum]
             datum_idf_total = np.sum(datum_idf)

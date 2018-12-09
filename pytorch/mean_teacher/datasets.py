@@ -144,7 +144,7 @@ def conll_ctx(args):
 
     if NECDatasetCTX.WORD_NOISE_TYPE in ['drop', 'replace', 'add', 'replace_idf', 'drop_idf']:
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, NECDatasetCTX.OOV, NECDatasetCTX.WORD_NOISE_TYPE)
-    elif NECDatasetCTX.WORD_NOISE_TYPE == 'gaussian':
+    elif NECDatasetCTX.WORD_NOISE_TYPE in ['gaussian', 'gaussian_all']:
         addNoise = data.RandomPatternWordNoise(NECDatasetCTX.NUM_WORDS_TO_CHANGE, None, NECDatasetCTX.WORD_NOISE_TYPE)
     elif NECDatasetCTX.WORD_NOISE_TYPE == 'no-noise':
         addNoise = None

@@ -99,6 +99,9 @@ class SeqModelCustomEmbedAttn(nn.Module):
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
+        elif self.word_noise_type == 'gaussian_all':
+            gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
+            pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
 
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
 
@@ -230,6 +233,9 @@ class SeqModelCustomEmbed(nn.Module):
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
+        elif self.word_noise_type == 'gaussian_all':
+            gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
+            pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
 
         entity_word_embed = self.entity_word_embeddings(entity).permute(1, 0, 2)  # compute the embeddings of the words in the entity (Note the permute step)
         pattern_word_embed = pattern_embeddings.permute(1, 0, 2)  # Note: the permute step is to make it compatible to be input to LSTM (seq of words,  batch, dimensions of each word)
@@ -336,6 +342,9 @@ class FeedForwardMLPEmbed(nn.Module):
                     gaussian_noise = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size()[2])).cuda()    #Hardcoding the std-dev value
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
+            pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
+        elif self.word_noise_type == 'gaussian_all':
+            gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
 
         entity_embed = torch.mean(self.entity_embeddings(entity), 1)  # Note: Average the word-embeddings
