@@ -99,7 +99,7 @@ class SeqModelCustomEmbedAttn(nn.Module):
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
-        elif self.word_noise_type == 'gaussian_all':
+        elif self.word_noise_type == 'gaussian_all' and gaussian_indexes_list[0] is not None::
             gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_word_embed.size())).cuda()
             pattern_word_embed = pattern_word_embed + gaussian_noise_tensor
 
@@ -233,7 +233,7 @@ class SeqModelCustomEmbed(nn.Module):
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
-        elif self.word_noise_type == 'gaussian_all':
+        elif self.word_noise_type == 'gaussian_all' and gaussian_indexes_list[0] is not None::
             gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
 
@@ -343,7 +343,7 @@ class FeedForwardMLPEmbed(nn.Module):
                     gaussian_noise_tensor[batch_num][idx] = gaussian_noise
 
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
-        elif self.word_noise_type == 'gaussian_all':
+        elif self.word_noise_type == 'gaussian_all' and gaussian_indexes_list[0] is not None::
             gaussian_noise_tensor = torch.FloatTensor(np.random.normal(scale=4, size=pattern_embeddings.size())).cuda()
             pattern_embeddings = pattern_embeddings + gaussian_noise_tensor
 

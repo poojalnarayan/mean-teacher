@@ -313,7 +313,7 @@ class NECDatasetCTX(Dataset):
                                           for w in self.contexts[idx].split(" ")]
                 context_datum = torch.LongTensor(self.pad_item(context_words_gaussian))
                 label = self.lbl[idx]
-                return (entity_datum, context_datum), (entity_datum, context_datum), label, None, None
+                return (entity_datum, context_datum), (entity_datum, context_datum), label, [], []
 
             context_words_dropout = list()
             context_words_dropout.append([self.word_vocab[w]
