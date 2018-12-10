@@ -92,6 +92,7 @@ def main(context):
             model_params['update_pretrained_wordemb'] = args.update_pretrained_wordemb
             model_params['use_dropout'] = args.use_dropout
             model_params['word_noise_type'] = args.word_noise.split(":")[0]
+            model_params['gauss_std_dev'] = args.gauss_std_dev
 
         model = model_factory(**model_params)
         # if torch.cuda.is_available():
